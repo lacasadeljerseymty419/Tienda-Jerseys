@@ -924,7 +924,9 @@ function createProductCard(producto) {
 
     let tallasHtml = '';
     let totalStock = 0;
-    if (producto.tallas && Array.isArray(producto.tallas)) {
+    const hasSizes = Array.isArray(producto.tallas) && producto.tallas.length > 0;
+
+    if (hasSizes) {
         tallasHtml = '<div class="flex flex-wrap gap-1.5 sm:gap-2 mt-auto pt-3 sm:pt-5 z-10 relative">';
         producto.tallas.forEach(t => {
             const stockVal = t.stock !== undefined ? t.stock : t.inventario;
@@ -945,24 +947,56 @@ function createProductCard(producto) {
         tallasHtml += '</div>';
     }
 
-    const price = producto.precio ? `$${parseFloat(producto.precio).toFixed(2)}` : 'Consultar';
-    const isSoldOut = totalStock === 0;
+    const isProximamente = !hasSizes;
+    const isAgotado = hasSizes && totalStock === 0;
+
+    // Determinar qué mostrar en el lugar del precio / estado
+    let statusTextHtml = '';
+    if (producto.precio) {
+        statusTextHtml = `<p class="text-base sm:text-xl font-bold text-gray-100 mb-1 sm:mb-2 z-10 relative">$${parseFloat(producto.precio).toFixed(2)}</p>`;
+    } else if (isProximamente) {
+        statusTextHtml = `
+            <p class="text-sm sm:text-base font-bold text-amber-500 mb-1 sm:mb-2 z-10 relative flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                Próximamente
+            </p>
+        `;
+    } else if (isAgotado) {
+        statusTextHtml = `
+            <p class="text-sm sm:text-base font-bold text-red-500 mb-1 sm:mb-2 z-10 relative flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-red-500"></span>
+                Agotado
+            </p>
+        `;
+    }
+
+    // Imagen overlay banner
+    let imageOverlayHtml = '';
+    if (isProximamente) {
+        imageOverlayHtml = `
+            <div class="absolute inset-0 flex items-center justify-center bg-dark/40 backdrop-blur-[2px] z-20">
+                <span class="bg-amber-500 text-white px-3 sm:px-5 py-1.5 sm:py-2 rounded-lg font-bold tracking-widest uppercase text-[10px] sm:text-xs border border-amber-400 shadow-xl shadow-amber-500/20 transform -rotate-6">Próximamente</span>
+            </div>
+        `;
+    } else if (isAgotado) {
+        imageOverlayHtml = `
+            <div class="absolute inset-0 flex items-center justify-center bg-dark/30 backdrop-blur-[2px] z-20">
+                <span class="bg-red-500 text-white px-3 sm:px-5 py-1.5 sm:py-2 rounded-lg font-bold tracking-widest uppercase text-[10px] sm:text-xs border border-red-400 shadow-xl shadow-red-500/20 transform -rotate-6">Agotado</span>
+            </div>
+        `;
+    }
 
     article.innerHTML = `
         <div class="product-image-container relative w-full aspect-[4/5] rounded-xl overflow-hidden mb-4 bg-dark z-10 cursor-pointer">
-            <img src="${imgUrl}" alt="${producto.nombre || 'Jersey'}" class="w-full h-full object-cover object-center group-hover:scale-110 transition-transform duration-700 ease-out ${isSoldOut ? 'grayscale opacity-60' : ''}" loading="lazy">
+            <img src="${imgUrl}" alt="${producto.nombre || 'Jersey'}" class="w-full h-full object-cover object-center group-hover:scale-110 transition-transform duration-700 ease-out ${(isAgotado || isProximamente) ? 'grayscale opacity-60' : ''}" loading="lazy">
             <div class="absolute inset-0 bg-gradient-to-t from-dark-100/90 via-dark-100/20 to-transparent opacity-60 group-hover:opacity-40 transition-opacity duration-500"></div>
-            ${isSoldOut ? `
-            <div class="absolute inset-0 flex items-center justify-center bg-dark/30 backdrop-blur-[2px] z-20">
-                <span class="bg-red-500 text-white px-3 sm:px-5 py-1.5 sm:py-2 rounded-lg font-bold tracking-widest uppercase text-[10px] sm:text-sm border border-red-400 shadow-xl shadow-red-500/20 transform -rotate-6">Agotado</span>
-            </div>
-            ` : ''}
+            ${imageOverlayHtml}
         </div>
-        ${tagsHtml}
-        <h3 class="text-sm sm:text-lg font-semibold text-white leading-tight mb-1 sm:mb-2 group-hover:text-navy-400 transition-colors line-clamp-2 z-10 relative">
+        <h3 class="text-sm sm:text-lg font-semibold text-white leading-tight mb-2 group-hover:text-navy-400 transition-colors line-clamp-2 z-10 relative">
             ${producto.nombre || 'Jersey Deportivo'}
         </h3>
-        <p class="text-base sm:text-xl font-bold text-gray-100 mb-1 sm:mb-2 z-10 relative">${price}</p>
+        ${tagsHtml}
+        ${statusTextHtml}
         ${tallasHtml}
         
         <div class="absolute inset-0 bg-gradient-to-tr from-navy-400/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
