@@ -208,20 +208,55 @@ function closeModal() {
 }
 
 async function loadCatalogs() {
+    let configs = null;
+    
+    // 1. Intentar cargar y parsear del localStorage de manera segura
     try {
-        let configs = JSON.parse(localStorage.getItem('419_configs'));
-        
-        if (!configs) {
-            configs = await get_configs();
-            if (configs) localStorage.setItem('419_configs', JSON.stringify(configs));
+        const cached = localStorage.getItem('419_configs');
+        if (cached) {
+            configs = JSON.parse(cached);
         }
+    } catch (e) {
+        console.warn("No se pudo parsear 419_configs del localStorage, se obtendrá de la API:", e);
+    }
+    
+    // 2. Determinar si los datos en caché o de la API son válidos (soportando variantes singular/plural y diferentes niveles de anidación)
+    const getValidData = (obj) => {
+        if (!obj) return null;
+        const candidate = obj.configuraciones || obj.data || obj;
+        if (!candidate) return null;
         
-        if (configs && configs.status === 'success' && configs.configuraciones) {
-            const data = configs.configuraciones;
-            populateSelects(data);
+        const tipos = candidate.tipos || candidate.tipo;
+        const versiones = candidate.versiones || candidate.version;
+        const generos = candidate.generos || candidate.genero;
+        
+        if (Array.isArray(tipos) && Array.isArray(versiones) && Array.isArray(generos)) {
+            return { tipos, versiones, generos };
         }
-    } catch (error) {
-        console.error("Error cargando catálogos", error);
+        return null;
+    };
+    
+    let validData = getValidData(configs);
+    
+    if (!validData) {
+        console.log("Caché de configuraciones ausente, inválido o incompleto. Obteniendo de la API...");
+        try {
+            const apiResponse = await get_configs();
+            validData = getValidData(apiResponse);
+            if (validData) {
+                // Guardar la respuesta original de la API
+                localStorage.setItem('419_configs', JSON.stringify(apiResponse));
+            }
+        } catch (error) {
+            console.error("Error al consultar la API para configuraciones:", error);
+        }
+    }
+    
+    // 3. Poblar los selects si tenemos datos válidos
+    if (validData) {
+        populateSelects(validData);
+    } else {
+        console.error("No se pudieron cargar las configuraciones de los filtros desde la API ni del caché local.");
     }
 }
 function populateDropdown(selectEl, items, defaultText) {
@@ -238,20 +273,26 @@ function populateDropdown(selectEl, items, defaultText) {
 }
 
 function populateSelects(data) {
+    if (!data) return;
+    
+    const tipos = data.tipos || [];
+    const versiones = data.versiones || [];
+    const generos = data.generos || [];
+    
     // Selects del Home
-    populateDropdown(DOM.filters.tipo, data.tipos, "Tipo (Todos)");
-    populateDropdown(DOM.filters.version, data.versiones, "Versión (Todas)");
-    populateDropdown(DOM.filters.genero, data.generos, "Género (Todos)");
+    populateDropdown(DOM.filters.tipo, tipos, "Tipo (Todos)");
+    populateDropdown(DOM.filters.version, versiones, "Versión (Todas)");
+    populateDropdown(DOM.filters.genero, generos, "Género (Todos)");
 
     // Selects del Modal de Creación
-    if(DOM.admin.createSelects.tipo) populateDropdown(DOM.admin.createSelects.tipo, data.tipos, "Selecciona tipo");
-    if(DOM.admin.createSelects.version) populateDropdown(DOM.admin.createSelects.version, data.versiones, "Selecciona versión");
-    if(DOM.admin.createSelects.genero) populateDropdown(DOM.admin.createSelects.genero, data.generos, "Selecciona género");
+    if(DOM.admin.createSelects.tipo) populateDropdown(DOM.admin.createSelects.tipo, tipos, "Selecciona tipo");
+    if(DOM.admin.createSelects.version) populateDropdown(DOM.admin.createSelects.version, versiones, "Selecciona versión");
+    if(DOM.admin.createSelects.genero) populateDropdown(DOM.admin.createSelects.genero, generos, "Selecciona género");
     
     // Selects de los filtros de Administración
-    if(DOM.admin.filterTipo) populateDropdown(DOM.admin.filterTipo, data.tipos, "Tipo (Todos)");
-    if(DOM.admin.filterVersion) populateDropdown(DOM.admin.filterVersion, data.versiones, "Versión (Todas)");
-    if(DOM.admin.filterGenero) populateDropdown(DOM.admin.filterGenero, data.generos, "Género (Todos)");
+    if(DOM.admin.filterTipo) populateDropdown(DOM.admin.filterTipo, tipos, "Tipo (Todos)");
+    if(DOM.admin.filterVersion) populateDropdown(DOM.admin.filterVersion, versiones, "Versión (Todas)");
+    if(DOM.admin.filterGenero) populateDropdown(DOM.admin.filterGenero, generos, "Género (Todos)");
 }
 
 function renderInitialLoader() {
