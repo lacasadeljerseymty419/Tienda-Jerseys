@@ -1,5 +1,4 @@
-// --- INICIO DE api.js ---
-const API_URL = "https://script.google.com/macros/s/AKfycbxIi3LtQ09at7mzYlHml_-zfyYO8RspljzeBDNo0dDNemWc9xpijiWQnXrgdJPbX_A-/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbyoE1dbHqM8iHb-wqaRQDTlKAgRQFOQlh3BvsIaJEuzZ7_ogtjRS-D4lEJZ_EDhx-lHtg/exec";
 
 async function get_configs() {
     try {
@@ -209,12 +208,20 @@ function closeModal() {
 
 async function loadCatalogs() {
     let configs = null;
+    const CACHE_KEY = '419_configs';
+    const CACHE_TTL = 60 * 60 * 1000; // 1 hora en milisegundos
     
-    // 1. Intentar cargar y parsear del localStorage de manera segura
+    // 1. Intentar cargar y parsear del localStorage de manera segura considerando la expiración (TTL)
     try {
-        const cached = localStorage.getItem('419_configs');
-        if (cached) {
-            configs = JSON.parse(cached);
+        const cachedStr = localStorage.getItem(CACHE_KEY);
+        if (cachedStr) {
+            const cachedObj = JSON.parse(cachedStr);
+            // Verificar si tiene el formato de objeto con timestamp y no ha expirado
+            if (cachedObj && cachedObj.timestamp && (Date.now() - cachedObj.timestamp < CACHE_TTL)) {
+                configs = cachedObj.data;
+            } else {
+                console.log("Caché de configuraciones expirada o en formato antiguo. Se requerirá actualización.");
+            }
         }
     } catch (e) {
         console.warn("No se pudo parsear 419_configs del localStorage, se obtendrá de la API:", e);
@@ -239,13 +246,17 @@ async function loadCatalogs() {
     let validData = getValidData(configs);
     
     if (!validData) {
-        console.log("Caché de configuraciones ausente, inválido o incompleto. Obteniendo de la API...");
+        console.log("Caché de configuraciones ausente, expirada o inválida. Obteniendo de la API...");
         try {
             const apiResponse = await get_configs();
             validData = getValidData(apiResponse);
             if (validData) {
-                // Guardar la respuesta original de la API
-                localStorage.setItem('419_configs', JSON.stringify(apiResponse));
+                // Guardar la respuesta original de la API con timestamp para el TTL
+                const cacheWrapper = {
+                    data: apiResponse,
+                    timestamp: Date.now()
+                };
+                localStorage.setItem(CACHE_KEY, JSON.stringify(cacheWrapper));
             }
         } catch (error) {
             console.error("Error al consultar la API para configuraciones:", error);
@@ -324,7 +335,7 @@ function renderSkeletons(count) {
 
 // --- FUNCIONES DE ADMINISTRACIÓN ---
 
-function applyAdminFilters() {
+function applyAdminFilters(keepPage = false) {
     const term = DOM.admin.filterSearch.value.toLowerCase();
     const tipo = DOM.admin.filterTipo.value;
     const version = DOM.admin.filterVersion.value;
@@ -338,7 +349,16 @@ function applyAdminFilters() {
         return matchName && matchTipo && matchVersion && matchGenero;
     });
     
-    adminCurrentPage = 1;
+    if (keepPage === true) {
+        // Asegurarnos de no estar fuera de rango
+        const totalItems = adminFilteredProducts.length;
+        const totalPages = Math.ceil(totalItems / adminItemsPerPage) || 1;
+        if (adminCurrentPage > totalPages) {
+            adminCurrentPage = totalPages;
+        }
+    } else {
+        adminCurrentPage = 1;
+    }
     renderAdminTable();
 }
 
@@ -590,6 +610,8 @@ async function handleAddNewTalla(e) {
     
     const payload = {
         action: "create",
+        id: currentJerseyToManage.id,
+        id_producto: currentJerseyToManage.id,
         nombre: currentJerseyToManage.nombre,
         tipo: currentJerseyToManage.tipo,
         version: currentJerseyToManage.version,
@@ -599,6 +621,7 @@ async function handleAddNewTalla(e) {
         tallas: [
             {
                 talla: tallaVal,
+                id_producto: currentJerseyToManage.id,
                 categoria: currentJerseyToManage.genero,
                 stock: stockVal
             }
@@ -627,14 +650,13 @@ async function handleAddNewTalla(e) {
                 showConfirmButton: false
             });
             DOM.admin.formAddTalla.reset();
-            // Refrescar data en segundo plano
+            // Refrescar data en segundo plano (esto actualizará allProducts y el listado si está abierto)
             await fetchInitialProducts();
-            // Buscar la playera actualizada para refrescar el modal
+            // Buscar la playera actualizada para refrescar el modal de inventario
             const updatedProduct = allProducts.find(p => p.id === currentJerseyToManage.id);
             if (updatedProduct) {
                 currentJerseyToManage = updatedProduct;
                 renderInventorySizes(updatedProduct);
-                renderAdminTable();
             }
         } else {
             throw new Error(data.message || 'Error desconocido');
@@ -806,6 +828,11 @@ async function fetchInitialProducts() {
     }
     
     renderLocalProducts(allProducts);
+    
+    // Si el modal de administración de lista está abierto, actualizar sus filtros e interfaz conservando la página
+    if (DOM.admin.listModal && !DOM.admin.listModal.classList.contains('hidden')) {
+        applyAdminFilters(true);
+    }
 }
 
 function handleLocalSearch() {
