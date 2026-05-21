@@ -220,7 +220,7 @@ function closeModal() {
 
 async function loadCatalogs() {
     let configs = null;
-    const CACHE_KEY = '419_configs';
+    const CACHE_KEY = 'jerseys_configs';
     const CACHE_TTL = 60 * 60 * 1000; // 1 hora en milisegundos
     
     // 1. Intentar cargar y parsear del localStorage de manera segura considerando la expiración (TTL)
@@ -236,7 +236,7 @@ async function loadCatalogs() {
             }
         }
     } catch (e) {
-        console.warn("No se pudo parsear 419_configs del localStorage, se obtendrá de la API:", e);
+        console.warn("No se pudo parsear jerseys_configs del localStorage, se obtendrá de la API:", e);
     }
     
     // 2. Determinar si los datos en caché o de la API son válidos (soportando variantes singular/plural y diferentes niveles de anidación)
@@ -324,7 +324,7 @@ function renderInitialLoader() {
             <div class="relative w-20 h-20 mb-6">
                 <div class="absolute inset-0 border-t-2 border-b-2 border-navy-500 border-solid rounded-full animate-spin"></div>
                 <div class="absolute inset-2 border-l-2 border-r-2 border-navy-400 border-solid rounded-full animate-[spin_1.5s_linear_infinite_reverse]"></div>
-                <div class="absolute inset-0 flex items-center justify-center text-navy-400 font-bold text-xs">419</div>
+                <div class="absolute inset-0 flex items-center justify-center text-navy-400 font-bold text-xs">J</div>
             </div>
             <h3 class="text-lg font-medium text-white tracking-widest uppercase">Inicializando Sistema</h3>
             <p class="text-gray-500 mt-2 text-sm">Cargando catálogos y configuraciones...</p>
