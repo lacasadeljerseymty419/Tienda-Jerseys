@@ -341,7 +341,7 @@
                     </table>
                 </div>
                 
-                <div id="admin-list-empty" class="hidden flex-col items-center justify-center py-12 text-center absolute inset-0 z-0">
+                <div id="admin-list-empty" class="hidden flex-col items-center justify-center py-12 text-center flex-grow">
                     <div class="w-16 h-16 bg-dark-200 rounded-full flex items-center justify-center mb-4">
                         <svg class="w-8 h-8 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path></svg>
                     </div>
@@ -372,7 +372,8 @@
                     <img id="inv-modal-img" src="" alt="Jersey" class="w-12 h-12 rounded-lg object-cover bg-dark">
                     <div>
                         <h2 id="inv-modal-title" class="text-lg font-bold text-white leading-tight">Nombre del Jersey</h2>
-                        <p id="inv-modal-id" class="text-xs font-mono text-gray-500">ID: ---</p>
+                        <p id="inv-modal-id" class="text-xs font-mono text-gray-500 hidden">ID: ---</p>
+                        <div id="inv-modal-tags" class="flex flex-wrap gap-1.5 mt-1.5"></div>
                     </div>
                 </div>
                 <button id="close-inventory-modal" class="text-white/50 hover:text-white transition-colors p-2 bg-white/5 rounded-full hover:bg-white/10">

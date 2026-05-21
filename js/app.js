@@ -102,6 +102,18 @@ let adminFilteredProducts = [];
 let isFirstLoad = true;
 let allProducts = []; // Para búsqueda local
 
+function getGenderColorClass(genero) {
+    const gen = (genero || '').toLowerCase();
+    if (gen.includes('hombre')) {
+        return 'bg-blue-500/10 text-blue-400 border-blue-500/20';
+    } else if (gen.includes('niño') || gen.includes('unisex')) {
+        return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
+    } else if (gen.includes('mujer') || gen.includes('dama')) {
+        return 'bg-purple-500/10 text-purple-400 border-purple-500/20';
+    }
+    return 'bg-white/5 text-gray-400 border-white/10';
+}
+
 document.addEventListener('DOMContentLoaded', initApp);
 
 async function initApp() {
@@ -426,15 +438,7 @@ function renderAdminTable() {
         
         const imgUrl = producto.foto || producto.imagen || 'https://images.unsplash.com/photo-1577212017184-807dd6acefd6?auto=format&fit=crop&q=80&w=100';
         
-        const gen = (producto.genero || '').toLowerCase();
-        let colorGenero = 'bg-white/5 text-gray-400 border-white/10'; // default
-        if (gen.includes('hombre')) {
-            colorGenero = 'bg-blue-500/10 text-blue-400 border-blue-500/20';
-        } else if (gen.includes('niño') || gen.includes('unisex')) {
-            colorGenero = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
-        } else if (gen.includes('mujer') || gen.includes('dama')) {
-            colorGenero = 'bg-purple-500/10 text-purple-400 border-purple-500/20';
-        }
+        const colorGenero = getGenderColorClass(producto.genero);
         
         const tr = document.createElement('tr');
         tr.className = 'hover:bg-white/5 transition-colors group';
@@ -450,7 +454,7 @@ function renderAdminTable() {
             </td>
             <td class="px-3 py-2">
                 <div class="flex flex-row flex-wrap gap-1 max-w-[180px]">
-                    <span class="inline-flex items-center text-[9px] font-bold uppercase tracking-wider bg-white/5 text-gray-300 px-1.5 py-0.5 rounded border border-white/10 leading-none">${producto.version || '-'}</span>
+                    <span class="inline-flex items-center text-[9px] font-bold uppercase tracking-wider bg-white/5 text-gray-400 px-1.5 py-0.5 rounded border border-white/10 leading-none">${producto.version || '-'}</span>
                     <span class="inline-flex items-center text-[9px] font-bold uppercase tracking-wider bg-white/5 text-gray-300 px-1.5 py-0.5 rounded border border-white/10 leading-none">${producto.tipo || '-'}</span>
                     <span class="inline-flex items-center text-[9px] font-bold uppercase tracking-wider ${colorGenero} px-1.5 py-0.5 rounded border leading-none">${producto.genero || '-'}</span>
                 </div>
@@ -490,6 +494,23 @@ function openInventoryModal(producto) {
     DOM.admin.invId.textContent = `ID: ${producto.id}`;
     DOM.admin.invImg.src = producto.foto || producto.imagen || '';
     
+    // Inyectar etiquetas del producto en el encabezado del modal
+    const tagsContainer = document.getElementById('inv-modal-tags');
+    if (tagsContainer) {
+        let tagsHtml = '';
+        if (producto.version) {
+            tagsHtml += `<span class="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-white/5 text-gray-400 rounded-md border border-white/10 backdrop-blur-sm">${producto.version}</span>`;
+        }
+        if (producto.tipo) {
+            tagsHtml += `<span class="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-white/5 text-gray-300 rounded-md border border-white/10 backdrop-blur-sm">${producto.tipo}</span>`;
+        }
+        if (producto.genero) {
+            const colorGen = getGenderColorClass(producto.genero);
+            tagsHtml += `<span class="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider ${colorGen} rounded-md border backdrop-blur-sm">${producto.genero}</span>`;
+        }
+        tagsContainer.innerHTML = tagsHtml;
+    }
+    
     renderInventorySizes(producto);
     
     DOM.admin.invModal.classList.remove('hidden');
@@ -525,7 +546,7 @@ function renderInventorySizes(producto) {
         div.innerHTML = `
             <div class="w-12 h-10 bg-dark-200/50 rounded flex items-center justify-center font-bold text-white text-sm">${t.talla}</div>
             <div class="flex-grow">
-                <div class="text-xs text-gray-400">ID: <span class="font-mono text-gray-500">${t.id_inventario || 'N/A'}</span></div>
+                <div class="text-xs text-gray-400 hidden">ID: <span class="font-mono text-gray-500">${t.id_inventario || 'N/A'}</span></div>
             </div>
             <div class="flex items-center gap-2">
                 <input type="number" min="0" value="${stockActual}" class="w-20 bg-dark-200 border border-white/10 rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:border-navy-400 focus:ring-1 focus:ring-navy-400 text-white input-update-stock" data-id="${t.id_inventario}">
@@ -893,9 +914,12 @@ function createProductCard(producto) {
     const imgUrl = producto.foto || producto.imagen || 'https://images.unsplash.com/photo-1577212017184-807dd6acefd6?auto=format&fit=crop&q=80&w=600';
     
     let tagsHtml = '<div class="flex flex-wrap gap-1.5 sm:gap-2 mb-2 sm:mb-3 z-10 relative">';
-    if (producto.version) tagsHtml += `<span class="px-1.5 py-0.5 sm:px-2.5 sm:py-1 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider bg-navy-400/10 text-navy-400 rounded-md border border-navy-400/20 backdrop-blur-sm">${producto.version}</span>`;
+    if (producto.version) tagsHtml += `<span class="px-1.5 py-0.5 sm:px-2.5 sm:py-1 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider bg-white/5 text-gray-400 rounded-md border border-white/10 backdrop-blur-sm">${producto.version}</span>`;
     if (producto.tipo) tagsHtml += `<span class="px-1.5 py-0.5 sm:px-2.5 sm:py-1 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider bg-white/5 text-gray-300 rounded-md border border-white/10 backdrop-blur-sm">${producto.tipo}</span>`;
-    if (producto.genero) tagsHtml += `<span class="px-1.5 py-0.5 sm:px-2.5 sm:py-1 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider bg-white/5 text-gray-300 rounded-md border border-white/10 backdrop-blur-sm">${producto.genero}</span>`;
+    if (producto.genero) {
+        const colorGen = getGenderColorClass(producto.genero);
+        tagsHtml += `<span class="px-1.5 py-0.5 sm:px-2.5 sm:py-1 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider ${colorGen} rounded-md border backdrop-blur-sm">${producto.genero}</span>`;
+    }
     tagsHtml += '</div>';
 
     let tallasHtml = '';
