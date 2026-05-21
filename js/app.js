@@ -84,6 +84,13 @@ const DOM = {
         formAddTalla: document.getElementById('form-add-talla'),
         newTallaVal: document.getElementById('new-talla-val'),
         newStockVal: document.getElementById('new-stock-val'),
+        precioMenudeo: document.getElementById('create-precio-menudeo'),
+        precioMayoreo: document.getElementById('create-precio-mayoreo'),
+        precioMayoreoSuper: document.getElementById('create-precio-mayoreo-super'),
+        formUpdatePrecios: document.getElementById('form-update-precios'),
+        updatePrecioMenudeo: document.getElementById('update-precio-menudeo'),
+        updatePrecioMayoreo: document.getElementById('update-precio-mayoreo'),
+        updatePrecioMayoreoSuper: document.getElementById('update-precio-mayoreo-super'),
         filterSearch: document.getElementById('admin-filter-search'),
         filterTipo: document.getElementById('admin-filter-tipo'),
         filterVersion: document.getElementById('admin-filter-version'),
@@ -153,6 +160,7 @@ async function initApp() {
     
     if (DOM.admin.closeInvModal) DOM.admin.closeInvModal.addEventListener('click', closeInventoryModal);
     if (DOM.admin.formAddTalla) DOM.admin.formAddTalla.addEventListener('submit', handleAddNewTalla);
+    if (DOM.admin.formUpdatePrecios) DOM.admin.formUpdatePrecios.addEventListener('submit', handleUpdatePrecios);
     
     // Filtros y paginación
     ['filterSearch', 'filterTipo', 'filterVersion', 'filterGenero'].forEach(id => {
@@ -512,6 +520,10 @@ function openInventoryModal(producto) {
     }
     
     renderInventorySizes(producto);
+
+    if (DOM.admin.updatePrecioMenudeo) DOM.admin.updatePrecioMenudeo.value = producto.precio_menudeo || 0;
+    if (DOM.admin.updatePrecioMayoreo) DOM.admin.updatePrecioMayoreo.value = producto.precio_mayoreo || 0;
+    if (DOM.admin.updatePrecioMayoreoSuper) DOM.admin.updatePrecioMayoreoSuper.value = producto.precio_mayoreo_super || 0;
     
     DOM.admin.invModal.classList.remove('hidden');
     void DOM.admin.invModal.offsetWidth;
@@ -527,6 +539,7 @@ function closeInventoryModal() {
     setTimeout(() => {
         DOM.admin.invModal.classList.add('hidden');
         DOM.admin.formAddTalla.reset();
+        if (DOM.admin.formUpdatePrecios) DOM.admin.formUpdatePrecios.reset();
         currentJerseyToManage = null;
     }, 300);
 }
@@ -639,6 +652,9 @@ async function handleAddNewTalla(e) {
         genero: currentJerseyToManage.genero,
         personalizacion: currentJerseyToManage.personalizacion,
         foto: currentJerseyToManage.foto || currentJerseyToManage.imagen,
+        precio_menudeo: parseFloat(currentJerseyToManage.precio_menudeo) || 0,
+        precio_mayoreo: parseFloat(currentJerseyToManage.precio_mayoreo) || 0,
+        precio_mayoreo_super: parseFloat(currentJerseyToManage.precio_mayoreo_super) || 0,
         tallas: [
             {
                 talla: tallaVal,
@@ -681,6 +697,74 @@ async function handleAddNewTalla(e) {
             }
         } else {
             throw new Error(data.message || 'Error desconocido');
+        }
+    } catch (error) {
+        Swal.fire({icon: 'error', title: 'Error', text: error.message, background: '#151515', color: '#fff'});
+    } finally {
+        btnSubmit.disabled = false;
+        btnSubmit.innerHTML = originalContent;
+    }
+}
+
+async function handleUpdatePrecios(e) {
+    e.preventDefault();
+    if (!currentJerseyToManage) return;
+    
+    const btnSubmit = document.getElementById('btn-submit-update-precios');
+    const originalContent = btnSubmit.innerHTML;
+    
+    const pMenudeo = parseFloat(DOM.admin.updatePrecioMenudeo.value) || 0;
+    const pMayoreo = parseFloat(DOM.admin.updatePrecioMayoreo.value) || 0;
+    const pMayoreoSuper = parseFloat(DOM.admin.updatePrecioMayoreoSuper.value) || 0;
+    
+    const payload = {
+        action: "create",
+        id: currentJerseyToManage.id,
+        id_producto: currentJerseyToManage.id,
+        nombre: currentJerseyToManage.nombre,
+        tipo: currentJerseyToManage.tipo,
+        version: currentJerseyToManage.version,
+        genero: currentJerseyToManage.genero,
+        personalizacion: currentJerseyToManage.personalizacion,
+        foto: currentJerseyToManage.foto || currentJerseyToManage.imagen,
+        precio_menudeo: pMenudeo,
+        precio_mayoreo: pMayoreo,
+        precio_mayoreo_super: pMayoreoSuper,
+        tallas: []
+    };
+
+    btnSubmit.disabled = true;
+    btnSubmit.innerHTML = 'Actualizando...';
+
+    try {
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify(payload)
+        });
+        
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            Swal.fire({
+                icon: 'success',
+                title: 'Precios Actualizados',
+                text: 'Los precios del jersey han sido actualizados con éxito.',
+                background: '#151515', color: '#fff',
+                timer: 2000,
+                showConfirmButton: false
+            });
+            
+            // Refrescar data en segundo plano
+            await fetchInitialProducts();
+            
+            // Buscar la playera actualizada
+            const updatedProduct = allProducts.find(p => p.id === currentJerseyToManage.id);
+            if (updatedProduct) {
+                currentJerseyToManage = updatedProduct;
+            }
+        } else {
+            throw new Error(data.message || 'Error al actualizar precios');
         }
     } catch (error) {
         Swal.fire({icon: 'error', title: 'Error', text: error.message, background: '#151515', color: '#fff'});
@@ -777,6 +861,9 @@ async function handleCreateProduct(e) {
         genero: DOM.admin.createSelects.genero.value,
         personalizacion: document.getElementById('create-personalizacion').value,
         foto: DOM.admin.fotoInput.value.trim(),
+        precio_menudeo: parseFloat(DOM.admin.precioMenudeo.value) || 0,
+        precio_mayoreo: parseFloat(DOM.admin.precioMayoreo.value) || 0,
+        precio_mayoreo_super: parseFloat(DOM.admin.precioMayoreoSuper.value) || 0,
         tallas: tallas
     };
 
@@ -951,8 +1038,26 @@ function createProductCard(producto) {
     const isAgotado = hasSizes && totalStock === 0;
 
     // Determinar qué mostrar en el lugar del precio / estado
+    const hasPrice = (parseFloat(producto.precio_menudeo) > 0) || (parseFloat(producto.precio_mayoreo) > 0) || (parseFloat(producto.precio_mayoreo_super) > 0);
     let statusTextHtml = '';
-    if (producto.precio) {
+    if (hasPrice) {
+        statusTextHtml = `
+            <div class="mt-2 mb-3 bg-dark-200/40 border border-white/5 rounded-xl p-2.5 space-y-1 text-[11px] sm:text-xs z-10 relative backdrop-blur-sm">
+                <div class="flex justify-between items-center text-gray-400">
+                    <span class="font-medium">Menudeo:</span>
+                    <span class="font-bold text-gray-200">$${parseFloat(producto.precio_menudeo || 0).toFixed(2)}</span>
+                </div>
+                <div class="flex justify-between items-center text-gray-400">
+                    <span class="font-medium">Mayoreo:</span>
+                    <span class="font-bold text-navy-400">$${parseFloat(producto.precio_mayoreo || 0).toFixed(2)}</span>
+                </div>
+                <div class="flex justify-between items-center text-gray-400">
+                    <span class="font-medium">Súper Mayoreo:</span>
+                    <span class="font-bold text-emerald-400">$${parseFloat(producto.precio_mayoreo_super || 0).toFixed(2)}</span>
+                </div>
+            </div>
+        `;
+    } else if (producto.precio) {
         statusTextHtml = `<p class="text-base sm:text-xl font-bold text-gray-100 mb-1 sm:mb-2 z-10 relative">$${parseFloat(producto.precio).toFixed(2)}</p>`;
     } else if (isProximamente) {
         statusTextHtml = `
