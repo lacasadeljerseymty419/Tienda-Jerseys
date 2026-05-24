@@ -1,4 +1,4 @@
-const API_URL = "https://script.google.com/macros/s/AKfycbyoE1dbHqM8iHb-wqaRQDTlKAgRQFOQlh3BvsIaJEuzZ7_ogtjRS-D4lEJZ_EDhx-lHtg/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbwhKfK6qPOtjZ3-P2JlWZQ1UW_KEA-MewEV4h2xFBF8j7pnOru5oNePKjbHFFg-UKa_dg/exec";
 
 async function get_configs() {
     try {
@@ -97,7 +97,37 @@ const DOM = {
         filterGenero: document.getElementById('admin-filter-genero'),
         pagePrev: document.getElementById('admin-page-prev'),
         pageNext: document.getElementById('admin-page-next'),
-        pageInfo: document.getElementById('admin-pagination-info')
+        pageInfo: document.getElementById('admin-pagination-info'),
+        selectPerfil: document.getElementById('select-perfil'),
+        adminMenuWrapper: document.getElementById('admin-menu-wrapper'),
+        btnOpenClients: document.getElementById('btn-open-clients'),
+        clientsModal: document.getElementById('admin-clients-modal'),
+        closeClientsModal: document.getElementById('close-clients-modal'),
+        clientFilterSearch: document.getElementById('client-filter-search'),
+        btnOpenCreateClient: document.getElementById('btn-open-create-client'),
+        clientTableBody: document.getElementById('client-table-body'),
+        clientListEmpty: document.getElementById('client-list-empty'),
+        clientPagePrev: document.getElementById('client-page-prev'),
+        clientPageNext: document.getElementById('client-page-next'),
+        clientPageInfo: document.getElementById('client-pagination-info'),
+        clientFormModal: document.getElementById('admin-client-form-modal'),
+        closeClientFormModal: document.getElementById('close-client-form-modal'),
+        clientFormTitle: document.getElementById('client-form-title'),
+        formClient: document.getElementById('form-client'),
+        btnCancelClient: document.getElementById('btn-cancel-client'),
+        clientInputs: {
+            nombre: document.getElementById('client-nombre'),
+            telefono: document.getElementById('client-telefono'),
+            usuario: document.getElementById('client-usuario'),
+            password: document.getElementById('client-password'),
+            perfil: document.getElementById('client-perfil'),
+            calle: document.getElementById('client-calle'),
+            numero: document.getElementById('client-numero'),
+            colonia: document.getElementById('client-colonia'),
+            municipio: document.getElementById('client-municipio'),
+            cp: document.getElementById('client-cp'),
+            referencias: document.getElementById('client-referencias')
+        }
     }
 };
 
@@ -108,6 +138,12 @@ let adminFilteredProducts = [];
 
 let isFirstLoad = true;
 let allProducts = []; // Para búsqueda local
+
+let allClients = [];
+let clientsFiltered = [];
+let clientCurrentPage = 1;
+const clientsPerPage = 5;
+let editingClientId = null;
 
 function getGenderColorClass(genero) {
     const gen = (genero || '').toLowerCase();
@@ -180,12 +216,43 @@ async function initApp() {
             }
         });
     }
+
+    // Eventos de Perfil y Clientes
+    if (DOM.admin.selectPerfil) {
+        DOM.admin.selectPerfil.addEventListener('change', handleProfileChange);
+    }
+    if (DOM.admin.btnOpenClients) DOM.admin.btnOpenClients.addEventListener('click', openClientsModal);
+    if (DOM.admin.closeClientsModal) DOM.admin.closeClientsModal.addEventListener('click', closeClientsModal);
+    if (DOM.admin.btnOpenCreateClient) DOM.admin.btnOpenCreateClient.addEventListener('click', () => openClientFormModal());
+    if (DOM.admin.closeClientFormModal) DOM.admin.closeClientFormModal.addEventListener('click', closeClientFormModal);
+    if (DOM.admin.btnCancelClient) DOM.admin.btnCancelClient.addEventListener('click', closeClientFormModal);
+    if (DOM.admin.formClient) DOM.admin.formClient.addEventListener('submit', handleSaveClient);
+    if (DOM.admin.clientFilterSearch) DOM.admin.clientFilterSearch.addEventListener('input', applyClientFilters);
+    if (DOM.admin.clientPagePrev) DOM.admin.clientPagePrev.addEventListener('click', () => { if (clientCurrentPage > 1) { clientCurrentPage--; renderClientsTable(); } });
+    if (DOM.admin.clientPageNext) DOM.admin.clientPageNext.addEventListener('click', () => { if (clientCurrentPage * clientsPerPage < clientsFiltered.length) { clientCurrentPage++; renderClientsTable(); } });
+    
+    // Toggle visibilidad de contraseña de cliente
+    const btnToggleClientPass = document.getElementById('btn-toggle-client-pass');
+    if (btnToggleClientPass) {
+        btnToggleClientPass.addEventListener('click', () => {
+            const passInput = DOM.admin.clientInputs.password;
+            if (passInput) {
+                const isPass = passInput.type === 'password';
+                passInput.type = isPass ? 'text' : 'password';
+                btnToggleClientPass.innerHTML = isPass 
+                    ? `<svg class="w-4 h-4 eye-off-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.542-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18"></path></svg>`
+                    : `<svg class="w-4 h-4 eye-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>`;
+            }
+        });
+    }
     
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape' && !DOM.modal.overlay.classList.contains('hidden')) closeModal();
         if (e.key === 'Escape' && !DOM.admin.createModal.classList.contains('hidden')) closeCreateModal();
         if (e.key === 'Escape' && DOM.admin.invModal && !DOM.admin.invModal.classList.contains('hidden')) closeInventoryModal();
         if (e.key === 'Escape' && DOM.admin.listModal && !DOM.admin.listModal.classList.contains('hidden') && DOM.admin.invModal.classList.contains('hidden')) closeListModal();
+        if (e.key === 'Escape' && DOM.admin.clientsModal && !DOM.admin.clientsModal.classList.contains('hidden') && DOM.admin.clientFormModal.classList.contains('hidden')) closeClientsModal();
+        if (e.key === 'Escape' && DOM.admin.clientFormModal && !DOM.admin.clientFormModal.classList.contains('hidden')) closeClientFormModal();
     });
 }
 
@@ -228,7 +295,7 @@ function closeModal() {
 
 async function loadCatalogs() {
     let configs = null;
-    const CACHE_KEY = 'jerseys_configs';
+    const CACHE_KEY = 'jerseys_configs_v2';
     const CACHE_TTL = 60 * 60 * 1000; // 1 hora en milisegundos
     
     // 1. Intentar cargar y parsear del localStorage de manera segura considerando la expiración (TTL)
@@ -256,9 +323,11 @@ async function loadCatalogs() {
         const tipos = candidate.tipos || candidate.tipo;
         const versiones = candidate.versiones || candidate.version;
         const generos = candidate.generos || candidate.genero;
+        const perfiles = candidate.perfiles || [];
+        const categorias = candidate.categorias || [];
         
         if (Array.isArray(tipos) && Array.isArray(versiones) && Array.isArray(generos)) {
-            return { tipos, versiones, generos };
+            return { tipos, versiones, generos, perfiles, categorias };
         }
         return null;
     };
@@ -286,6 +355,7 @@ async function loadCatalogs() {
     // 3. Poblar los selects si tenemos datos válidos
     if (validData) {
         populateSelects(validData);
+        initProfileView();
     } else {
         console.error("No se pudieron cargar las configuraciones de los filtros desde la API ni del caché local.");
     }
@@ -309,6 +379,7 @@ function populateSelects(data) {
     const tipos = data.tipos || [];
     const versiones = data.versiones || [];
     const generos = data.generos || [];
+    const perfiles = (data.perfiles && data.perfiles.length > 0) ? data.perfiles : ["Menudeo", "Mayoreo", "Administrador"];
     
     // Selects del Home
     populateDropdown(DOM.filters.tipo, tipos, "Tipo (Todos)");
@@ -324,6 +395,51 @@ function populateSelects(data) {
     if(DOM.admin.filterTipo) populateDropdown(DOM.admin.filterTipo, tipos, "Tipo (Todos)");
     if(DOM.admin.filterVersion) populateDropdown(DOM.admin.filterVersion, versiones, "Versión (Todas)");
     if(DOM.admin.filterGenero) populateDropdown(DOM.admin.filterGenero, generos, "Género (Todos)");
+
+    // Perfiles
+    if(DOM.admin.selectPerfil) {
+        populateDropdown(DOM.admin.selectPerfil, perfiles, "Selecciona perfil");
+        // Quitar la opción vacía por defecto
+        const defaultOpt = DOM.admin.selectPerfil.querySelector('option[value=""]');
+        if (defaultOpt) defaultOpt.remove();
+    }
+    if(DOM.admin.clientInputs.perfil) populateDropdown(DOM.admin.clientInputs.perfil, perfiles, "Selecciona perfil");
+}
+
+function initProfileView() {
+    let savedProfile = localStorage.getItem('current_perfil');
+    if (!savedProfile) {
+        savedProfile = "Administrador";
+        localStorage.setItem('current_perfil', savedProfile);
+    }
+    
+    if (DOM.admin.selectPerfil) {
+        DOM.admin.selectPerfil.value = savedProfile;
+    }
+    
+    applyProfileView(savedProfile);
+}
+
+function handleProfileChange(e) {
+    const selectedProfile = e.target.value;
+    localStorage.setItem('current_perfil', selectedProfile);
+    applyProfileView(selectedProfile);
+}
+
+function applyProfileView(profile) {
+    const wrapper = DOM.admin.adminMenuWrapper;
+    if (wrapper) {
+        if (profile === "Administrador") {
+            wrapper.classList.remove('hidden');
+        } else {
+            wrapper.classList.add('hidden');
+        }
+    }
+    
+    // Volver a renderizar catálogo de productos según perfil
+    if (allProducts && allProducts.length > 0) {
+        renderLocalProducts(allProducts);
+    }
 }
 
 function renderInitialLoader() {
@@ -718,19 +834,11 @@ async function handleUpdatePrecios(e) {
     const pMayoreoSuper = parseFloat(DOM.admin.updatePrecioMayoreoSuper.value) || 0;
     
     const payload = {
-        action: "create",
+        action: "update",
         id: currentJerseyToManage.id,
-        id_producto: currentJerseyToManage.id,
-        nombre: currentJerseyToManage.nombre,
-        tipo: currentJerseyToManage.tipo,
-        version: currentJerseyToManage.version,
-        genero: currentJerseyToManage.genero,
-        personalizacion: currentJerseyToManage.personalizacion,
-        foto: currentJerseyToManage.foto || currentJerseyToManage.imagen,
         precio_menudeo: pMenudeo,
         precio_mayoreo: pMayoreo,
-        precio_mayoreo_super: pMayoreoSuper,
-        tallas: []
+        precio_mayoreo_super: pMayoreoSuper
     };
 
     btnSubmit.disabled = true;
@@ -1038,25 +1146,51 @@ function createProductCard(producto) {
     const isAgotado = hasSizes && totalStock === 0;
 
     // Determinar qué mostrar en el lugar del precio / estado
+    const activeProfile = localStorage.getItem('current_perfil') || 'Administrador';
     const hasPrice = (parseFloat(producto.precio_menudeo) > 0) || (parseFloat(producto.precio_mayoreo) > 0) || (parseFloat(producto.precio_mayoreo_super) > 0);
     let statusTextHtml = '';
     if (hasPrice) {
-        statusTextHtml = `
-            <div class="mt-2 mb-3 bg-dark-200/40 border border-white/5 rounded-xl p-2.5 space-y-1 text-[11px] sm:text-xs z-10 relative backdrop-blur-sm">
-                <div class="flex justify-between items-center text-gray-400">
-                    <span class="font-medium">Menudeo:</span>
-                    <span class="font-bold text-gray-200">$${parseFloat(producto.precio_menudeo || 0).toFixed(2)}</span>
+        if (activeProfile === "Administrador") {
+            statusTextHtml = `
+                <div class="mt-2 mb-3 bg-dark-200/40 border border-white/5 rounded-xl p-2.5 space-y-1 text-[11px] sm:text-xs z-10 relative backdrop-blur-sm">
+                    <div class="flex justify-between items-center text-gray-400">
+                        <span class="font-medium">Menudeo:</span>
+                        <span class="font-bold text-gray-200">$${parseFloat(producto.precio_menudeo || 0).toFixed(2)}</span>
+                    </div>
+                    <div class="flex justify-between items-center text-gray-400">
+                        <span class="font-medium">Mayoreo:</span>
+                        <span class="font-bold text-navy-400">$${parseFloat(producto.precio_mayoreo || 0).toFixed(2)}</span>
+                    </div>
+                    <div class="flex justify-between items-center text-gray-400">
+                        <span class="font-medium">Súper Mayoreo:</span>
+                        <span class="font-bold text-emerald-400">$${parseFloat(producto.precio_mayoreo_super || 0).toFixed(2)}</span>
+                    </div>
                 </div>
-                <div class="flex justify-between items-center text-gray-400">
-                    <span class="font-medium">Mayoreo:</span>
-                    <span class="font-bold text-navy-400">$${parseFloat(producto.precio_mayoreo || 0).toFixed(2)}</span>
+            `;
+        } else if (activeProfile === "Mayoreo") {
+            statusTextHtml = `
+                <div class="mt-2 mb-3 bg-dark-200/40 border border-white/5 rounded-xl p-2.5 space-y-1 text-[11px] sm:text-xs z-10 relative backdrop-blur-sm">
+                    <div class="flex justify-between items-center text-gray-400">
+                        <span class="font-medium">Mayoreo:</span>
+                        <span class="font-bold text-navy-400">$${parseFloat(producto.precio_mayoreo || 0).toFixed(2)}</span>
+                    </div>
+                    <div class="flex justify-between items-center text-gray-400">
+                        <span class="font-medium">Súper Mayoreo:</span>
+                        <span class="font-bold text-emerald-400">$${parseFloat(producto.precio_mayoreo_super || 0).toFixed(2)}</span>
+                    </div>
                 </div>
-                <div class="flex justify-between items-center text-gray-400">
-                    <span class="font-medium">Súper Mayoreo:</span>
-                    <span class="font-bold text-emerald-400">$${parseFloat(producto.precio_mayoreo_super || 0).toFixed(2)}</span>
+            `;
+        } else {
+            // Menudeo (por defecto)
+            statusTextHtml = `
+                <div class="mt-2 mb-3 bg-dark-200/40 border border-white/5 rounded-xl p-2.5 space-y-1 text-[11px] sm:text-xs z-10 relative backdrop-blur-sm">
+                    <div class="flex justify-between items-center text-gray-400">
+                        <span class="font-medium">Menudeo:</span>
+                        <span class="font-bold text-gray-200">$${parseFloat(producto.precio_menudeo || 0).toFixed(2)}</span>
+                    </div>
                 </div>
-            </div>
-        `;
+            `;
+        }
     } else if (producto.precio) {
         statusTextHtml = `<p class="text-base sm:text-xl font-bold text-gray-100 mb-1 sm:mb-2 z-10 relative">$${parseFloat(producto.precio).toFixed(2)}</p>`;
     } else if (isProximamente) {
@@ -1097,12 +1231,14 @@ function createProductCard(producto) {
             <div class="absolute inset-0 bg-gradient-to-t from-dark-100/90 via-dark-100/20 to-transparent opacity-60 group-hover:opacity-40 transition-opacity duration-500"></div>
             ${imageOverlayHtml}
         </div>
-        <h3 class="text-sm sm:text-lg font-semibold text-white leading-tight mb-2 group-hover:text-navy-400 transition-colors line-clamp-2 z-10 relative">
-            ${producto.nombre || 'Jersey Deportivo'}
-        </h3>
-        ${tagsHtml}
-        ${statusTextHtml}
-        ${tallasHtml}
+        <div class="product-details-container flex flex-col flex-grow cursor-pointer z-10 relative">
+            <h3 class="text-sm sm:text-lg font-semibold text-white leading-tight mb-2 group-hover:text-navy-400 transition-colors line-clamp-2">
+                ${producto.nombre || 'Jersey Deportivo'}
+            </h3>
+            ${tagsHtml}
+            ${statusTextHtml}
+            ${tallasHtml}
+        </div>
         
         <div class="absolute inset-0 bg-gradient-to-tr from-navy-400/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
     `;
@@ -1110,6 +1246,382 @@ function createProductCard(producto) {
     if (imgContainer) {
         imgContainer.addEventListener('click', () => openModal(imgUrl));
     }
+    const detailsContainer = article.querySelector('.product-details-container');
+    if (detailsContainer) {
+        detailsContainer.addEventListener('click', () => {
+            const activeProfile = localStorage.getItem('current_perfil') || 'Administrador';
+            if (activeProfile === 'Administrador') {
+                openInventoryModal(producto);
+            }
+        });
+    }
     
     return article;
+}
+
+// --- FUNCIONES DEL CRUD DE CLIENTES ---
+
+async function fetchClients(keepPage = false) {
+    renderClientSkeletons(clientsPerPage);
+    try {
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({ action: "search_clients", filtros: {} })
+        });
+        const data = await response.json();
+        if (data.status === 'success' && Array.isArray(data.data)) {
+            // Reversar el arreglo para mostrar los clientes más recientes al inicio del grid
+            allClients = data.data.reverse();
+        } else {
+            console.error("Error al obtener clientes:", data.message);
+            allClients = [];
+        }
+    } catch (error) {
+        console.error("Error al consultar clientes:", error);
+        allClients = [];
+    }
+    applyClientFilters(keepPage);
+}
+
+function applyClientFilters(keepPage = false) {
+    const term = DOM.admin.clientFilterSearch ? DOM.admin.clientFilterSearch.value.trim().toLowerCase() : '';
+    
+    clientsFiltered = allClients.filter(c => {
+        const matchName = !term || (c.nombre_completo && c.nombre_completo.toLowerCase().includes(term));
+        const matchUser = !term || (c.usuario && c.usuario.toLowerCase().includes(term));
+        return matchName || matchUser;
+    });
+
+    if (keepPage === true) {
+        const totalItems = clientsFiltered.length;
+        const totalPages = Math.ceil(totalItems / clientsPerPage) || 1;
+        if (clientCurrentPage > totalPages) {
+            clientCurrentPage = totalPages;
+        }
+    } else {
+        clientCurrentPage = 1;
+    }
+    renderClientsTable();
+}
+
+function openClientsModal() {
+    DOM.admin.clientsModal.classList.remove('hidden');
+    void DOM.admin.clientsModal.offsetWidth;
+    DOM.admin.clientsModal.classList.remove('opacity-0');
+    DOM.admin.clientsModal.querySelector('.transform').classList.remove('scale-95');
+    DOM.admin.clientsModal.querySelector('.transform').classList.add('scale-100');
+    document.body.style.overflow = 'hidden';
+    
+    if (DOM.admin.clientFilterSearch) DOM.admin.clientFilterSearch.value = '';
+    fetchClients();
+}
+
+function closeClientsModal() {
+    DOM.admin.clientsModal.classList.add('opacity-0');
+    DOM.admin.clientsModal.querySelector('.transform').classList.remove('scale-100');
+    DOM.admin.clientsModal.querySelector('.transform').classList.add('scale-95');
+    setTimeout(() => {
+        DOM.admin.clientsModal.classList.add('hidden');
+        if (DOM.admin.invModal.classList.contains('hidden') && DOM.admin.listModal.classList.contains('hidden') && DOM.admin.createModal.classList.contains('hidden')) {
+            document.body.style.overflow = '';
+        }
+    }, 300);
+}
+
+function openClientFormModal(client = null) {
+    if (client) {
+        editingClientId = client.id_cliente;
+        DOM.admin.clientFormTitle.textContent = "Editar Cliente";
+        DOM.admin.clientInputs.nombre.value = client.nombre_completo || '';
+        DOM.admin.clientInputs.telefono.value = client.telefono || '';
+        DOM.admin.clientInputs.usuario.value = client.usuario || '';
+        DOM.admin.clientInputs.password.value = client.password || '';
+        DOM.admin.clientInputs.perfil.value = client.perfil || '';
+        DOM.admin.clientInputs.calle.value = client.calle || '';
+        DOM.admin.clientInputs.numero.value = client.numero || '';
+        DOM.admin.clientInputs.colonia.value = client.colonia || '';
+        DOM.admin.clientInputs.municipio.value = client.municipio || '';
+        DOM.admin.clientInputs.cp.value = client.cp || '';
+        DOM.admin.clientInputs.referencias.value = client.referencias || '';
+        DOM.admin.clientInputs.usuario.disabled = true;
+    } else {
+        editingClientId = null;
+        DOM.admin.clientFormTitle.textContent = "Registrar Nuevo Cliente";
+        DOM.admin.formClient.reset();
+        DOM.admin.clientInputs.usuario.disabled = false;
+        DOM.admin.clientInputs.perfil.value = "Menudeo";
+    }
+    
+    DOM.admin.clientFormModal.classList.remove('hidden');
+    void DOM.admin.clientFormModal.offsetWidth;
+    DOM.admin.clientFormModal.classList.remove('opacity-0');
+    DOM.admin.clientFormModal.querySelector('.transform').classList.remove('scale-95');
+    DOM.admin.clientFormModal.querySelector('.transform').classList.add('scale-100');
+}
+
+function closeClientFormModal() {
+    DOM.admin.clientFormModal.classList.add('opacity-0');
+    DOM.admin.clientFormModal.querySelector('.transform').classList.remove('scale-100');
+    DOM.admin.clientFormModal.querySelector('.transform').classList.add('scale-95');
+    setTimeout(() => {
+        DOM.admin.clientFormModal.classList.add('hidden');
+        DOM.admin.formClient.reset();
+        
+        // Resetear tipo de contraseña y su icono
+        const passInput = DOM.admin.clientInputs.password;
+        if (passInput) passInput.type = 'password';
+        const btnToggleClientPass = document.getElementById('btn-toggle-client-pass');
+        if (btnToggleClientPass) {
+            btnToggleClientPass.innerHTML = `<svg class="w-4 h-4 eye-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>`;
+        }
+        
+        editingClientId = null;
+    }, 300);
+}
+
+function renderClientSkeletons(count = 5) {
+    DOM.admin.clientTableBody.innerHTML = '';
+    DOM.admin.clientListEmpty.classList.add('hidden');
+    DOM.admin.clientTableBody.closest('div.overflow-x-auto').classList.remove('hidden');
+    if (DOM.admin.clientPageInfo && DOM.admin.clientPageInfo.parentElement) {
+        DOM.admin.clientPageInfo.parentElement.classList.add('hidden');
+    }
+    
+    for (let i = 0; i < count; i++) {
+        const tr = document.createElement('tr');
+        tr.className = 'border-b border-white/5 animate-pulse';
+        tr.innerHTML = `
+            <td class="px-3 py-3 w-[35%]">
+                <div class="space-y-2">
+                    <div class="h-3.5 bg-dark-200 rounded-md w-3/4"></div>
+                    <div class="h-2 bg-dark-200 rounded-md w-1/2"></div>
+                </div>
+            </td>
+            <td class="px-3 py-3 w-[20%]">
+                <div class="h-3 bg-dark-200 rounded-md w-2/3"></div>
+            </td>
+            <td class="px-3 py-3 w-[15%]">
+                <div class="h-5 bg-dark-200 rounded-md w-16"></div>
+            </td>
+            <td class="px-3 py-3 w-[18%]">
+                <div class="h-3 bg-dark-200 rounded-md w-5/6"></div>
+            </td>
+            <td class="px-3 py-3 w-[12%] text-right">
+                <div class="flex justify-end gap-1.5">
+                    <div class="w-7 h-7 bg-dark-200 rounded-md"></div>
+                    <div class="w-7 h-7 bg-dark-200 rounded-md"></div>
+                </div>
+            </td>
+        `;
+        DOM.admin.clientTableBody.appendChild(tr);
+    }
+}
+
+function renderClientsTable() {
+    DOM.admin.clientTableBody.innerHTML = '';
+    
+    if (!clientsFiltered || clientsFiltered.length === 0) {
+        DOM.admin.clientListEmpty.classList.remove('hidden');
+        DOM.admin.clientTableBody.closest('div.overflow-x-auto').classList.add('hidden');
+        DOM.admin.clientPageInfo.parentElement.classList.add('hidden');
+        return;
+    }
+    
+    DOM.admin.clientListEmpty.classList.add('hidden');
+    DOM.admin.clientTableBody.closest('div.overflow-x-auto').classList.remove('hidden');
+    DOM.admin.clientPageInfo.parentElement.classList.remove('hidden');
+    
+    const totalItems = clientsFiltered.length;
+    const totalPages = Math.ceil(totalItems / clientsPerPage);
+    const startIndex = (clientCurrentPage - 1) * clientsPerPage;
+    const endIndex = Math.min(startIndex + clientsPerPage, totalItems);
+    
+    const paginatedItems = clientsFiltered.slice(startIndex, endIndex);
+    
+    DOM.admin.clientPageInfo.textContent = `Mostrando ${startIndex + 1}-${endIndex} de ${totalItems}`;
+    DOM.admin.clientPagePrev.disabled = clientCurrentPage === 1;
+    DOM.admin.clientPageNext.disabled = clientCurrentPage === totalPages;
+    
+    paginatedItems.forEach(client => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-white/5 transition-colors group';
+        
+        let perfilBadgeColor = 'bg-white/5 text-gray-400 border-white/10';
+        if (client.perfil === 'Administrador') {
+            perfilBadgeColor = 'bg-purple-500/10 text-purple-400 border-purple-500/20';
+        } else if (client.perfil === 'Mayoreo') {
+            perfilBadgeColor = 'bg-blue-500/10 text-blue-400 border-blue-500/20';
+        } else if (client.perfil === 'Menudeo') {
+            perfilBadgeColor = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
+        }
+
+        const direccionResumida = client.calle 
+            ? `${client.calle} #${client.numero || ''}, Col. ${client.colonia || ''}` 
+            : 'Sin dirección';
+            
+        tr.innerHTML = `
+            <td class="px-3 py-2">
+                <div>
+                    <div class="font-bold text-white text-xs cursor-default leading-tight">${client.nombre_completo || 'Sin Nombre'}</div>
+                    <div class="text-[9px] font-mono text-gray-500 mt-0.5">Usuario: ${client.usuario || 'N/A'} | ID: ${client.id_cliente || 'N/A'}</div>
+                </div>
+            </td>
+            <td class="px-3 py-2 text-xs text-gray-300">
+                ${client.telefono || '-'}
+            </td>
+            <td class="px-3 py-2">
+                <span class="inline-flex items-center text-[9px] font-bold uppercase tracking-wider ${perfilBadgeColor} px-1.5 py-0.5 rounded border leading-none">
+                    ${client.perfil || 'Menudeo'}
+                </span>
+            </td>
+            <td class="px-3 py-2 text-xs text-gray-400 truncate max-w-[200px]" title="${client.calle ? `${client.calle} #${client.numero}, Col. ${client.colonia}, CP ${client.cp}, ${client.municipio}` : ''}">
+                ${direccionResumida}
+            </td>
+            <td class="px-3 py-2 text-right">
+                <div class="flex items-center justify-end gap-1.5 opacity-50 group-hover:opacity-100 transition-opacity">
+                    <button class="p-1.5 rounded-md bg-navy-500/10 hover:bg-navy-500 text-navy-400 hover:text-white transition-all duration-300 shadow hover:shadow-navy-500/30 btn-edit-client" title="Editar Cliente" data-id="${client.id_cliente}">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                    </button>
+                    <button class="p-1.5 rounded-md bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white transition-all duration-300 shadow hover:shadow-red-500/30 btn-delete-client" title="Eliminar Cliente" data-id="${client.id_cliente}">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                    </button>
+                </div>
+            </td>
+        `;
+        
+        DOM.admin.clientTableBody.appendChild(tr);
+    });
+
+    // Eventos de botones en la tabla
+    document.querySelectorAll('.btn-edit-client').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const id = e.currentTarget.getAttribute('data-id');
+            const client = allClients.find(c => c.id_cliente === id);
+            if (client) openClientFormModal(client);
+        });
+    });
+
+    document.querySelectorAll('.btn-delete-client').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const id = e.currentTarget.getAttribute('data-id');
+            handleDeleteClient(id);
+        });
+    });
+}
+
+async function handleSaveClient(e) {
+    e.preventDefault();
+    
+    const btnSubmit = document.getElementById('btn-submit-client');
+    const originalText = btnSubmit.innerHTML;
+    
+    const payload = {
+        action: editingClientId ? "update_client" : "create_client",
+        nombre_completo: DOM.admin.clientInputs.nombre.value.trim(),
+        telefono: DOM.admin.clientInputs.telefono.value.trim(),
+        usuario: DOM.admin.clientInputs.usuario.value.trim(),
+        password: DOM.admin.clientInputs.password.value,
+        perfil: DOM.admin.clientInputs.perfil.value,
+        calle: DOM.admin.clientInputs.calle.value.trim(),
+        numero: DOM.admin.clientInputs.numero.value.trim(),
+        colonia: DOM.admin.clientInputs.colonia.value.trim(),
+        municipio: DOM.admin.clientInputs.municipio.value.trim(),
+        cp: DOM.admin.clientInputs.cp.value.trim(),
+        referencias: DOM.admin.clientInputs.referencias.value.trim()
+    };
+    
+    if (editingClientId) {
+        payload.id_cliente = editingClientId;
+    }
+    
+    btnSubmit.disabled = true;
+    btnSubmit.innerHTML = "Guardando...";
+    
+    try {
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify(payload)
+        });
+        
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            const isEditing = !!editingClientId;
+            Swal.fire({
+                icon: 'success',
+                title: isEditing ? 'Cliente Actualizado' : 'Cliente Creado',
+                text: data.message || 'La operación se realizó con éxito.',
+                background: '#151515', color: '#fff',
+                timer: 2000,
+                showConfirmButton: false
+            });
+            closeClientFormModal();
+            fetchClients(isEditing);
+        } else {
+            throw new Error(data.message || 'Error en la operación.');
+        }
+    } catch (error) {
+        Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: error.message,
+            background: '#151515', color: '#fff'
+        });
+    } finally {
+        btnSubmit.disabled = false;
+        btnSubmit.innerHTML = originalText;
+    }
+}
+
+async function handleDeleteClient(clientId) {
+    if (!clientId) return;
+    
+    const result = await Swal.fire({
+        title: '¿Eliminar Cliente?',
+        text: 'Esta acción no se puede deshacer y borrará al cliente del sistema.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        cancelButtonColor: '#222222',
+        confirmButtonText: 'Sí, eliminar',
+        cancelButtonText: 'Cancelar',
+        background: '#151515', color: '#fff',
+        customClass: { popup: 'border border-white/10 rounded-2xl' }
+    });
+    
+    if (!result.isConfirmed) return;
+    
+    try {
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({
+                action: "delete_client",
+                id_cliente: clientId
+            })
+        });
+        const data = await response.json();
+        if (data.status === 'success') {
+            Swal.fire({
+                icon: 'success',
+                title: 'Cliente Eliminado',
+                text: data.message || 'El cliente ha sido borrado.',
+                background: '#151515', color: '#fff',
+                timer: 1500,
+                showConfirmButton: false
+            });
+            fetchClients(true);
+        } else {
+            throw new Error(data.message || 'Error al eliminar cliente.');
+        }
+    } catch (error) {
+        Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: error.message,
+            background: '#151515', color: '#fff'
+        });
+    }
 }

@@ -57,11 +57,16 @@
                 <h1 class="text-lg sm:text-xl font-bold tracking-[0.15em] uppercase text-white"><span class="text-navy-400 font-light">Jerseys</span></h1>
             </div>
             <nav class="flex items-center gap-2 sm:gap-4">
-                <button id="btn-nav-catalogo" class="text-sm font-semibold text-white hover:text-navy-400 transition-colors flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-white/5" onclick="document.getElementById('image-modal').classList.add('hidden'); document.getElementById('admin-create-modal').classList.add('hidden'); document.getElementById('admin-list-modal').classList.add('hidden'); if(document.getElementById('admin-inventory-modal')) document.getElementById('admin-inventory-modal').classList.add('hidden'); document.body.style.overflow='';">
+                <div class="flex items-center gap-1.5 sm:gap-2">
+                    <select id="select-perfil" class="bg-white/5 border border-white/10 rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 text-[11px] sm:text-xs font-semibold text-white focus:outline-none cursor-pointer">
+                        <!-- Cargados dinámicamente -->
+                    </select>
+                </div>
+                <button id="btn-nav-catalogo" class="text-sm font-semibold text-white hover:text-navy-400 transition-colors flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-white/5" onclick="document.getElementById('image-modal').classList.add('hidden'); document.getElementById('admin-create-modal').classList.add('hidden'); document.getElementById('admin-list-modal').classList.add('hidden'); if(document.getElementById('admin-inventory-modal')) document.getElementById('admin-inventory-modal').classList.add('hidden'); if(document.getElementById('admin-clients-modal')) document.getElementById('admin-clients-modal').classList.add('hidden'); if(document.getElementById('admin-client-form-modal')) document.getElementById('admin-client-form-modal').classList.add('hidden'); document.body.style.overflow='';">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
                     Catálogo
                 </button>
-                <div class="relative group">
+                <div id="admin-menu-wrapper" class="relative group">
                     <button id="btn-admin-menu" class="text-sm font-semibold text-gray-400 hover:text-white transition-colors flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-white/5">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                         Administración
@@ -76,6 +81,10 @@
                             <button id="btn-open-list" class="w-full text-left px-4 py-2 text-sm text-gray-300 hover:text-white hover:bg-navy-500/20 rounded-lg transition-colors flex items-center gap-2 mt-1">
                                 <svg class="w-4 h-4 text-navy-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path></svg>
                                 Mis Jerseys
+                            </button>
+                            <button id="btn-open-clients" class="w-full text-left px-4 py-2 text-sm text-gray-300 hover:text-white hover:bg-navy-500/20 rounded-lg transition-colors flex items-center gap-2 mt-1">
+                                <svg class="w-4 h-4 text-navy-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                                Clientes
                             </button>
                         </div>
                     </div>
@@ -446,6 +455,167 @@
                     </form>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- Modal de Administración: Gestión de Clientes -->
+    <div id="admin-clients-modal" class="fixed inset-0 z-[60] flex items-center justify-center hidden bg-dark/90 backdrop-blur-sm transition-opacity duration-300 opacity-0 overflow-y-auto py-6 sm:py-10">
+        <div class="bg-dark-100 border border-white/10 rounded-2xl w-full max-w-4xl mx-4 shadow-2xl shadow-navy-500/10 transform scale-95 transition-transform duration-300 flex flex-col my-auto relative max-h-none sm:max-h-[85vh]">
+            <div class="p-4 sm:p-6 border-b border-white/5 flex justify-between items-center bg-dark-100/90 backdrop-blur-md rounded-t-2xl z-10 flex-shrink-0">
+                <div>
+                    <h2 class="text-xl sm:text-2xl font-bold text-white flex items-center gap-3">
+                        <span class="bg-navy-500/20 text-navy-400 p-2 rounded-lg">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                        </span>
+                        Catálogo de Clientes
+                    </h2>
+                    <p class="text-xs sm:text-sm text-gray-400 mt-1">Administra el catálogo de perfiles y clientes del sistema.</p>
+                </div>
+                <button id="close-clients-modal" class="text-white/50 hover:text-white transition-colors p-2 bg-white/5 rounded-full hover:bg-white/10">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            
+            <div class="p-4 sm:p-6 flex-grow overflow-visible sm:overflow-auto flex flex-col h-auto sm:h-full">
+                <!-- Barra superior de búsqueda y alta -->
+                <div class="mb-4 bg-dark-200/50 p-4 rounded-xl border border-white/5 flex flex-wrap gap-3 items-center justify-between">
+                    <div class="flex-grow min-w-[200px] max-w-md">
+                        <input type="text" id="client-filter-search" placeholder="Buscar por nombre o usuario..." class="w-full bg-dark-100 border border-white/10 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-navy-400 text-white placeholder-gray-500 transition-colors">
+                    </div>
+                    <button type="button" id="btn-open-create-client" class="px-4 py-2 rounded-lg bg-navy-500 hover:bg-navy-400 text-white font-bold transition-all duration-300 shadow hover:shadow-navy-500/30 text-xs flex items-center gap-1.5">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path></svg>
+                        Registrar Cliente
+                    </button>
+                </div>
+
+                <div class="overflow-x-auto bg-dark-200/30 rounded-xl border border-white/5 flex-grow relative custom-scrollbar">
+                    <table class="w-full text-left text-sm text-gray-400 table-fixed">
+                        <thead class="text-xs text-gray-500 uppercase bg-dark-200 border-b border-white/10 sticky top-0 z-10 shadow-md shadow-dark-100/50">
+                            <tr>
+                                <th scope="col" class="px-3 py-2.5 font-semibold text-gray-300 w-[35%]">Cliente / Usuario</th>
+                                <th scope="col" class="px-3 py-2.5 font-semibold text-gray-300 w-[20%]">Teléfono</th>
+                                <th scope="col" class="px-3 py-2.5 font-semibold text-gray-300 w-[15%]">Perfil</th>
+                                <th scope="col" class="px-3 py-2.5 font-semibold text-gray-300 w-[18%]">Dirección</th>
+                                <th scope="col" class="px-3 py-2.5 font-semibold text-gray-300 text-right w-[12%]">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="client-table-body" class="divide-y divide-white/5">
+                            <!-- Filas dinámicas se inyectarán aquí -->
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div id="client-list-empty" class="hidden flex-col items-center justify-center py-12 text-center flex-grow">
+                    <div class="w-16 h-16 bg-dark-200 rounded-full flex items-center justify-center mb-4">
+                        <svg class="w-8 h-8 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                    </div>
+                    <p class="text-gray-400">No se encontraron clientes.</p>
+                </div>
+
+                <!-- Paginación -->
+                <div class="mt-4 flex items-center justify-between px-2 pt-2 border-t border-white/5">
+                    <span id="client-pagination-info" class="text-xs font-medium text-gray-400">Mostrando 0 de 0</span>
+                    <div class="flex gap-2">
+                        <button id="client-page-prev" class="px-3 py-1.5 rounded-lg bg-dark-200 hover:bg-navy-500/20 text-white text-xs font-semibold transition-colors disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg> Anterior
+                        </button>
+                        <button id="client-page-next" class="px-3 py-1.5 rounded-lg bg-dark-200 hover:bg-navy-500/20 text-white text-xs font-semibold transition-colors disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1">
+                            Siguiente <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Formulario de Cliente (Creación y Edición) -->
+    <div id="admin-client-form-modal" class="fixed inset-0 z-[65] flex items-center justify-center hidden bg-dark/95 backdrop-blur-md transition-opacity duration-300 opacity-0 overflow-y-auto py-6 sm:py-10">
+        <div class="bg-dark-100 border border-white/10 rounded-2xl w-full max-w-2xl mx-4 shadow-2xl shadow-navy-500/10 transform scale-95 transition-transform duration-300 flex flex-col my-auto relative max-h-none sm:max-h-[90vh]">
+            <div class="p-4 border-b border-white/5 flex justify-between items-center bg-dark-100/90 backdrop-blur-md rounded-t-2xl z-10 flex-shrink-0">
+                <div>
+                    <h2 id="client-form-title" class="text-base sm:text-lg font-bold text-white leading-tight">Registrar Nuevo Cliente</h2>
+                    <p class="text-xs text-gray-500 mt-1">Ingresa los datos personales y de acceso del cliente.</p>
+                </div>
+                <button id="close-client-form-modal" class="text-white/50 hover:text-white transition-colors p-2 bg-white/5 rounded-full hover:bg-white/10">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            
+            <form id="form-client" class="p-4 sm:p-6 space-y-4 overflow-y-visible sm:overflow-y-auto flex-grow custom-scrollbar">
+                <!-- Información de Acceso y Nombre -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label for="client-nombre" class="block text-[10px] font-semibold text-gray-400 mb-1 uppercase tracking-wider">Nombre Completo</label>
+                        <input type="text" id="client-nombre" required placeholder="Ej. Juan Pérez" class="w-full bg-dark-200/50 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-navy-400 text-white">
+                    </div>
+                    <div>
+                        <label for="client-telefono" class="block text-[10px] font-semibold text-gray-400 mb-1 uppercase tracking-wider">Teléfono</label>
+                        <input type="text" id="client-telefono" required placeholder="Ej. 5512345678" class="w-full bg-dark-200/50 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-navy-400 text-white">
+                    </div>
+                    <div>
+                        <label for="client-usuario" class="block text-[10px] font-semibold text-gray-400 mb-1 uppercase tracking-wider">Usuario (Login)</label>
+                        <input type="text" id="client-usuario" required placeholder="Ej. juanperez" class="w-full bg-dark-200/50 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-navy-400 text-white">
+                    </div>
+                    <div>
+                        <label for="client-password" class="block text-[10px] font-semibold text-gray-400 mb-1 uppercase tracking-wider">Contraseña</label>
+                        <div class="relative">
+                            <input type="password" id="client-password" required placeholder="••••••••" class="w-full bg-dark-200/50 border border-white/10 rounded-lg pl-3 pr-10 py-2 text-sm focus:outline-none focus:border-navy-400 text-white">
+                            <button type="button" id="btn-toggle-client-pass" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors focus:outline-none" title="Mostrar/Ocultar Contraseña">
+                                <svg class="w-4 h-4 eye-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="sm:col-span-2">
+                        <label for="client-perfil" class="block text-[10px] font-semibold text-gray-400 mb-1 uppercase tracking-wider">Perfil</label>
+                        <select id="client-perfil" required class="w-full bg-dark-200/50 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-navy-400 text-white cursor-pointer">
+                            <!-- Se cargan dinámicamente -->
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Dirección de Envío -->
+                <div class="pt-4 border-t border-white/5 space-y-4">
+                    <h3 class="text-xs font-semibold text-gray-300 uppercase tracking-wider">Dirección de Envío</h3>
+                    
+                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                        <div class="col-span-2">
+                            <label for="client-calle" class="block text-[10px] font-semibold text-gray-400 mb-1 uppercase tracking-wider">Calle</label>
+                            <input type="text" id="client-calle" placeholder="Ej. Av. Reforma" class="w-full bg-dark-200/50 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-navy-400 text-white">
+                        </div>
+                        <div>
+                            <label for="client-numero" class="block text-[10px] font-semibold text-gray-400 mb-1 uppercase tracking-wider">Número</label>
+                            <input type="text" id="client-numero" placeholder="Ej. 123" class="w-full bg-dark-200/50 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-navy-400 text-white">
+                        </div>
+                        <div>
+                            <label for="client-colonia" class="block text-[10px] font-semibold text-gray-400 mb-1 uppercase tracking-wider">Colonia</label>
+                            <input type="text" id="client-colonia" placeholder="Ej. Centro" class="w-full bg-dark-200/50 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-navy-400 text-white">
+                        </div>
+                        <div>
+                            <label for="client-municipio" class="block text-[10px] font-semibold text-gray-400 mb-1 uppercase tracking-wider">Municipio/Alcaldía</label>
+                            <input type="text" id="client-municipio" placeholder="Ej. Cuauhtémoc" class="w-full bg-dark-200/50 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-navy-400 text-white">
+                        </div>
+                        <div>
+                            <label for="client-cp" class="block text-[10px] font-semibold text-gray-400 mb-1 uppercase tracking-wider">Código Postal</label>
+                            <input type="text" id="client-cp" placeholder="Ej. 06000" class="w-full bg-dark-200/50 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-navy-400 text-white">
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label for="client-referencias" class="block text-[10px] font-semibold text-gray-400 mb-1 uppercase tracking-wider">Referencias del Domicilio</label>
+                        <textarea id="client-referencias" rows="2" placeholder="Ej. Entre calle A y B, portón color verde..." class="w-full bg-dark-200/50 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-navy-400 text-white resize-none"></textarea>
+                    </div>
+                </div>
+
+                <!-- Botones -->
+                <div class="pt-4 border-t border-white/5 flex justify-end gap-3">
+                    <button type="button" id="btn-cancel-client" class="px-5 py-2.5 rounded-lg border border-white/10 text-white hover:bg-white/5 transition-colors text-sm">
+                        Cancelar
+                    </button>
+                    <button type="submit" id="btn-submit-client" class="px-5 py-2.5 rounded-lg bg-navy-500 hover:bg-navy-400 text-white font-bold transition-all duration-300 shadow hover:shadow-navy-500/30 text-sm">
+                        Guardar Cliente
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 
