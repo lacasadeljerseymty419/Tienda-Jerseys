@@ -1,4 +1,4 @@
-const API_URL = "https://script.google.com/macros/s/AKfycbwhKfK6qPOtjZ3-P2JlWZQ1UW_KEA-MewEV4h2xFBF8j7pnOru5oNePKjbHFFg-UKa_dg/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbwrOFvWa4kN9sNmC6TNzcKH_CVO4GOq-cGs6Gby7uB8jNMdwSCRoSmhvKBErxEf-ZVNdQ/exec";
 
 async function get_configs() {
     try {
@@ -12,6 +12,22 @@ async function get_configs() {
         return await response.json();
     } catch (error) {
         console.error("Error al obtener configuraciones:", error);
+        return null;
+    }
+}
+
+async function get_personalizations() {
+    try {
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({ action: "get_personalizations" })
+        });
+        
+        if (!response.ok) throw new Error(`Error HTTP: ${response.status}`);
+        return await response.json();
+    } catch (error) {
+        console.error("Error al obtener personalizaciones:", error);
         return null;
     }
 }
@@ -35,6 +51,41 @@ async function search(filtros = { nombre: "", tipo: "", version: "", genero: "" 
 
 // --- INICIO DE app.js ---
 const DOM = {
+    btnNavCatalogo: document.getElementById('btn-nav-catalogo'),
+    btnNavJerseysView: document.getElementById('btn-nav-jerseys-view'),
+    btnOpenCart: document.getElementById('btn-open-cart'),
+    cartCount: document.getElementById('cart-count'),
+    cart: {
+        modal: document.getElementById('cart-modal'),
+        closeBtn: document.getElementById('close-cart-modal'),
+        selectCliente: document.getElementById('cart-select-cliente'),
+        perfilInfo: document.getElementById('cart-cliente-perfil-info'),
+        perfilVal: document.getElementById('cart-cliente-perfil-val'),
+        itemsContainer: document.getElementById('cart-items-container'),
+        emptyMessage: document.getElementById('cart-empty-message'),
+        subtotalVal: document.getElementById('cart-subtotal-val'),
+        personalizacionesVal: document.getElementById('cart-personalizaciones-val'),
+        totalVal: document.getElementById('cart-total-val'),
+        btnEmpty: document.getElementById('btn-empty-cart'),
+        btnSubmit: document.getElementById('btn-submit-order')
+    },
+    pedido: {
+        modal: document.getElementById('add-to-pedido-modal'),
+        closeBtn: document.getElementById('close-pedido-modal'),
+        form: document.getElementById('form-add-to-pedido'),
+        talla: document.getElementById('pedido-talla'),
+        cantidad: document.getElementById('pedido-cantidad'),
+        personalizacion: document.getElementById('pedido-personalizacion'),
+        personalizacionPrecio: document.getElementById('pedido-personalizacion-precio'),
+        personalizacionRegla: document.getElementById('pedido-personalizacion-regla'),
+        customTextContainer: document.getElementById('pedido-custom-text-container'),
+        customText: document.getElementById('pedido-custom-text'),
+        stockInfo: document.getElementById('pedido-stock-info'),
+        img: document.getElementById('pedido-modal-img'),
+        name: document.getElementById('pedido-modal-jersey-name'),
+        desc: document.getElementById('pedido-modal-jersey-desc'),
+        btnCancel: document.getElementById('btn-cancel-pedido')
+    },
     grid: document.getElementById('products-grid'),
     emptyState: document.getElementById('empty-state'),
     resultsCount: document.getElementById('results-count'),
@@ -145,6 +196,19 @@ let clientCurrentPage = 1;
 const clientsPerPage = 5;
 let editingClientId = null;
 
+// Variables de estado del Carrito y Pedidos
+let currentView = "mis-jerseys"; // "mis-jerseys" o "jerseys-pedido"
+let cart = []; // Artículos en el carrito
+let allPersonalizaciones = []; // Catálogo de personalizaciones
+const defaultPersonalizaciones = [
+    { id: "PERS-001", nombre: "Pers 22 Cm", precio_menudeo: 70, precio_mayoreo: 100 },
+    { id: "PERS-002", nombre: "Pers 26.5 Cm", precio_menudeo: 85, precio_mayoreo: 120 },
+    { id: "PERS-003", nombre: "Pers 26.5 Cm y 10 Cm (Atras y Adelante)", precio_menudeo: 95, precio_mayoreo: 130 },
+    { id: "PERS-004", nombre: "Personalizacion Oficial (Atras y Adelante)", precio_menudeo: 125, precio_mayoreo: 150 }
+];
+let currentJerseyForPedido = null; // Jersey activo para configurar en el modal
+
+
 function getGenderColorClass(genero) {
     const gen = (genero || '').toLowerCase();
     if (gen.includes('hombre')) {
@@ -164,6 +228,33 @@ async function initApp() {
     await loadCatalogs();
     await fetchInitialProducts(); // Cargar todos y renderizar
     
+    // Cargar la lista de clientes en segundo plano al iniciar la app
+    ensureClientsLoaded();
+    
+    // Listeners de Vistas del Header (Navegación)
+    if (DOM.btnNavCatalogo) {
+        DOM.btnNavCatalogo.addEventListener('click', () => switchView('mis-jerseys'));
+    }
+    if (DOM.btnNavJerseysView) {
+        DOM.btnNavJerseysView.addEventListener('click', () => switchView('jerseys-pedido'));
+    }
+    if (DOM.btnOpenCart) {
+        DOM.btnOpenCart.addEventListener('click', openCartModal);
+    }
+    
+    // Listeners del Modal de Carrito/Orden
+    if (DOM.cart.closeBtn) DOM.cart.closeBtn.addEventListener('click', closeCartModal);
+    if (DOM.cart.btnEmpty) DOM.cart.btnEmpty.addEventListener('click', emptyCart);
+    if (DOM.cart.btnSubmit) DOM.cart.btnSubmit.addEventListener('click', submitOrder);
+    if (DOM.cart.selectCliente) DOM.cart.selectCliente.addEventListener('change', handleCartClientChange);
+    
+    // Listeners del Modal de Agregar a mi Pedido
+    if (DOM.pedido.closeBtn) DOM.pedido.closeBtn.addEventListener('click', closePedidoModal);
+    if (DOM.pedido.btnCancel) DOM.pedido.btnCancel.addEventListener('click', closePedidoModal);
+    if (DOM.pedido.form) DOM.pedido.form.addEventListener('submit', handleAddToPedidoSubmit);
+    if (DOM.pedido.personalizacion) DOM.pedido.personalizacion.addEventListener('change', handlePedidoPersonalizacionChange);
+    if (DOM.pedido.talla) DOM.pedido.talla.addEventListener('change', handlePedidoTallaChange);
+
     DOM.btnAplicar.addEventListener('click', handleLocalSearch);
     DOM.filters.nombre.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') handleLocalSearch();
@@ -253,7 +344,12 @@ async function initApp() {
         if (e.key === 'Escape' && DOM.admin.listModal && !DOM.admin.listModal.classList.contains('hidden') && DOM.admin.invModal.classList.contains('hidden')) closeListModal();
         if (e.key === 'Escape' && DOM.admin.clientsModal && !DOM.admin.clientsModal.classList.contains('hidden') && DOM.admin.clientFormModal.classList.contains('hidden')) closeClientsModal();
         if (e.key === 'Escape' && DOM.admin.clientFormModal && !DOM.admin.clientFormModal.classList.contains('hidden')) closeClientFormModal();
+        if (e.key === 'Escape' && DOM.pedido.modal && !DOM.pedido.modal.classList.contains('hidden')) closePedidoModal();
+        if (e.key === 'Escape' && DOM.cart.modal && !DOM.cart.modal.classList.contains('hidden')) closeCartModal();
     });
+    
+    // Aplicar estilos de la vista inicial
+    switchView(currentView);
 }
 
 function toggleFiltros() {
@@ -325,9 +421,10 @@ async function loadCatalogs() {
         const generos = candidate.generos || candidate.genero;
         const perfiles = candidate.perfiles || [];
         const categorias = candidate.categorias || [];
+        const personalizaciones = candidate.personalizaciones || candidate.personalizacion || [];
         
         if (Array.isArray(tipos) && Array.isArray(versiones) && Array.isArray(generos)) {
-            return { tipos, versiones, generos, perfiles, categorias };
+            return { tipos, versiones, generos, perfiles, categorias, personalizaciones };
         }
         return null;
     };
@@ -352,6 +449,49 @@ async function loadCatalogs() {
         }
     }
     
+    // Cargar Catálogo de Personalizaciones
+    let pers = null;
+    const PERS_CACHE_KEY = 'jerseys_personalizations_v3';
+    try {
+        const cachedPersStr = localStorage.getItem(PERS_CACHE_KEY);
+        if (cachedPersStr) {
+            const cachedPersObj = JSON.parse(cachedPersStr);
+            if (cachedPersObj && cachedPersObj.timestamp && (Date.now() - cachedPersObj.timestamp < CACHE_TTL)) {
+                pers = cachedPersObj.data;
+            }
+        }
+    } catch (e) {
+        console.warn("Error al leer caché de personalizaciones:", e);
+    }
+    
+    if (!pers) {
+        console.log("Cargando personalizaciones desde la API...");
+        try {
+            const persResponse = await get_personalizations();
+            if (persResponse && persResponse.status === 'success' && Array.isArray(persResponse.data)) {
+                pers = persResponse.data;
+                const cacheWrapper = {
+                    data: pers,
+                    timestamp: Date.now()
+                };
+                localStorage.setItem(PERS_CACHE_KEY, JSON.stringify(cacheWrapper));
+            }
+        } catch (error) {
+            console.error("Error al obtener personalizaciones:", error);
+        }
+    }
+    
+    if (pers && pers.length > 0) {
+        allPersonalizaciones = pers.map(p => ({
+            id: p.id_personalizacion,
+            nombre: p.concepto || p.nombre || '',
+            precio_menudeo: parseFloat(p.precio_menudeo || 0),
+            precio_mayoreo: parseFloat(p.precio_mayoreo || 0)
+        }));
+    } else {
+        allPersonalizaciones = defaultPersonalizaciones;
+    }
+    
     // 3. Poblar los selects si tenemos datos válidos
     if (validData) {
         populateSelects(validData);
@@ -367,7 +507,7 @@ function populateDropdown(selectEl, items, defaultText) {
         items.forEach(item => {
             const option = document.createElement('option');
             option.value = typeof item === 'object' ? item.id : item;
-            option.textContent = typeof item === 'object' ? item.nombre : item;
+            option.textContent = typeof item === 'object' ? (item.precio > 0 ? `${item.nombre} (+$${parseFloat(item.precio).toFixed(2)})` : item.nombre) : item;
             selectEl.appendChild(option);
         });
     }
@@ -380,6 +520,9 @@ function populateSelects(data) {
     const versiones = data.versiones || [];
     const generos = data.generos || [];
     const perfiles = (data.perfiles && data.perfiles.length > 0) ? data.perfiles : ["Menudeo", "Mayoreo", "Administrador"];
+    
+    // Poblar select de personalización en modal de pedidos
+    updatePersonalizacionDropdown();
     
     // Selects del Home
     populateDropdown(DOM.filters.tipo, tipos, "Tipo (Todos)");
@@ -403,7 +546,7 @@ function populateSelects(data) {
         const defaultOpt = DOM.admin.selectPerfil.querySelector('option[value=""]');
         if (defaultOpt) defaultOpt.remove();
     }
-    if(DOM.admin.clientInputs.perfil) populateDropdown(DOM.admin.clientInputs.perfil, perfiles, "Selecciona perfil");
+    if(DOM.admin.clientInputs.perfil) populateDropdown(DOM.admin.clientInputs.perfil, ["Menudeo", "Mayoreo"], "Selecciona perfil");
 }
 
 function initProfileView() {
@@ -440,6 +583,9 @@ function applyProfileView(profile) {
     if (allProducts && allProducts.length > 0) {
         renderLocalProducts(allProducts);
     }
+    
+    // Actualizar precios de personalización del modal
+    updatePersonalizacionDropdown();
 }
 
 function renderInitialLoader() {
@@ -1174,10 +1320,6 @@ function createProductCard(producto) {
                         <span class="font-medium">Mayoreo:</span>
                         <span class="font-bold text-navy-400">$${parseFloat(producto.precio_mayoreo || 0).toFixed(2)}</span>
                     </div>
-                    <div class="flex justify-between items-center text-gray-400">
-                        <span class="font-medium">Súper Mayoreo:</span>
-                        <span class="font-bold text-emerald-400">$${parseFloat(producto.precio_mayoreo_super || 0).toFixed(2)}</span>
-                    </div>
                 </div>
             `;
         } else {
@@ -1225,6 +1367,17 @@ function createProductCard(producto) {
         `;
     }
 
+    let bottomSectionHtml = '';
+    if (currentView === 'jerseys-pedido') {
+        if (isProximamente || isAgotado) {
+            bottomSectionHtml = `<button class="w-full mt-auto py-2 rounded-lg bg-dark-200 text-gray-600 font-bold text-[11px] uppercase cursor-not-allowed border border-white/5" disabled>No disponible</button>`;
+        } else {
+            bottomSectionHtml = `<button class="w-full mt-auto py-2 rounded-lg bg-navy-500 hover:bg-navy-400 text-white font-bold text-[11px] uppercase tracking-wider transition-all duration-300 shadow hover:shadow-navy-500/20 active:scale-[0.97] btn-agregar-pedido">Agregar a mi pedido</button>`;
+        }
+    } else {
+        bottomSectionHtml = statusTextHtml + tallasHtml;
+    }
+
     article.innerHTML = `
         <div class="product-image-container relative w-full aspect-[4/5] rounded-lg sm:rounded-xl overflow-hidden mb-2 sm:mb-4 bg-dark z-10 cursor-pointer">
             <img src="${imgUrl}" alt="${producto.nombre || 'Jersey'}" class="w-full h-full object-cover object-center group-hover:scale-110 transition-transform duration-700 ease-out ${(isAgotado || isProximamente) ? 'grayscale opacity-60' : ''}" loading="lazy">
@@ -1236,8 +1389,7 @@ function createProductCard(producto) {
                 ${producto.nombre || 'Jersey Deportivo'}
             </h3>
             ${tagsHtml}
-            ${statusTextHtml}
-            ${tallasHtml}
+            ${bottomSectionHtml}
         </div>
         
         <div class="absolute inset-0 bg-gradient-to-tr from-navy-400/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
@@ -1248,11 +1400,25 @@ function createProductCard(producto) {
     }
     const detailsContainer = article.querySelector('.product-details-container');
     if (detailsContainer) {
-        detailsContainer.addEventListener('click', () => {
-            const activeProfile = localStorage.getItem('current_perfil') || 'Administrador';
-            if (activeProfile === 'Administrador') {
-                openInventoryModal(producto);
+        detailsContainer.addEventListener('click', (e) => {
+            if (currentView === 'jerseys-pedido') {
+                if (!isAgotado && !isProximamente) {
+                    openPedidoModal(producto);
+                }
+            } else {
+                const activeProfile = localStorage.getItem('current_perfil') || 'Administrador';
+                if (activeProfile === 'Administrador') {
+                    openInventoryModal(producto);
+                }
             }
+        });
+    }
+
+    const btnAgregar = article.querySelector('.btn-agregar-pedido');
+    if (btnAgregar) {
+        btnAgregar.addEventListener('click', (e) => {
+            e.stopPropagation(); // Evitar doble click en detailsContainer
+            openPedidoModal(producto);
         });
     }
     
@@ -1337,7 +1503,11 @@ function openClientFormModal(client = null) {
         DOM.admin.clientInputs.telefono.value = client.telefono || '';
         DOM.admin.clientInputs.usuario.value = client.usuario || '';
         DOM.admin.clientInputs.password.value = client.password || '';
-        DOM.admin.clientInputs.perfil.value = client.perfil || '';
+        let clientPerfil = client.perfil || '';
+        if (clientPerfil === 'Súper Mayoreo' || clientPerfil === 'Mayoreo Súper') {
+            clientPerfil = 'Mayoreo';
+        }
+        DOM.admin.clientInputs.perfil.value = clientPerfil;
         DOM.admin.clientInputs.calle.value = client.calle || '';
         DOM.admin.clientInputs.numero.value = client.numero || '';
         DOM.admin.clientInputs.colonia.value = client.colonia || '';
@@ -1447,12 +1617,17 @@ function renderClientsTable() {
         const tr = document.createElement('tr');
         tr.className = 'hover:bg-white/5 transition-colors group';
         
+        let clientPerfil = client.perfil || 'Menudeo';
+        if (clientPerfil === 'Súper Mayoreo' || clientPerfil === 'Mayoreo Súper') {
+            clientPerfil = 'Mayoreo';
+        }
+        
         let perfilBadgeColor = 'bg-white/5 text-gray-400 border-white/10';
-        if (client.perfil === 'Administrador') {
+        if (clientPerfil === 'Administrador') {
             perfilBadgeColor = 'bg-purple-500/10 text-purple-400 border-purple-500/20';
-        } else if (client.perfil === 'Mayoreo') {
+        } else if (clientPerfil === 'Mayoreo') {
             perfilBadgeColor = 'bg-blue-500/10 text-blue-400 border-blue-500/20';
-        } else if (client.perfil === 'Menudeo') {
+        } else if (clientPerfil === 'Menudeo') {
             perfilBadgeColor = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
         }
 
@@ -1472,7 +1647,7 @@ function renderClientsTable() {
             </td>
             <td class="px-3 py-2">
                 <span class="inline-flex items-center text-[9px] font-bold uppercase tracking-wider ${perfilBadgeColor} px-1.5 py-0.5 rounded border leading-none">
-                    ${client.perfil || 'Menudeo'}
+                    ${clientPerfil}
                 </span>
             </td>
             <td class="px-3 py-2 text-xs text-gray-400 truncate max-w-[200px]" title="${client.calle ? `${client.calle} #${client.numero}, Col. ${client.colonia}, CP ${client.cp}, ${client.municipio}` : ''}">
@@ -1575,53 +1750,709 @@ async function handleSaveClient(e) {
     }
 }
 
-async function handleDeleteClient(clientId) {
-    if (!clientId) return;
+// --- SISTEMA DE CARRITO Y ORDENES (NUEVA VISTA) ---
+
+function switchView(view) {
+    currentView = view;
+    if (view === 'mis-jerseys') {
+        DOM.btnNavCatalogo.className = "w-full text-left px-4 py-2 text-sm text-white bg-navy-500/20 rounded-lg transition-colors flex items-center gap-2";
+        DOM.btnNavJerseysView.className = "text-xs sm:text-sm font-semibold text-gray-400 hover:text-white transition-colors flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg hover:bg-white/5";
+        if (DOM.admin.selectPerfil && DOM.admin.selectPerfil.parentElement) {
+            DOM.admin.selectPerfil.parentElement.classList.remove('hidden');
+        }
+    } else if (view === 'jerseys-pedido') {
+        DOM.btnNavCatalogo.className = "w-full text-left px-4 py-2 text-sm text-gray-300 hover:text-white hover:bg-navy-500/20 rounded-lg transition-colors flex items-center gap-2";
+        DOM.btnNavJerseysView.className = "text-xs sm:text-sm font-semibold text-white transition-colors flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg bg-white/5 border border-white/10";
+        if (DOM.admin.selectPerfil && DOM.admin.selectPerfil.parentElement) {
+            DOM.admin.selectPerfil.parentElement.classList.add('hidden');
+        }
+    }
+    renderLocalProducts(allProducts);
+}
+
+function openPedidoModal(producto) {
+    currentJerseyForPedido = producto;
     
-    const result = await Swal.fire({
-        title: '¿Eliminar Cliente?',
-        text: 'Esta acción no se puede deshacer y borrará al cliente del sistema.',
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#ef4444',
-        cancelButtonColor: '#222222',
-        confirmButtonText: 'Sí, eliminar',
-        cancelButtonText: 'Cancelar',
-        background: '#151515', color: '#fff',
-        customClass: { popup: 'border border-white/10 rounded-2xl' }
+    // Configurar información del modal
+    DOM.pedido.name.textContent = producto.nombre || 'Jersey Deportivo';
+    const selectedClientId = DOM.cart.selectCliente ? DOM.cart.selectCliente.value : '';
+    const clientObj = allClients.find(c => c.id_cliente === selectedClientId);
+    let profileToUse = clientObj ? (clientObj.perfil || 'Menudeo') : (localStorage.getItem('current_perfil') || 'Menudeo');
+    if (profileToUse === 'Administrador') {
+        profileToUse = 'Menudeo';
+    }
+    if (profileToUse === 'Súper Mayoreo' || profileToUse === 'Mayoreo Súper') {
+        profileToUse = 'Mayoreo';
+    }
+    const basePrice = getBasePriceForProfile(producto, profileToUse);
+    DOM.pedido.desc.innerHTML = `${producto.genero || '-'} | ${producto.tipo || '-'} | ${producto.version || '-'} | <span class="text-navy-400 font-bold">$${basePrice.toFixed(2)}</span>`;
+    DOM.pedido.img.src = producto.foto || producto.imagen || '';
+    
+    // Limpiar y poblar select de tallas con stock disponible
+    DOM.pedido.talla.innerHTML = '<option value="" disabled selected>Selecciona talla...</option>';
+    let hasAvailableSizes = false;
+    
+    if (producto.tallas && Array.isArray(producto.tallas)) {
+        producto.tallas.forEach(t => {
+            const stockVal = t.stock !== undefined ? t.stock : t.inventario;
+            if (stockVal > 0) {
+                hasAvailableSizes = true;
+                const option = document.createElement('option');
+                option.value = t.talla;
+                option.textContent = t.talla;
+                DOM.pedido.talla.appendChild(option);
+            }
+        });
+    }
+    
+    // Reiniciar campos
+    DOM.pedido.cantidad.value = 1;
+    DOM.pedido.cantidad.max = 999;
+    DOM.pedido.stockInfo.textContent = '';
+    
+    // Seleccionar personalización por defecto
+    if (DOM.pedido.personalizacion) {
+        updatePersonalizacionDropdown();
+        DOM.pedido.personalizacion.value = "PERS-NONE";
+        handlePedidoPersonalizacionChange();
+    }
+    
+    // Abrir modal con animación
+    DOM.pedido.modal.classList.remove('hidden');
+    void DOM.pedido.modal.offsetWidth;
+    DOM.pedido.modal.classList.remove('opacity-0');
+    DOM.pedido.modal.querySelector('.transform').classList.remove('scale-95');
+    DOM.pedido.modal.querySelector('.transform').classList.add('scale-100');
+    document.body.style.overflow = 'hidden';
+}
+
+function closePedidoModal() {
+    DOM.pedido.modal.classList.add('opacity-0');
+    DOM.pedido.modal.querySelector('.transform').classList.remove('scale-100');
+    DOM.pedido.modal.querySelector('.transform').classList.add('scale-95');
+    setTimeout(() => {
+        DOM.pedido.modal.classList.add('hidden');
+        DOM.pedido.form.reset();
+        DOM.pedido.customTextContainer.classList.add('hidden');
+        currentJerseyForPedido = null;
+        if (DOM.cart.modal.classList.contains('hidden')) {
+            document.body.style.overflow = '';
+        }
+    }, 300);
+}
+
+function handlePedidoPersonalizacionChange() {
+    const val = DOM.pedido.personalizacion.value;
+    const isCustomized = val !== "PERS-NONE";
+    
+    let price = 0;
+    if (isCustomized) {
+        const selectedClientId = DOM.cart.selectCliente ? DOM.cart.selectCliente.value : '';
+        const clientObj = allClients.find(c => c.id_cliente === selectedClientId);
+        let profileToUse = clientObj ? (clientObj.perfil || 'Menudeo') : (localStorage.getItem('current_perfil') || 'Menudeo');
+        if (profileToUse === 'Administrador') {
+            profileToUse = 'Menudeo';
+        }
+        if (profileToUse === 'Súper Mayoreo' || profileToUse === 'Mayoreo Súper') {
+            profileToUse = 'Mayoreo';
+        }
+        const isMayoreo = profileToUse === 'Mayoreo';
+        const persObj = allPersonalizaciones.find(x => x.id === val) || defaultPersonalizaciones.find(x => x.id === val);
+        if (persObj) {
+            price = isMayoreo ? parseFloat(persObj.precio_mayoreo || 0) : parseFloat(persObj.precio_menudeo || 0);
+        }
+    }
+    
+    if (DOM.pedido.personalizacionPrecio) {
+        if (isCustomized && price > 0) {
+            DOM.pedido.personalizacionPrecio.textContent = `Costo de personalización: +$${price.toFixed(2)}`;
+        } else {
+            DOM.pedido.personalizacionPrecio.textContent = `Sin costo adicional`;
+        }
+    }
+    
+    // Regla de cantidad para personalizados
+    if (isCustomized) {
+        DOM.pedido.cantidad.value = 1;
+        DOM.pedido.cantidad.disabled = true;
+        DOM.pedido.cantidad.classList.add('opacity-50', 'cursor-not-allowed');
+        
+        if (DOM.pedido.personalizacionRegla) {
+            DOM.pedido.personalizacionRegla.textContent = "* Los jerseys personalizados se agregan de 1 en 1 para configurar cada nombre y número individualmente.";
+            DOM.pedido.personalizacionRegla.classList.remove('hidden');
+        }
+    } else {
+        DOM.pedido.cantidad.disabled = false;
+        DOM.pedido.cantidad.classList.remove('opacity-50', 'cursor-not-allowed');
+        
+        if (DOM.pedido.personalizacionRegla) {
+            DOM.pedido.personalizacionRegla.textContent = "";
+            DOM.pedido.personalizacionRegla.classList.add('hidden');
+        }
+    }
+    
+    if (isCustomized) {
+        DOM.pedido.customTextContainer.classList.remove('hidden');
+        DOM.pedido.customText.setAttribute('required', 'true');
+        DOM.pedido.customText.focus();
+    } else {
+        DOM.pedido.customTextContainer.classList.add('hidden');
+        DOM.pedido.customText.value = '';
+        DOM.pedido.customText.removeAttribute('required');
+    }
+}
+
+function updatePersonalizacionDropdown() {
+    if (!DOM.pedido.personalizacion) return;
+    
+    const currentVal = DOM.pedido.personalizacion.value || "PERS-NONE";
+    DOM.pedido.personalizacion.innerHTML = '';
+    
+    const optNinguna = document.createElement('option');
+    optNinguna.value = "PERS-NONE";
+    optNinguna.textContent = "Ninguna";
+    DOM.pedido.personalizacion.appendChild(optNinguna);
+    
+    const selectedClientId = DOM.cart.selectCliente ? DOM.cart.selectCliente.value : '';
+    const clientObj = allClients.find(c => c.id_cliente === selectedClientId);
+    let profileToUse = clientObj ? (clientObj.perfil || 'Menudeo') : (localStorage.getItem('current_perfil') || 'Menudeo');
+    if (profileToUse === 'Administrador') {
+        profileToUse = 'Menudeo';
+    }
+    if (profileToUse === 'Súper Mayoreo' || profileToUse === 'Mayoreo Súper') {
+        profileToUse = 'Mayoreo';
+    }
+    const isMayoreo = profileToUse === 'Mayoreo';
+    
+    allPersonalizaciones.forEach(p => {
+        const option = document.createElement('option');
+        option.value = p.id;
+        const price = isMayoreo ? p.precio_mayoreo : p.precio_menudeo;
+        option.textContent = `${p.nombre} (+$${price.toFixed(2)})`;
+        DOM.pedido.personalizacion.appendChild(option);
     });
     
-    if (!result.isConfirmed) return;
+    DOM.pedido.personalizacion.value = currentVal;
+}
+
+function handlePedidoTallaChange() {
+    if (!currentJerseyForPedido) return;
+    const selectedTalla = DOM.pedido.talla.value;
+    const tallaObj = currentJerseyForPedido.tallas.find(t => t.talla === selectedTalla);
+    
+    if (tallaObj) {
+        const stockVal = tallaObj.stock !== undefined ? tallaObj.stock : tallaObj.inventario;
+        DOM.pedido.cantidad.max = stockVal;
+        // No mostrar stock al usuario
+        DOM.pedido.stockInfo.textContent = '';
+        if (parseInt(DOM.pedido.cantidad.value) > stockVal) {
+            DOM.pedido.cantidad.value = stockVal;
+        }
+    }
+}
+
+function handleAddToPedidoSubmit(e) {
+    e.preventDefault();
+    if (!currentJerseyForPedido) return;
+    
+    const selectedTalla = DOM.pedido.talla.value;
+    const selectedQty = parseInt(DOM.pedido.cantidad.value) || 1;
+    const selectedPersId = DOM.pedido.personalizacion.value;
+    const customText = DOM.pedido.customText.value.trim().toUpperCase();
+    
+    if (!selectedTalla) {
+        Swal.fire({ icon: 'warning', title: 'Talla requerida', text: 'Por favor selecciona una talla.', background: '#151515', color: '#fff' });
+        return;
+    }
+    
+    // Validar stock disponible
+    const tallaObj = currentJerseyForPedido.tallas.find(t => t.talla === selectedTalla);
+    const stockVal = tallaObj ? (tallaObj.stock !== undefined ? tallaObj.stock : tallaObj.inventario) : 0;
+    
+    // Validar acumulando lo que ya está en el carrito para esta talla de este jersey
+    const existingQty = cart
+        .filter(item => item.producto.id === currentJerseyForPedido.id && item.talla === selectedTalla)
+        .reduce((sum, item) => sum + item.cantidad, 0);
+        
+    if (selectedQty + existingQty > stockVal) {
+        if (existingQty > 0) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Stock Insuficiente',
+                text: `La cantidad solicitada supera el stock disponible (ya tienes ${existingQty} unidades en tu carrito).`,
+                background: '#151515',
+                color: '#fff'
+            });
+        } else {
+            Swal.fire({
+                icon: 'error',
+                title: 'Stock Insuficiente',
+                text: `La cantidad solicitada supera el stock disponible para esta talla.`,
+                background: '#151515',
+                color: '#fff'
+            });
+        }
+        return;
+    }
+    
+    const cleanCustomText = selectedPersId === 'PERS-NONE' ? '' : customText;
+    
+    // Buscar si ya existe un artículo idéntico en el carrito para agruparlo
+    const existingItem = cart.find(item => 
+        item.producto.id === currentJerseyForPedido.id && 
+        item.talla === selectedTalla && 
+        item.personalizacionId === selectedPersId && 
+        item.texto_personalizado === cleanCustomText
+    );
+    
+    if (existingItem) {
+        existingItem.cantidad += selectedQty;
+    } else {
+        cart.push({
+            producto: currentJerseyForPedido,
+            talla: selectedTalla,
+            cantidad: selectedQty,
+            personalizacionId: selectedPersId,
+            texto_personalizado: cleanCustomText
+        });
+    }
+    
+    updateCartBadge();
+    
+    // Alerta de éxito tipo Toast
+    Swal.fire({
+        icon: 'success',
+        title: 'Agregado al pedido',
+        text: `${currentJerseyForPedido.nombre} (${selectedTalla}) añadido con éxito.`,
+        toast: true,
+        position: 'top-end',
+        showConfirmButton: false,
+        timer: 2500,
+        timerProgressBar: true,
+        background: '#151515',
+        color: '#fff'
+    });
+    
+    closePedidoModal();
+}
+
+function updateCartBadge() {
+    let totalItems = 0;
+    cart.forEach(item => {
+        totalItems += item.cantidad;
+    });
+    
+    if (DOM.cartCount) {
+        DOM.cartCount.textContent = totalItems;
+        if (totalItems > 0) {
+            DOM.cartCount.classList.remove('scale-0');
+            DOM.cartCount.classList.add('scale-100');
+            DOM.btnOpenCart.classList.add('text-navy-400');
+        } else {
+            DOM.cartCount.classList.remove('scale-100');
+            DOM.cartCount.classList.add('scale-0');
+            DOM.btnOpenCart.classList.remove('text-navy-400');
+        }
+    }
+}
+
+function openCartModal() {
+    DOM.cart.modal.classList.remove('hidden');
+    void DOM.cart.modal.offsetWidth;
+    DOM.cart.modal.classList.remove('opacity-0');
+    DOM.cart.modal.querySelector('.transform').classList.remove('scale-95');
+    DOM.cart.modal.querySelector('.transform').classList.add('scale-100');
+    document.body.style.overflow = 'hidden';
+    
+    ensureClientsLoaded();
+    renderCartItems();
+}
+
+function closeCartModal() {
+    DOM.cart.modal.classList.add('opacity-0');
+    DOM.cart.modal.querySelector('.transform').classList.remove('scale-100');
+    DOM.cart.modal.querySelector('.transform').classList.add('scale-95');
+    setTimeout(() => {
+        DOM.cart.modal.classList.add('hidden');
+        if (DOM.pedido.modal.classList.contains('hidden') && DOM.admin.createModal.classList.contains('hidden') && DOM.admin.listModal.classList.contains('hidden')) {
+            document.body.style.overflow = '';
+        }
+    }, 300);
+}
+
+async function ensureClientsLoaded() {
+    if (allClients && allClients.length > 0) {
+        populateCartClientsDropdown();
+        return;
+    }
+    
+    DOM.cart.selectCliente.innerHTML = '<option value="">Cargando clientes...</option>';
+    try {
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({ action: "search_clients", filtros: {} })
+        });
+        const data = await response.json();
+        if (data.status === 'success' && Array.isArray(data.data)) {
+            allClients = data.data;
+        } else {
+            allClients = [];
+        }
+    } catch (error) {
+        console.error("Error al cargar clientes en carrito:", error);
+        allClients = [];
+    }
+    populateCartClientsDropdown();
+}
+
+function populateCartClientsDropdown() {
+    DOM.cart.selectCliente.innerHTML = '<option value="" disabled selected>Selecciona un cliente...</option>';
+    if (allClients && allClients.length > 0) {
+        // Ordenar alfabéticamente
+        const sorted = [...allClients].sort((a,b) => (a.nombre_completo || '').localeCompare(b.nombre_completo || ''));
+        sorted.forEach(c => {
+            const option = document.createElement('option');
+            option.value = c.id_cliente;
+            option.textContent = `${c.nombre_completo} (${c.usuario || 'N/A'})`;
+            DOM.cart.selectCliente.appendChild(option);
+        });
+    } else {
+        DOM.cart.selectCliente.innerHTML = '<option value="">No hay clientes registrados</option>';
+    }
+    DOM.cart.perfilInfo.classList.add('hidden');
+}
+
+function handleCartClientChange() {
+    const selectedClientId = DOM.cart.selectCliente.value;
+    const client = allClients.find(c => c.id_cliente === selectedClientId);
+    
+    if (client) {
+        let displayPerfil = client.perfil || 'Menudeo';
+        if (displayPerfil === 'Súper Mayoreo' || displayPerfil === 'Mayoreo Súper') {
+            displayPerfil = 'Mayoreo';
+        }
+        DOM.cart.perfilVal.textContent = displayPerfil;
+        DOM.cart.perfilInfo.classList.remove('hidden');
+    } else {
+        DOM.cart.perfilInfo.classList.add('hidden');
+    }
+    
+    renderCartItems();
+}
+
+function getBasePriceForProfile(producto, profile) {
+    let basePrice = 0;
+    if (profile === 'Mayoreo' || profile === 'Súper Mayoreo' || profile === 'Mayoreo Súper') {
+        basePrice = parseFloat(producto.precio_mayoreo || 0);
+    } else {
+        basePrice = parseFloat(producto.precio_menudeo || 0);
+    }
+    
+    // Soporte para productos con esquema de precio tradicional / compatibilidad hacia atrás
+    if (basePrice === 0 && producto.precio) {
+        basePrice = parseFloat(producto.precio || 0);
+    }
+    return basePrice;
+}
+
+function renderCartItems() {
+    DOM.cart.itemsContainer.innerHTML = '';
+    
+    if (cart.length === 0) {
+        DOM.cart.emptyMessage.classList.remove('hidden');
+        DOM.cart.itemsContainer.classList.add('hidden');
+        DOM.cart.subtotalVal.textContent = '$0.00';
+        DOM.cart.personalizacionesVal.textContent = '$0.00';
+        DOM.cart.totalVal.textContent = '$0.00';
+        return;
+    }
+    
+    DOM.cart.emptyMessage.classList.add('hidden');
+    DOM.cart.itemsContainer.classList.remove('hidden');
+    
+    // Obtener perfil del cliente seleccionado
+    const selectedClientId = DOM.cart.selectCliente.value;
+    const clientObj = allClients.find(c => c.id_cliente === selectedClientId);
+    const activeProfile = localStorage.getItem('current_perfil') || 'Menudeo';
+    const fallbackProfile = activeProfile === 'Administrador' ? 'Menudeo' : activeProfile;
+    let clientProfile = clientObj ? (clientObj.perfil || fallbackProfile) : fallbackProfile;
+    if (clientProfile === 'Súper Mayoreo' || clientProfile === 'Mayoreo Súper') {
+        clientProfile = 'Mayoreo';
+    }
+    
+    let subtotal = 0;
+    let personalizacionesTotal = 0;
+    
+    cart.forEach((item, index) => {
+        const prod = item.producto;
+        const basePrice = getBasePriceForProfile(prod, clientProfile);
+        
+        // Obtener coste de personalización
+        let persPrice = 0;
+        let persName = "Ninguna";
+        const isMayoreo = clientProfile === 'Mayoreo' || clientProfile === 'Súper Mayoreo' || clientProfile === 'Mayoreo Súper';
+        if (item.personalizacionId !== 'PERS-NONE') {
+            const persObj = allPersonalizaciones.find(x => x.id === item.personalizacionId) || defaultPersonalizaciones.find(x => x.id === item.personalizacionId);
+            if (persObj) {
+                persPrice = isMayoreo ? parseFloat(persObj.precio_mayoreo || 0) : parseFloat(persObj.precio_menudeo || 0);
+                persName = persObj.nombre;
+            }
+        }
+        
+        const finalUnitPrice = basePrice + persPrice;
+        const itemTotal = finalUnitPrice * item.cantidad;
+        
+        subtotal += basePrice * item.cantidad;
+        personalizacionesTotal += persPrice * item.cantidad;
+        
+        const imgUrl = prod.foto || prod.imagen || 'https://images.unsplash.com/photo-1577212017184-807dd6acefd6?auto=format&fit=crop&q=80&w=100';
+        
+        const itemDiv = document.createElement('div');
+        itemDiv.className = 'flex items-center gap-3 bg-dark-200/20 p-2.5 rounded-xl border border-white/5 group';
+        itemDiv.innerHTML = `
+            <img src="${imgUrl}" alt="Foto" class="w-12 h-12 rounded-lg object-cover bg-dark flex-shrink-0">
+            <div class="flex-grow min-w-0">
+                <h4 class="font-bold text-white text-xs truncate leading-tight">${prod.nombre}</h4>
+                <div class="text-[9px] text-gray-400 mt-0.5 font-medium uppercase tracking-wider">
+                    ${prod.genero || '-'} | ${prod.tipo || '-'} | ${prod.version || '-'}
+                </div>
+                <div class="text-[10px] text-gray-500 mt-0.5">
+                    Talla: <span class="text-gray-300 font-semibold">${item.talla}</span> | 
+                    Cant: <span class="text-gray-300 font-semibold">${item.cantidad}</span>
+                </div>
+                <div class="text-[10px] text-gray-400 mt-0.5">
+                    Pers: <span class="text-navy-400 font-semibold">${persName}</span>
+                    ${item.texto_personalizado ? ` | <span class="text-emerald-400 font-mono">"${item.texto_personalizado}"</span>` : ''}
+                </div>
+            </div>
+            <div class="text-right flex-shrink-0 min-w-[70px]">
+                <div class="font-bold text-white text-xs">$${itemTotal.toFixed(2)}</div>
+                <div class="text-[9px] text-gray-500 mt-0.5">$${finalUnitPrice.toFixed(2)} c/u</div>
+            </div>
+            <button onclick="removeCartItem(${index})" class="p-1.5 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-colors" title="Eliminar artículo">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+            </button>
+        `;
+        DOM.cart.itemsContainer.appendChild(itemDiv);
+    });
+    
+    const grandTotal = subtotal + personalizacionesTotal;
+    DOM.cart.subtotalVal.textContent = `$${subtotal.toFixed(2)}`;
+    DOM.cart.personalizacionesVal.textContent = `$${personalizacionesTotal.toFixed(2)}`;
+    DOM.cart.totalVal.textContent = `$${grandTotal.toFixed(2)}`;
+}
+
+window.removeCartItem = function(index) {
+    cart.splice(index, 1);
+    updateCartBadge();
+    renderCartItems();
+};
+
+function emptyCart(confirm = true) {
+    if (cart.length === 0) return;
+    
+    const clearAction = () => {
+        cart = [];
+        updateCartBadge();
+        renderCartItems();
+        Swal.fire({
+            icon: 'info',
+            title: 'Carrito Vaciado',
+            text: 'Tu pedido ha sido vaciado.',
+            timer: 1500,
+            showConfirmButton: false,
+            background: '#151515', color: '#fff'
+        });
+    };
+    
+    if (confirm === true) {
+        Swal.fire({
+            title: '¿Vaciar el pedido?',
+            text: 'Se eliminarán todos los jerseys de tu carrito.',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#ef4444',
+            cancelButtonColor: '#222222',
+            confirmButtonText: 'Sí, vaciar',
+            cancelButtonText: 'Cancelar',
+            background: '#151515', color: '#fff',
+            customClass: { popup: 'border border-white/10 rounded-2xl' }
+        }).then((result) => {
+            if (result.isConfirmed) {
+                clearAction();
+            }
+        });
+    } else {
+        clearAction();
+    }
+}
+
+async function submitOrder() {
+    if (cart.length === 0) {
+        Swal.fire({ icon: 'warning', title: 'Pedido Vacío', text: 'Tu pedido no contiene artículos.', background: '#151515', color: '#fff' });
+        return;
+    }
+    
+    const selectedClientId = DOM.cart.selectCliente.value;
+    if (!selectedClientId) {
+        Swal.fire({ icon: 'warning', title: 'Cliente requerido', text: 'Por favor selecciona un cliente para la orden.', background: '#151515', color: '#fff' });
+        return;
+    }
+    
+    const clientObj = allClients.find(c => c.id_cliente === selectedClientId);
+    let profile = clientObj.perfil || 'Menudeo';
+    if (profile === 'Súper Mayoreo' || profile === 'Mayoreo Súper') {
+        profile = 'Mayoreo';
+    }
+    const isMayoreo = profile === 'Mayoreo';
+    
+    // Construir lista de artículos con precios calculados para el payload
+    const articulos = cart.map(item => {
+        const basePrice = getBasePriceForProfile(item.producto, profile);
+        
+        let persPrice = 0;
+        if (item.personalizacionId !== 'PERS-NONE') {
+            const persObj = allPersonalizaciones.find(x => x.id === item.personalizacionId) || defaultPersonalizaciones.find(x => x.id === item.personalizacionId);
+            if (persObj) {
+                persPrice = isMayoreo ? parseFloat(persObj.precio_mayoreo || 0) : parseFloat(persObj.precio_menudeo || 0);
+            }
+        }
+        
+        const finalPrice = basePrice + persPrice;
+        
+        return {
+            id_producto: item.producto.id,
+            talla: item.talla,
+            cantidad: item.cantidad,
+            id_personalizacion: item.personalizacionId,
+            texto_personalizado: item.texto_personalizado,
+            precio_unitario_final: finalPrice
+        };
+    });
+    
+    const payload = {
+        action: "create_order",
+        id_cliente: selectedClientId,
+        tipo_precio_aplicado: profile,
+        articulos: articulos
+    };
+    
+    // Mostrar spinner de carga
+    Swal.fire({
+        title: 'Procesando Pedido',
+        text: 'Enviando orden a la base de datos...',
+        allowOutsideClick: false,
+        background: '#151515', color: '#fff',
+        didOpen: () => {
+            Swal.showLoading();
+        }
+    });
     
     try {
         const response = await fetch(API_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify({
-                action: "delete_client",
-                id_cliente: clientId
-            })
+            body: JSON.stringify(payload)
         });
         const data = await response.json();
+        
         if (data.status === 'success') {
+            // Generar HTML de recibo de compra
+            let subtotal = 0;
+            let totalQty = 0;
+            let articulosHtml = '';
+            
+            cart.forEach(item => {
+                const basePrice = getBasePriceForProfile(item.producto, profile);
+                
+                let persPrice = 0;
+                let persName = "Ninguna";
+                if (item.personalizacionId !== 'PERS-NONE') {
+                    const persObj = allPersonalizaciones.find(x => x.id === item.personalizacionId) || defaultPersonalizaciones.find(x => x.id === item.personalizacionId);
+                    if (persObj) {
+                        persPrice = isMayoreo ? parseFloat(persObj.precio_mayoreo || 0) : parseFloat(persObj.precio_menudeo || 0);
+                        persName = persObj.nombre;
+                    }
+                }
+                
+                const finalUnitPrice = basePrice + persPrice;
+                const itemTotal = finalUnitPrice * item.cantidad;
+                
+                subtotal += itemTotal;
+                totalQty += item.cantidad;
+                
+                articulosHtml += `
+                    <div class="flex flex-col py-1.5 border-b border-white/5">
+                        <div class="flex justify-between text-xs">
+                            <div class="truncate pr-4 flex-1">
+                                <span class="font-bold text-gray-300">${item.cantidad}x</span> ${item.producto.nombre} (${item.talla})
+                                <div class="text-[9px] text-gray-500 font-medium uppercase mt-0.5">${item.producto.genero || '-'} | ${item.producto.tipo || '-'} | ${item.producto.version || '-'}</div>
+                            </div>
+                            <div class="text-right font-mono text-gray-300">$${itemTotal.toFixed(2)}</div>
+                        </div>
+                        <div class="flex justify-between text-[9px] text-gray-500 mt-0.5 pl-5">
+                            <div>
+                                Base: $${basePrice.toFixed(2)} ${persPrice > 0 ? `+ Personalización (${persName}): $${persPrice.toFixed(2)}` : ''}
+                                ${item.texto_personalizado ? `<span class="text-emerald-500 font-semibold block mt-0.5">"${item.texto_personalizado}"</span>` : ''}
+                            </div>
+                            <div class="text-right font-mono">$${finalUnitPrice.toFixed(2)} c/u</div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            const receiptHtml = `
+                <div class="text-left space-y-4 text-sm mt-3 border-t border-white/10 pt-3">
+                    <div class="grid grid-cols-2 text-xs text-gray-400 gap-1">
+                        <div><strong>Cliente:</strong> ${clientObj.nombre_completo}</div>
+                        <div><strong>ID Cliente:</strong> ${clientObj.id_cliente}</div>
+                        <div><strong>Perfil Aplicado:</strong> ${profile}</div>
+                        <div><strong>Cantidad total:</strong> ${totalQty} playeras</div>
+                    </div>
+                    
+                    <div class="space-y-1">
+                        <div class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Desglose de Artículos:</div>
+                        ${articulosHtml}
+                    </div>
+                    
+                    <div class="flex justify-between text-base border-t border-white/10 pt-3 font-bold">
+                        <span>Total Pagado:</span>
+                        <span class="text-emerald-400">$${subtotal.toFixed(2)}</span>
+                    </div>
+                    <div class="text-[10px] text-gray-500 text-center pt-2">
+                        La orden ha sido guardada en la base de datos de Sheets.
+                    </div>
+                </div>
+            `;
+            
             Swal.fire({
                 icon: 'success',
-                title: 'Cliente Eliminado',
-                text: data.message || 'El cliente ha sido borrado.',
+                title: '¡Pedido Realizado!',
+                html: receiptHtml,
                 background: '#151515', color: '#fff',
-                timer: 1500,
-                showConfirmButton: false
+                confirmButtonColor: '#1d4ed8',
+                customClass: { popup: 'border border-white/10 rounded-2xl max-w-md' }
             });
-            fetchClients(true);
+            
+            // Vaciar carrito
+            cart = [];
+            updateCartBadge();
+            closeCartModal();
+            
+            // Recargar productos en background para actualizar inventarios/stock
+            fetchInitialProducts();
         } else {
-            throw new Error(data.message || 'Error al eliminar cliente.');
+            throw new Error(data.message || 'Error desconocido al registrar pedido.');
         }
     } catch (error) {
         Swal.fire({
             icon: 'error',
-            title: 'Error',
-            text: error.message,
-            background: '#151515', color: '#fff'
+            title: 'Error de Red',
+            text: error.message || 'Ocurrió un problema de conexión al guardar el pedido.',
+            background: '#151515', color: '#fff',
+            confirmButtonColor: '#ef4444'
         });
     }
 }
+
