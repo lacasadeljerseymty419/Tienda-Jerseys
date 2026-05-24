@@ -76,12 +76,26 @@ const DOM = {
     },
     navUserBadge: document.getElementById('nav-user-badge'),
     navUserName: document.getElementById('nav-user-name'),
-    btnLogout: document.getElementById('btn-logout'),
     adminSubperfilSelect: document.getElementById('admin-subperfil-select'),
-    btnNavCatalogo: document.getElementById('btn-nav-catalogo'),
-    btnNavJerseysView: document.getElementById('btn-nav-jerseys-view'),
     btnOpenCart: document.getElementById('btn-open-cart'),
     cartCount: document.getElementById('cart-count'),
+    actions: {
+        logout: document.querySelectorAll('.action-logout'),
+        navCatalogo: document.querySelectorAll('.action-nav-catalogo'),
+        navJerseysView: document.querySelectorAll('.action-nav-jerseys-view'),
+        openCreate: document.querySelectorAll('.action-open-create'),
+        openList: document.querySelectorAll('.action-open-list'),
+        openClients: document.querySelectorAll('.action-open-clients')
+    },
+    mobileMenu: {
+        toggleBtn: document.getElementById('btn-mobile-menu-toggle'),
+        closeBtn: document.getElementById('btn-close-mobile-menu'),
+        overlay: document.getElementById('mobile-menu-overlay'),
+        drawer: document.getElementById('mobile-menu-drawer'),
+        userName: document.getElementById('mobile-nav-user-name'),
+        adminSection: document.getElementById('mobile-admin-section'),
+        adminSubperfilSelect: document.getElementById('mobile-admin-subperfil-select')
+    },
     cart: {
         modal: document.getElementById('cart-modal'),
         closeBtn: document.getElementById('close-cart-modal'),
@@ -132,7 +146,6 @@ const DOM = {
         closeBtn: document.getElementById('close-modal')
     },
     admin: {
-        btnOpenCreate: document.getElementById('btn-open-create'),
         createModal: document.getElementById('admin-create-modal'),
         closeCreateModal: document.getElementById('close-create-modal'),
         btnCancelCreate: document.getElementById('btn-cancel-create'),
@@ -147,7 +160,6 @@ const DOM = {
         fotoInput: document.getElementById('create-foto'),
         fotoPreviewContainer: document.getElementById('preview-foto-container'),
         fotoPreview: document.getElementById('preview-foto'),
-        btnOpenList: document.getElementById('btn-open-list'),
         listModal: document.getElementById('admin-list-modal'),
         closeListModal: document.getElementById('close-list-modal'),
         tableBody: document.getElementById('admin-table-body'),
@@ -176,7 +188,6 @@ const DOM = {
         pageNext: document.getElementById('admin-page-next'),
         pageInfo: document.getElementById('admin-pagination-info'),
         adminMenuWrapper: document.getElementById('admin-menu-wrapper'),
-        btnOpenClients: document.getElementById('btn-open-clients'),
         clientsModal: document.getElementById('admin-clients-modal'),
         closeClientsModal: document.getElementById('close-clients-modal'),
         clientFilterSearch: document.getElementById('client-filter-search'),
@@ -258,15 +269,22 @@ async function initApp() {
         DOM.login.overlay.classList.add('hidden');
         const loggedUser = JSON.parse(loggedUserStr);
         DOM.navUserName.textContent = loggedUser.nombre_completo || loggedUser.usuario || 'Usuario';
+        if (DOM.mobileMenu.userName) DOM.mobileMenu.userName.textContent = loggedUser.nombre_completo || loggedUser.usuario || 'Usuario';
         DOM.navUserBadge.classList.remove('hidden');
         if (loggedUser.perfil === "Administrador") {
             if (DOM.admin.adminMenuWrapper) DOM.admin.adminMenuWrapper.classList.remove('hidden');
+            if (DOM.mobileMenu.adminSection) DOM.mobileMenu.adminSection.classList.remove('hidden');
+            const savedSub = localStorage.getItem('current_subperfil') || 'Menudeo';
             if (DOM.adminSubperfilSelect) {
                 DOM.adminSubperfilSelect.classList.remove('hidden');
-                DOM.adminSubperfilSelect.value = localStorage.getItem('current_subperfil') || 'Menudeo';
+                DOM.adminSubperfilSelect.value = savedSub;
+            }
+            if (DOM.mobileMenu.adminSubperfilSelect) {
+                DOM.mobileMenu.adminSubperfilSelect.value = savedSub;
             }
         } else {
             if (DOM.admin.adminMenuWrapper) DOM.admin.adminMenuWrapper.classList.add('hidden');
+            if (DOM.mobileMenu.adminSection) DOM.mobileMenu.adminSection.classList.add('hidden');
             if (DOM.adminSubperfilSelect) DOM.adminSubperfilSelect.classList.add('hidden');
         }
     }
@@ -279,23 +297,47 @@ async function initApp() {
     ensureClientsLoaded();
     
     // Listeners de Vistas del Header (Navegación)
-    if (DOM.btnLogout) {
-        DOM.btnLogout.addEventListener('click', handleLogout);
-    }
-    if (DOM.adminSubperfilSelect) {
-        DOM.adminSubperfilSelect.addEventListener('change', (e) => {
-            localStorage.setItem('current_subperfil', e.target.value);
-            applyProfileView();
-        });
-    }
-    if (DOM.btnNavCatalogo) {
-        DOM.btnNavCatalogo.addEventListener('click', () => switchView('mis-jerseys'));
-    }
-    if (DOM.btnNavJerseysView) {
-        DOM.btnNavJerseysView.addEventListener('click', () => switchView('jerseys-pedido'));
-    }
+    if (DOM.actions.logout) DOM.actions.logout.forEach(btn => btn.addEventListener('click', handleLogout));
+    if (DOM.actions.navCatalogo) DOM.actions.navCatalogo.forEach(btn => btn.addEventListener('click', () => { switchView('mis-jerseys'); closeMobileMenu(); }));
+    if (DOM.actions.navJerseysView) DOM.actions.navJerseysView.forEach(btn => btn.addEventListener('click', () => { switchView('jerseys-pedido'); closeMobileMenu(); }));
     if (DOM.btnOpenCart) {
         DOM.btnOpenCart.addEventListener('click', openCartModal);
+    }
+
+    function handleSubperfilChange(e) {
+        const val = e.target.value;
+        if (DOM.adminSubperfilSelect) DOM.adminSubperfilSelect.value = val;
+        if (DOM.mobileMenu.adminSubperfilSelect) DOM.mobileMenu.adminSubperfilSelect.value = val;
+        localStorage.setItem('current_subperfil', val);
+        applyProfileView();
+    }
+    if (DOM.adminSubperfilSelect) DOM.adminSubperfilSelect.addEventListener('change', handleSubperfilChange);
+    if (DOM.mobileMenu.adminSubperfilSelect) DOM.mobileMenu.adminSubperfilSelect.addEventListener('change', handleSubperfilChange);
+
+    // Mobile Menu Toggle
+    if (DOM.mobileMenu.toggleBtn) {
+        DOM.mobileMenu.toggleBtn.addEventListener('click', () => {
+            if (DOM.mobileMenu.overlay) DOM.mobileMenu.overlay.classList.remove('hidden');
+            setTimeout(() => {
+                if (DOM.mobileMenu.overlay) DOM.mobileMenu.overlay.classList.remove('opacity-0');
+                if (DOM.mobileMenu.drawer) DOM.mobileMenu.drawer.classList.remove('translate-x-full');
+            }, 10);
+        });
+    }
+    if (DOM.mobileMenu.closeBtn) DOM.mobileMenu.closeBtn.addEventListener('click', closeMobileMenu);
+    if (DOM.mobileMenu.overlay) {
+        DOM.mobileMenu.overlay.addEventListener('click', (e) => {
+            if (e.target === DOM.mobileMenu.overlay) closeMobileMenu();
+        });
+    }
+
+    function closeMobileMenu() {
+        if (!DOM.mobileMenu.overlay) return;
+        DOM.mobileMenu.overlay.classList.add('opacity-0');
+        if (DOM.mobileMenu.drawer) DOM.mobileMenu.drawer.classList.add('translate-x-full');
+        setTimeout(() => {
+            DOM.mobileMenu.overlay.classList.add('hidden');
+        }, 300);
     }
     
     // Listeners del Modal de Carrito/Orden
@@ -333,12 +375,12 @@ async function initApp() {
     }
     
     // Eventos de Admin
-    if (DOM.admin.btnOpenCreate) DOM.admin.btnOpenCreate.addEventListener('click', openCreateModal);
+    if (DOM.actions.openCreate) DOM.actions.openCreate.forEach(btn => btn.addEventListener('click', () => { openCreateModal(); closeMobileMenu(); }));
     if (DOM.admin.closeCreateModal) DOM.admin.closeCreateModal.addEventListener('click', closeCreateModal);
     if (DOM.admin.btnCancelCreate) DOM.admin.btnCancelCreate.addEventListener('click', closeCreateModal);
     if (DOM.admin.btnAddTalla) DOM.admin.btnAddTalla.addEventListener('click', addTallaField);
     if (DOM.admin.formCreate) DOM.admin.formCreate.addEventListener('submit', handleCreateProduct);
-    if (DOM.admin.btnOpenList) DOM.admin.btnOpenList.addEventListener('click', openListModal);
+    if (DOM.actions.openList) DOM.actions.openList.forEach(btn => btn.addEventListener('click', () => { openListModal(); closeMobileMenu(); }));
     if (DOM.admin.closeListModal) DOM.admin.closeListModal.addEventListener('click', closeListModal);
     
     if (DOM.admin.closeInvModal) DOM.admin.closeInvModal.addEventListener('click', closeInventoryModal);
@@ -365,7 +407,7 @@ async function initApp() {
     }
 
     // Eventos de Perfil y Clientes
-    if (DOM.admin.btnOpenClients) DOM.admin.btnOpenClients.addEventListener('click', openClientsModal);
+    if (DOM.actions.openClients) DOM.actions.openClients.forEach(btn => btn.addEventListener('click', () => { openClientsModal(); closeMobileMenu(); }));
     if (DOM.admin.closeClientsModal) DOM.admin.closeClientsModal.addEventListener('click', closeClientsModal);
     if (DOM.admin.btnOpenCreateClient) DOM.admin.btnOpenCreateClient.addEventListener('click', () => openClientFormModal());
     if (DOM.admin.closeClientFormModal) DOM.admin.closeClientFormModal.addEventListener('click', closeClientFormModal);
@@ -537,10 +579,10 @@ async function loadCatalogs() {
     
     if (pers && pers.length > 0) {
         allPersonalizaciones = pers.map(p => ({
-            id: p.id_personalizacion,
+            id: p.id_personalizacion || p.id,
             nombre: p.concepto || p.nombre || '',
-            precio_menudeo: parseFloat(p.precio_menudeo || 0),
-            precio_mayoreo: parseFloat(p.precio_mayoreo || 0)
+            precio_menudeo: parseFloat((p.precio_menudeo !== undefined && p.precio_menudeo !== "") ? p.precio_menudeo : (p.precio || 0)),
+            precio_mayoreo: parseFloat((p.precio_mayoreo !== undefined && p.precio_mayoreo !== "") ? p.precio_mayoreo : (p.precio || 0))
         }));
     } else {
         allPersonalizaciones = defaultPersonalizaciones;
@@ -647,11 +689,24 @@ async function handleLoginSubmit(e) {
             setTimeout(() => DOM.login.overlay.classList.add('hidden'), 300);
             
             DOM.navUserName.textContent = res.data.nombre_completo || res.data.usuario || 'Usuario';
-            DOM.navUserBadge.classList.remove('hidden');
+            if (DOM.mobileMenu && DOM.mobileMenu.userName) DOM.mobileMenu.userName.textContent = res.data.nombre_completo || res.data.usuario || 'Usuario';
+            if (DOM.navUserBadge) DOM.navUserBadge.classList.remove('hidden');
+            
             if (res.data.perfil === "Administrador") {
-                if (DOM.admin.adminMenuWrapper) DOM.admin.adminMenuWrapper.classList.remove('hidden');
+                if (DOM.admin && DOM.admin.adminMenuWrapper) DOM.admin.adminMenuWrapper.classList.remove('hidden');
+                if (DOM.mobileMenu && DOM.mobileMenu.adminSection) DOM.mobileMenu.adminSection.classList.remove('hidden');
+                const savedSub = localStorage.getItem('current_subperfil') || 'Menudeo';
+                if (DOM.adminSubperfilSelect) {
+                    DOM.adminSubperfilSelect.classList.remove('hidden');
+                    DOM.adminSubperfilSelect.value = savedSub;
+                }
+                if (DOM.mobileMenu && DOM.mobileMenu.adminSubperfilSelect) {
+                    DOM.mobileMenu.adminSubperfilSelect.value = savedSub;
+                }
             } else {
-                if (DOM.admin.adminMenuWrapper) DOM.admin.adminMenuWrapper.classList.add('hidden');
+                if (DOM.admin && DOM.admin.adminMenuWrapper) DOM.admin.adminMenuWrapper.classList.add('hidden');
+                if (DOM.mobileMenu && DOM.mobileMenu.adminSection) DOM.mobileMenu.adminSection.classList.add('hidden');
+                if (DOM.adminSubperfilSelect) DOM.adminSubperfilSelect.classList.add('hidden');
             }
             
             applyProfileView();
@@ -1831,16 +1886,18 @@ async function handleSaveClient(e) {
 function switchView(view) {
     currentView = view;
     if (view === 'mis-jerseys') {
-        DOM.btnNavCatalogo.className = "w-full text-left px-4 py-2 text-sm text-white bg-navy-500/20 rounded-lg transition-colors flex items-center gap-2";
-        DOM.btnNavJerseysView.className = "text-xs sm:text-sm font-semibold text-gray-400 hover:text-white transition-colors flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg hover:bg-white/5";
-        if (DOM.admin.selectPerfil && DOM.admin.selectPerfil.parentElement) {
-            DOM.admin.selectPerfil.parentElement.classList.remove('hidden');
+        if (DOM.actions && DOM.actions.navCatalogo) {
+            DOM.actions.navCatalogo.forEach(btn => btn.className = "action-nav-catalogo w-full text-left px-4 py-2 text-sm text-white bg-navy-500/20 rounded-lg transition-colors flex items-center gap-2");
+        }
+        if (DOM.actions && DOM.actions.navJerseysView) {
+            DOM.actions.navJerseysView.forEach(btn => btn.className = "action-nav-jerseys-view text-xs sm:text-sm font-semibold text-gray-400 hover:text-white transition-colors flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg hover:bg-white/5");
         }
     } else if (view === 'jerseys-pedido') {
-        DOM.btnNavCatalogo.className = "w-full text-left px-4 py-2 text-sm text-gray-300 hover:text-white hover:bg-navy-500/20 rounded-lg transition-colors flex items-center gap-2";
-        DOM.btnNavJerseysView.className = "text-xs sm:text-sm font-semibold text-white transition-colors flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg bg-white/5 border border-white/10";
-        if (DOM.admin.selectPerfil && DOM.admin.selectPerfil.parentElement) {
-            DOM.admin.selectPerfil.parentElement.classList.add('hidden');
+        if (DOM.actions && DOM.actions.navCatalogo) {
+            DOM.actions.navCatalogo.forEach(btn => btn.className = "action-nav-catalogo w-full text-left px-4 py-2 text-sm text-gray-300 hover:text-white hover:bg-navy-500/20 rounded-lg transition-colors flex items-center gap-2");
+        }
+        if (DOM.actions && DOM.actions.navJerseysView) {
+            DOM.actions.navJerseysView.forEach(btn => btn.className = "action-nav-jerseys-view text-xs sm:text-sm font-semibold text-white transition-colors flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg bg-white/5 border border-white/10");
         }
     }
     renderLocalProducts(allProducts);
