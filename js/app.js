@@ -1429,6 +1429,8 @@ function createProductCard(producto) {
     let totalStock = 0;
     const hasSizes = Array.isArray(producto.tallas) && producto.tallas.length > 0;
 
+    const isAdmin = (localStorage.getItem('current_perfil') === "Administrador");
+
     if (hasSizes) {
         tallasHtml = '<div class="flex flex-wrap gap-1 sm:gap-2 mt-auto pt-2 sm:pt-4 z-10 relative">';
         producto.tallas.forEach(t => {
@@ -1439,12 +1441,17 @@ function createProductCard(producto) {
                 ? 'bg-dark-200 text-gray-200 border-white/10 hover:border-navy-400 hover:text-navy-400 hover:bg-dark-100 cursor-pointer shadow-sm' 
                 : 'bg-dark/50 text-gray-600 border-white/5 line-through opacity-40 cursor-not-allowed';
             
+            const adminStockHtml = isAdmin ? `<span class="absolute -top-2 -right-2 bg-navy-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full shadow-lg border border-dark z-20">${stockVal}</span>` : '';
+
             tallasHtml += `
-                <button class="w-6 h-6 sm:w-9 sm:h-9 rounded-md sm:rounded-lg flex items-center justify-center text-[8px] sm:text-xs font-semibold border transition-all duration-200 ${btnClass}" 
-                        ${!hasStock ? 'disabled' : ''} 
-                        title="${hasStock ? `Stock: ${stockVal}` : 'Agotado'}">
-                    ${t.talla}
-                </button>
+                <div class="relative">
+                    <button class="w-6 h-6 sm:w-9 sm:h-9 rounded-md sm:rounded-lg flex items-center justify-center text-[8px] sm:text-xs font-semibold border transition-all duration-200 ${btnClass}" 
+                            ${!hasStock ? 'disabled' : ''} 
+                            title="${hasStock ? `Stock: ${stockVal}` : 'Agotado'}">
+                        ${t.talla}
+                    </button>
+                    ${adminStockHtml}
+                </div>
             `;
         });
         tallasHtml += '</div>';
