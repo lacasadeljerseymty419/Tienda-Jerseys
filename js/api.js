@@ -1,4 +1,4 @@
-export const API_URL = "https://script.google.com/macros/s/AKfycbwrOFvWa4kN9sNmC6TNzcKH_CVO4GOq-cGs6Gby7uB8jNMdwSCRoSmhvKBErxEf-ZVNdQ/exec";
+export const API_URL = "https://script.google.com/macros/s/AKfycbxmcNdzNin1dmn2OM8oPiuBtric6COHvDJQWGqVu3vNQmYaFaH47wl-C6r_uEEgTnaKEw/exec";
 
 /**
  * Obtiene los catálogos de filtros disponibles.
@@ -48,5 +48,32 @@ export async function search(filtros = { nombre: "", tipo: "", version: "", gene
     } catch (error) {
         console.error("Error al buscar productos:", error);
         return [];
+    }
+}
+
+/**
+ * Autentica un cliente en el sistema.
+ * @param {string} usuario - El usuario del cliente.
+ * @param {string} password - La contraseña del cliente.
+ * @returns {Promise<Object>} JSON con el resultado de la autenticación.
+ */
+export async function login_client(usuario, password) {
+    try {
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'text/plain;charset=utf-8'
+            },
+            body: JSON.stringify({ action: "login_client", usuario, password })
+        });
+        
+        if (!response.ok) {
+            throw new Error(`Error de red HTTP: ${response.status}`);
+        }
+        
+        return await response.json();
+    } catch (error) {
+        console.error("Error en login:", error);
+        return { status: "error", message: "Error de conexión al servidor." };
     }
 }
