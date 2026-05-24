@@ -1104,16 +1104,16 @@ function renderLocalProducts(productos) {
 
 function createProductCard(producto) {
     const article = document.createElement('article');
-    article.className = 'group bg-dark-100 rounded-2xl p-3 sm:p-4 border border-white/5 hover:border-navy-400/40 transition-all duration-300 flex flex-col h-full hover:shadow-[0_0_30px_rgba(59,130,246,0.08)] relative overflow-hidden';
+    article.className = 'group bg-dark-100 rounded-xl sm:rounded-2xl p-2 sm:p-4 border border-white/5 hover:border-navy-400/40 transition-all duration-300 flex flex-col h-full hover:shadow-[0_0_30px_rgba(59,130,246,0.08)] relative overflow-hidden';
     
     const imgUrl = producto.foto || producto.imagen || 'https://images.unsplash.com/photo-1577212017184-807dd6acefd6?auto=format&fit=crop&q=80&w=600';
     
-    let tagsHtml = '<div class="flex flex-wrap gap-1.5 sm:gap-2 mb-2 sm:mb-3 z-10 relative">';
-    if (producto.version) tagsHtml += `<span class="px-1.5 py-0.5 sm:px-2.5 sm:py-1 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider bg-white/5 text-gray-400 rounded-md border border-white/10 backdrop-blur-sm">${producto.version}</span>`;
-    if (producto.tipo) tagsHtml += `<span class="px-1.5 py-0.5 sm:px-2.5 sm:py-1 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider bg-white/5 text-gray-300 rounded-md border border-white/10 backdrop-blur-sm">${producto.tipo}</span>`;
+    let tagsHtml = '<div class="flex flex-wrap gap-1 sm:gap-2 mb-1.5 sm:mb-3 z-10 relative">';
+    if (producto.version) tagsHtml += `<span class="px-1.5 py-0.5 sm:px-2.5 sm:py-1 text-[8px] sm:text-[10px] font-bold uppercase tracking-wider bg-white/5 text-gray-400 rounded-md border border-white/10 backdrop-blur-sm">${producto.version}</span>`;
+    if (producto.tipo) tagsHtml += `<span class="px-1.5 py-0.5 sm:px-2.5 sm:py-1 text-[8px] sm:text-[10px] font-bold uppercase tracking-wider bg-white/5 text-gray-300 rounded-md border border-white/10 backdrop-blur-sm">${producto.tipo}</span>`;
     if (producto.genero) {
         const colorGen = getGenderColorClass(producto.genero);
-        tagsHtml += `<span class="px-1.5 py-0.5 sm:px-2.5 sm:py-1 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider ${colorGen} rounded-md border backdrop-blur-sm">${producto.genero}</span>`;
+        tagsHtml += `<span class="px-1.5 py-0.5 sm:px-2.5 sm:py-1 text-[8px] sm:text-[10px] font-bold uppercase tracking-wider ${colorGen} rounded-md border backdrop-blur-sm">${producto.genero}</span>`;
     }
     tagsHtml += '</div>';
 
@@ -1122,7 +1122,7 @@ function createProductCard(producto) {
     const hasSizes = Array.isArray(producto.tallas) && producto.tallas.length > 0;
 
     if (hasSizes) {
-        tallasHtml = '<div class="flex flex-wrap gap-1.5 sm:gap-2 mt-auto pt-3 sm:pt-5 z-10 relative">';
+        tallasHtml = '<div class="flex flex-wrap gap-1 sm:gap-2 mt-auto pt-2 sm:pt-4 z-10 relative">';
         producto.tallas.forEach(t => {
             const stockVal = t.stock !== undefined ? t.stock : t.inventario;
             if (stockVal > 0) totalStock += stockVal;
@@ -1132,7 +1132,7 @@ function createProductCard(producto) {
                 : 'bg-dark/50 text-gray-600 border-white/5 line-through opacity-40 cursor-not-allowed';
             
             tallasHtml += `
-                <button class="w-7 h-7 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center text-[10px] sm:text-xs font-semibold border transition-all duration-200 ${btnClass}" 
+                <button class="w-6 h-6 sm:w-9 sm:h-9 rounded-md sm:rounded-lg flex items-center justify-center text-[8px] sm:text-xs font-semibold border transition-all duration-200 ${btnClass}" 
                         ${!hasStock ? 'disabled' : ''} 
                         title="${hasStock ? `Stock: ${stockVal}` : 'Agotado'}">
                     ${t.talla}
@@ -1152,7 +1152,7 @@ function createProductCard(producto) {
     if (hasPrice) {
         if (activeProfile === "Administrador") {
             statusTextHtml = `
-                <div class="mt-2 mb-3 bg-dark-200/40 border border-white/5 rounded-xl p-2.5 space-y-1 text-[11px] sm:text-xs z-10 relative backdrop-blur-sm">
+                <div class="mt-1 mb-2 bg-dark-200/40 border border-white/5 rounded-xl p-1.5 sm:p-2.5 space-y-0.5 sm:space-y-1 text-[9px] sm:text-xs z-10 relative backdrop-blur-sm">
                     <div class="flex justify-between items-center text-gray-400">
                         <span class="font-medium">Menudeo:</span>
                         <span class="font-bold text-gray-200">$${parseFloat(producto.precio_menudeo || 0).toFixed(2)}</span>
@@ -1169,7 +1169,7 @@ function createProductCard(producto) {
             `;
         } else if (activeProfile === "Mayoreo") {
             statusTextHtml = `
-                <div class="mt-2 mb-3 bg-dark-200/40 border border-white/5 rounded-xl p-2.5 space-y-1 text-[11px] sm:text-xs z-10 relative backdrop-blur-sm">
+                <div class="mt-1 mb-2 bg-dark-200/40 border border-white/5 rounded-xl p-1.5 sm:p-2.5 space-y-0.5 sm:space-y-1 text-[9px] sm:text-xs z-10 relative backdrop-blur-sm">
                     <div class="flex justify-between items-center text-gray-400">
                         <span class="font-medium">Mayoreo:</span>
                         <span class="font-bold text-navy-400">$${parseFloat(producto.precio_mayoreo || 0).toFixed(2)}</span>
@@ -1183,7 +1183,7 @@ function createProductCard(producto) {
         } else {
             // Menudeo (por defecto)
             statusTextHtml = `
-                <div class="mt-2 mb-3 bg-dark-200/40 border border-white/5 rounded-xl p-2.5 space-y-1 text-[11px] sm:text-xs z-10 relative backdrop-blur-sm">
+                <div class="mt-1 mb-2 bg-dark-200/40 border border-white/5 rounded-xl p-1.5 sm:p-2.5 space-y-0.5 sm:space-y-1 text-[9px] sm:text-xs z-10 relative backdrop-blur-sm">
                     <div class="flex justify-between items-center text-gray-400">
                         <span class="font-medium">Menudeo:</span>
                         <span class="font-bold text-gray-200">$${parseFloat(producto.precio_menudeo || 0).toFixed(2)}</span>
@@ -1192,18 +1192,18 @@ function createProductCard(producto) {
             `;
         }
     } else if (producto.precio) {
-        statusTextHtml = `<p class="text-base sm:text-xl font-bold text-gray-100 mb-1 sm:mb-2 z-10 relative">$${parseFloat(producto.precio).toFixed(2)}</p>`;
+        statusTextHtml = `<p class="text-xs sm:text-sm font-bold text-gray-100 mb-1 sm:mb-2 z-10 relative">$${parseFloat(producto.precio).toFixed(2)}</p>`;
     } else if (isProximamente) {
         statusTextHtml = `
-            <p class="text-sm sm:text-base font-bold text-amber-500 mb-1 sm:mb-2 z-10 relative flex items-center gap-1.5">
-                <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+            <p class="text-xs sm:text-sm font-bold text-amber-500 mb-1 sm:mb-2 z-10 relative flex items-center gap-1.5">
+                <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
                 Próximamente
             </p>
         `;
     } else if (isAgotado) {
         statusTextHtml = `
-            <p class="text-sm sm:text-base font-bold text-red-500 mb-1 sm:mb-2 z-10 relative flex items-center gap-1.5">
-                <span class="w-2 h-2 rounded-full bg-red-500"></span>
+            <p class="text-xs sm:text-sm font-bold text-red-500 mb-1 sm:mb-2 z-10 relative flex items-center gap-1.5">
+                <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>
                 Agotado
             </p>
         `;
@@ -1214,25 +1214,25 @@ function createProductCard(producto) {
     if (isProximamente) {
         imageOverlayHtml = `
             <div class="absolute inset-0 flex items-center justify-center bg-dark/40 backdrop-blur-[2px] z-20">
-                <span class="bg-amber-500 text-white px-3 sm:px-5 py-1.5 sm:py-2 rounded-lg font-bold tracking-widest uppercase text-[10px] sm:text-xs border border-amber-400 shadow-xl shadow-amber-500/20 transform -rotate-6">Próximamente</span>
+                <span class="bg-amber-500 text-white px-2 sm:px-5 py-1 sm:py-2 rounded-lg font-bold tracking-widest uppercase text-[8px] sm:text-xs border border-amber-400 shadow-xl shadow-amber-500/20 transform -rotate-6">Próximamente</span>
             </div>
         `;
     } else if (isAgotado) {
         imageOverlayHtml = `
             <div class="absolute inset-0 flex items-center justify-center bg-dark/30 backdrop-blur-[2px] z-20">
-                <span class="bg-red-500 text-white px-3 sm:px-5 py-1.5 sm:py-2 rounded-lg font-bold tracking-widest uppercase text-[10px] sm:text-xs border border-red-400 shadow-xl shadow-red-500/20 transform -rotate-6">Agotado</span>
+                <span class="bg-red-500 text-white px-2 sm:px-5 py-1 sm:py-2 rounded-lg font-bold tracking-widest uppercase text-[8px] sm:text-xs border border-red-400 shadow-xl shadow-red-500/20 transform -rotate-6">Agotado</span>
             </div>
         `;
     }
 
     article.innerHTML = `
-        <div class="product-image-container relative w-full aspect-[4/5] rounded-xl overflow-hidden mb-4 bg-dark z-10 cursor-pointer">
+        <div class="product-image-container relative w-full aspect-[4/5] rounded-lg sm:rounded-xl overflow-hidden mb-2 sm:mb-4 bg-dark z-10 cursor-pointer">
             <img src="${imgUrl}" alt="${producto.nombre || 'Jersey'}" class="w-full h-full object-cover object-center group-hover:scale-110 transition-transform duration-700 ease-out ${(isAgotado || isProximamente) ? 'grayscale opacity-60' : ''}" loading="lazy">
             <div class="absolute inset-0 bg-gradient-to-t from-dark-100/90 via-dark-100/20 to-transparent opacity-60 group-hover:opacity-40 transition-opacity duration-500"></div>
             ${imageOverlayHtml}
         </div>
         <div class="product-details-container flex flex-col flex-grow cursor-pointer z-10 relative">
-            <h3 class="text-sm sm:text-lg font-semibold text-white leading-tight mb-2 group-hover:text-navy-400 transition-colors line-clamp-2">
+            <h3 class="text-[13px] sm:text-lg font-semibold text-white leading-tight mb-1 sm:mb-2 group-hover:text-navy-400 transition-colors line-clamp-2">
                 ${producto.nombre || 'Jersey Deportivo'}
             </h3>
             ${tagsHtml}
