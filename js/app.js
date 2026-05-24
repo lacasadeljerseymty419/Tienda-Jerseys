@@ -686,7 +686,10 @@ async function handleLoginSubmit(e) {
             localStorage.setItem('current_perfil', res.data.perfil || 'Menudeo');
             
             DOM.login.overlay.classList.add('opacity-0', 'pointer-events-none');
-            setTimeout(() => DOM.login.overlay.classList.add('hidden'), 300);
+            setTimeout(() => {
+                DOM.login.overlay.classList.add('hidden');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }, 300);
             
             DOM.navUserName.textContent = res.data.nombre_completo || res.data.usuario || 'Usuario';
             if (DOM.mobileMenu && DOM.mobileMenu.userName) DOM.mobileMenu.userName.textContent = res.data.nombre_completo || res.data.usuario || 'Usuario';
