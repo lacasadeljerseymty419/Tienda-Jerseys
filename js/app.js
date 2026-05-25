@@ -85,7 +85,8 @@ const DOM = {
         navJerseysView: document.querySelectorAll('.action-nav-jerseys-view'),
         openCreate: document.querySelectorAll('.action-open-create'),
         openList: document.querySelectorAll('.action-open-list'),
-        openClients: document.querySelectorAll('.action-open-clients')
+        openClients: document.querySelectorAll('.action-open-clients'),
+        openOrders: document.querySelectorAll('.action-open-orders')
     },
     mobileMenu: {
         toggleBtn: document.getElementById('btn-mobile-menu-toggle'),
@@ -177,6 +178,7 @@ const DOM = {
         precioMayoreo: document.getElementById('create-precio-mayoreo'),
         precioMayoreoSuper: document.getElementById('create-precio-mayoreo-super'),
         formUpdatePrecios: document.getElementById('form-update-precios'),
+        updateFotoUrl: document.getElementById('update-foto-url'),
         updatePrecioMenudeo: document.getElementById('update-precio-menudeo'),
         updatePrecioMayoreo: document.getElementById('update-precio-mayoreo'),
         updatePrecioMayoreoSuper: document.getElementById('update-precio-mayoreo-super'),
@@ -214,6 +216,19 @@ const DOM = {
             municipio: document.getElementById('client-municipio'),
             cp: document.getElementById('client-cp'),
             referencias: document.getElementById('client-referencias')
+        },
+        ordenes: {
+            modal: document.getElementById('admin-ordenes-modal'),
+            closeBtn: document.getElementById('close-ordenes-modal'),
+            btnBuscar: document.getElementById('btn-admin-ordenes-buscar'),
+            filtros: {
+                nombre: document.getElementById('admin-ordenes-filtro-nombre'),
+                id: document.getElementById('admin-ordenes-filtro-id'),
+                estatus: document.getElementById('admin-ordenes-filtro-estatus')
+            },
+            listContainer: document.getElementById('admin-ordenes-list'),
+            emptyState: document.getElementById('admin-ordenes-empty'),
+            loadingState: document.getElementById('admin-ordenes-loading')
         }
     }
 };
@@ -352,11 +367,18 @@ async function initApp() {
     if (DOM.pedido.form) DOM.pedido.form.addEventListener('submit', handleAddToPedidoSubmit);
     if (DOM.pedido.personalizacion) DOM.pedido.personalizacion.addEventListener('change', handlePedidoPersonalizacionChange);
     if (DOM.pedido.talla) DOM.pedido.talla.addEventListener('change', handlePedidoTallaChange);
+    if (DOM.pedido.cantidad) {
+        DOM.pedido.cantidad.addEventListener('input', () => {
+            const max = parseInt(DOM.pedido.cantidad.max);
+            let val = parseInt(DOM.pedido.cantidad.value);
+            if (!isNaN(max) && !isNaN(val) && val > max) {
+                DOM.pedido.cantidad.value = max;
+            }
+        });
+    }
 
     DOM.btnAplicar.addEventListener('click', handleLocalSearch);
-    DOM.filters.nombre.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') handleLocalSearch();
-    });
+    DOM.filters.nombre.addEventListener('input', handleLocalSearch);
     
     if (DOM.btnToggleFiltros) {
         DOM.btnToggleFiltros.addEventListener('click', toggleFiltros);
@@ -410,6 +432,25 @@ async function initApp() {
     if (DOM.actions.openClients) DOM.actions.openClients.forEach(btn => btn.addEventListener('click', () => { openClientsModal(); closeMobileMenu(); }));
     if (DOM.admin.closeClientsModal) DOM.admin.closeClientsModal.addEventListener('click', closeClientsModal);
     if (DOM.admin.btnOpenCreateClient) DOM.admin.btnOpenCreateClient.addEventListener('click', () => openClientFormModal());
+    
+    // Eventos de Órdenes
+    if (DOM.actions.openOrders) DOM.actions.openOrders.forEach(btn => btn.addEventListener('click', () => { openOrdenesModal(); closeMobileMenu(); }));
+    if (DOM.admin.ordenes?.closeBtn) DOM.admin.ordenes.closeBtn.addEventListener('click', closeOrdenesModal);
+    if (DOM.admin.ordenes?.btnBuscar) DOM.admin.ordenes.btnBuscar.addEventListener('click', handleSearchOrdenes);
+    
+    const ordenesPagePrev = document.getElementById('admin-ordenes-page-prev');
+    const ordenesPageNext = document.getElementById('admin-ordenes-page-next');
+    const ordenesPerPageSelect = document.getElementById('admin-ordenes-per-page');
+    if (ordenesPagePrev) ordenesPagePrev.addEventListener('click', () => { if (ordenesCurrentPage > 1) { ordenesCurrentPage--; renderOrdenes(); } });
+    if (ordenesPageNext) ordenesPageNext.addEventListener('click', () => { if (ordenesCurrentPage * ordenesPerPage < currentOrdenes.length) { ordenesCurrentPage++; renderOrdenes(); } });
+    if (ordenesPerPageSelect) {
+        ordenesPerPageSelect.addEventListener('change', (e) => {
+            ordenesPerPage = parseInt(e.target.value) || 5;
+            ordenesCurrentPage = 1;
+            renderOrdenes();
+        });
+    }
+    
     if (DOM.admin.closeClientFormModal) DOM.admin.closeClientFormModal.addEventListener('click', closeClientFormModal);
     if (DOM.admin.btnCancelClient) DOM.admin.btnCancelClient.addEventListener('click', closeClientFormModal);
     if (DOM.admin.formClient) DOM.admin.formClient.addEventListener('submit', handleSaveClient);
@@ -486,7 +527,7 @@ function closeModal() {
 
 async function loadCatalogs() {
     let configs = null;
-    const CACHE_KEY = 'jerseys_configs_v3';
+    const CACHE_KEY = 'jerseys_configs_v5';
     const CACHE_TTL = 60 * 60 * 1000; // 1 hora en milisegundos
     
     // 1. Intentar cargar y parsear del localStorage de manera segura considerando la expiración (TTL)
@@ -518,9 +559,10 @@ async function loadCatalogs() {
         const categorias = candidate.categorias || [];
         const personalizaciones = candidate.personalizaciones || candidate.personalizacion || [];
         const reglas_mayoreo_super = candidate.reglas_mayoreo_super || null;
+        const estatus_ordenes = candidate.estatus_ordenes || candidate.estatus || null;
         
         if (Array.isArray(tipos) && Array.isArray(versiones) && Array.isArray(generos)) {
-            return { tipos, versiones, generos, perfiles, categorias, personalizaciones, reglas_mayoreo_super };
+            return { tipos, versiones, generos, perfiles, categorias, personalizaciones, reglas_mayoreo_super, estatus_ordenes };
         }
         return null;
     };
@@ -547,7 +589,7 @@ async function loadCatalogs() {
     
     // Cargar Catálogo de Personalizaciones
     let pers = null;
-    const PERS_CACHE_KEY = 'jerseys_personalizations_v4';
+    const PERS_CACHE_KEY = 'jerseys_personalizations_v5';
     try {
         const cachedPersStr = localStorage.getItem(PERS_CACHE_KEY);
         if (cachedPersStr) {
@@ -616,6 +658,8 @@ function populateSelects(data) {
     const versiones = data.versiones || [];
     const generos = data.generos || [];
     const perfiles = (data.perfiles && data.perfiles.length > 0) ? data.perfiles : ["Menudeo", "Mayoreo", "Administrador"];
+    const estatusList = data.estatus_ordenes || ['Pendiente', 'Enviado', 'Entregado', 'Cancelado'];
+    window.ordenesEstatusList = estatusList;
     
     // Poblar select de personalización en modal de pedidos
     updatePersonalizacionDropdown();
@@ -643,6 +687,11 @@ function populateSelects(data) {
         if (defaultOpt) defaultOpt.remove();
     }
     if(DOM.admin.clientInputs.perfil) populateDropdown(DOM.admin.clientInputs.perfil, ["Menudeo", "Mayoreo"], "Selecciona perfil");
+    
+    // Estatus de Órdenes
+    if (DOM.admin.ordenes && DOM.admin.ordenes.filtros.estatus) {
+        populateDropdown(DOM.admin.ordenes.filtros.estatus, estatusList, "Todos los Estatus");
+    }
 }
 
 function handleLogout() {
@@ -950,6 +999,7 @@ function openInventoryModal(producto) {
     if (DOM.admin.updatePrecioMenudeo) DOM.admin.updatePrecioMenudeo.value = producto.precio_menudeo || 0;
     if (DOM.admin.updatePrecioMayoreo) DOM.admin.updatePrecioMayoreo.value = producto.precio_mayoreo || 0;
     if (DOM.admin.updatePrecioMayoreoSuper) DOM.admin.updatePrecioMayoreoSuper.value = producto.precio_mayoreo_super || 0;
+    if (DOM.admin.updateFotoUrl) DOM.admin.updateFotoUrl.value = producto.foto || producto.imagen || '';
     
     DOM.admin.invModal.classList.remove('hidden');
     void DOM.admin.invModal.offsetWidth;
@@ -1039,6 +1089,8 @@ async function handleUpdateStock(e) {
                 if(t) t.stock = nuevoStock;
                 // Refrescar tabla si es visible
                 renderAdminTable(); 
+                // Refrescar el catálogo de fondo para reflejar el nuevo stock en las cards
+                handleLocalSearch();
             }
             
             setTimeout(() => {
@@ -1148,7 +1200,8 @@ async function handleUpdatePrecios(e) {
         id: currentJerseyToManage.id,
         precio_menudeo: pMenudeo,
         precio_mayoreo: pMayoreo,
-        precio_mayoreo_super: pMayoreoSuper
+        precio_mayoreo_super: pMayoreoSuper,
+        foto: DOM.admin.updateFotoUrl ? DOM.admin.updateFotoUrl.value.trim() : ''
     };
 
     btnSubmit.disabled = true;
@@ -1166,8 +1219,8 @@ async function handleUpdatePrecios(e) {
         if (data.status === 'success') {
             Swal.fire({
                 icon: 'success',
-                title: 'Precios Actualizados',
-                text: 'Los precios del jersey han sido actualizados con éxito.',
+                title: 'Datos Actualizados',
+                text: 'Los datos del jersey han sido actualizados con éxito.',
                 background: '#151515', color: '#fff',
                 timer: 2000,
                 showConfirmButton: false
@@ -1429,7 +1482,7 @@ function createProductCard(producto) {
     let totalStock = 0;
     const hasSizes = Array.isArray(producto.tallas) && producto.tallas.length > 0;
 
-    const isAdmin = (localStorage.getItem('current_perfil') === "Administrador");
+    const isAdmin = (localStorage.getItem('current_perfil') === "Administrador" && currentView === "mis-jerseys");
 
     if (hasSizes) {
         tallasHtml = '<div class="flex flex-wrap gap-1 sm:gap-2 mt-auto pt-2 sm:pt-4 z-10 relative">';
@@ -1996,7 +2049,7 @@ function handlePedidoPersonalizacionChange() {
             profileToUse = 'Mayoreo';
         }
         const isMayoreo = profileToUse === 'Mayoreo';
-        const persObj = allPersonalizaciones.find(x => x.id === val) || defaultPersonalizaciones.find(x => x.id === val);
+        const persObj = allPersonalizaciones.find(x => String(x.id) === String(val)) || defaultPersonalizaciones.find(x => String(x.id) === String(val));
         if (persObj) {
             price = isMayoreo ? parseFloat(persObj.precio_mayoreo || 0) : parseFloat(persObj.precio_menudeo || 0);
         }
@@ -2308,7 +2361,7 @@ function renderCartItems() {
         let persName = "Ninguna";
         const isMayoreo = clientProfile === 'Mayoreo' || clientProfile === 'Súper Mayoreo' || clientProfile === 'Mayoreo Súper';
         if (item.personalizacionId !== 'PERS-NONE') {
-            const persObj = allPersonalizaciones.find(x => x.id === item.personalizacionId) || defaultPersonalizaciones.find(x => x.id === item.personalizacionId);
+            const persObj = allPersonalizaciones.find(x => String(x.id) === String(item.personalizacionId)) || defaultPersonalizaciones.find(x => String(x.id) === String(item.personalizacionId));
             if (persObj) {
                 persPrice = isMayoreo ? parseFloat(persObj.precio_mayoreo || 0) : parseFloat(persObj.precio_menudeo || 0);
                 persName = persObj.nombre;
@@ -2418,7 +2471,11 @@ async function submitOrder() {
     const loggedUser = JSON.parse(loggedUserStr);
     const selectedClientId = loggedUser.id_cliente;
     
-    let profile = loggedUser.perfil || 'Menudeo';
+    const activeProfile = localStorage.getItem('current_perfil') || 'Menudeo';
+    let profile = activeProfile;
+    if (activeProfile === "Administrador") {
+        profile = localStorage.getItem('current_subperfil') || 'Menudeo';
+    }
     if (profile === 'Súper Mayoreo' || profile === 'Mayoreo Súper') {
         profile = 'Mayoreo';
     }
@@ -2430,7 +2487,7 @@ async function submitOrder() {
         
         let persPrice = 0;
         if (item.personalizacionId !== 'PERS-NONE') {
-            const persObj = allPersonalizaciones.find(x => x.id === item.personalizacionId) || defaultPersonalizaciones.find(x => x.id === item.personalizacionId);
+            const persObj = allPersonalizaciones.find(x => String(x.id) === String(item.personalizacionId)) || defaultPersonalizaciones.find(x => String(x.id) === String(item.personalizacionId));
             if (persObj) {
                 persPrice = isMayoreo ? parseFloat(persObj.precio_mayoreo || 0) : parseFloat(persObj.precio_menudeo || 0);
             }
@@ -2486,7 +2543,7 @@ async function submitOrder() {
                 let persPrice = 0;
                 let persName = "Ninguna";
                 if (item.personalizacionId !== 'PERS-NONE') {
-                    const persObj = allPersonalizaciones.find(x => x.id === item.personalizacionId) || defaultPersonalizaciones.find(x => x.id === item.personalizacionId);
+                    const persObj = allPersonalizaciones.find(x => String(x.id) === String(item.personalizacionId)) || defaultPersonalizaciones.find(x => String(x.id) === String(item.personalizacionId));
                     if (persObj) {
                         persPrice = isMayoreo ? parseFloat(persObj.precio_mayoreo || 0) : parseFloat(persObj.precio_menudeo || 0);
                         persName = persObj.nombre;
@@ -2519,12 +2576,14 @@ async function submitOrder() {
                 `;
             });
             
+            const orderIdStr = data.id_orden || data.id || data.order_id || 'Generado';
             const receiptHtml = `
+                <div class="text-center text-gray-400 font-mono text-sm tracking-wider mb-4 border border-white/10 rounded-lg py-2 bg-dark-200/50">
+                    ID Orden: <span class="text-white">${orderIdStr}</span>
+                </div>
                 <div class="text-left space-y-4 text-sm mt-3 border-t border-white/10 pt-3">
                     <div class="grid grid-cols-2 text-xs text-gray-400 gap-1">
-                        <div><strong>Cliente:</strong> ${clientObj.nombre_completo}</div>
-                        <div><strong>ID Cliente:</strong> ${clientObj.id_cliente}</div>
-                        <div><strong>Perfil Aplicado:</strong> ${profile}</div>
+                        <div><strong>Cliente:</strong> ${loggedUser.nombre_completo}</div>
                         <div><strong>Cantidad total:</strong> ${totalQty} playeras</div>
                     </div>
                     
@@ -2534,22 +2593,26 @@ async function submitOrder() {
                     </div>
                     
                     <div class="flex justify-between text-base border-t border-white/10 pt-3 font-bold">
-                        <span>Total Pagado:</span>
+                        <span>Total de la Orden:</span>
                         <span class="text-emerald-400">$${subtotal.toFixed(2)}</span>
-                    </div>
-                    <div class="text-[10px] text-gray-500 text-center pt-2">
-                        La orden ha sido guardada en la base de datos de Sheets.
                     </div>
                 </div>
             `;
+            const waText = encodeURIComponent(`Hola, Acabo de Realizar un pedido de *${totalQty}* jerseys, el ID es el: *${orderIdStr}* por un total de *$${subtotal.toFixed(2)}*`);
+            const waUrl = `https://wa.me/5218132698182?text=${waText}`;
             
             Swal.fire({
                 icon: 'success',
                 title: '¡Pedido Realizado!',
                 html: receiptHtml,
                 background: '#151515', color: '#fff',
-                confirmButtonColor: '#1d4ed8',
+                confirmButtonColor: '#25D366',
+                confirmButtonText: '<div class="flex items-center gap-2"><svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>Notificar por WhatsApp</div>',
                 customClass: { popup: 'border border-white/10 rounded-2xl max-w-md' }
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    window.open(waUrl, '_blank');
+                }
             });
             
             // Vaciar carrito
@@ -2573,3 +2636,343 @@ async function submitOrder() {
     }
 }
 
+// --- ÓRDENES / PEDIDOS ---
+
+let currentOrdenes = []; // Guarda las órdenes actuales cargadas
+let ordenesCurrentPage = 1;
+let ordenesPerPage = 5;
+
+function openOrdenesModal() {
+    const loggedUserStr = localStorage.getItem('logged_user');
+    if (!loggedUserStr) return;
+    const loggedUser = JSON.parse(loggedUserStr);
+    if (loggedUser.perfil !== 'Administrador') return;
+
+    DOM.admin.ordenes.modal.classList.remove('hidden');
+    // Animar entrada
+    setTimeout(() => {
+        DOM.admin.ordenes.modal.classList.remove('opacity-0');
+        DOM.admin.ordenes.modal.querySelector('.bg-dark-100').classList.remove('scale-95');
+    }, 10);
+    // Limpiar filtros al abrir
+    DOM.admin.ordenes.filtros.nombre.value = '';
+    DOM.admin.ordenes.filtros.id.value = '';
+    DOM.admin.ordenes.filtros.estatus.value = '';
+    
+    // Buscar historial completo inicialmente
+    fetchOrdenes();
+}
+
+function closeOrdenesModal() {
+    DOM.admin.ordenes.modal.classList.add('opacity-0');
+    DOM.admin.ordenes.modal.querySelector('.bg-dark-100').classList.add('scale-95');
+    setTimeout(() => {
+        DOM.admin.ordenes.modal.classList.add('hidden');
+    }, 300);
+}
+
+function handleSearchOrdenes() {
+    const filtros = {};
+    const nombre = DOM.admin.ordenes.filtros.nombre.value.trim();
+    const id = DOM.admin.ordenes.filtros.id.value.trim();
+    const estatus = DOM.admin.ordenes.filtros.estatus.value;
+    
+    if (nombre) filtros.nombre_cliente = nombre;
+    if (id) filtros.id_orden = id;
+    if (estatus) filtros.estatus = estatus;
+    
+    fetchOrdenes(filtros);
+}
+
+async function fetchOrdenes(filtros = null) {
+    DOM.admin.ordenes.listContainer.innerHTML = '';
+    DOM.admin.ordenes.emptyState.classList.add('hidden');
+    DOM.admin.ordenes.loadingState.classList.remove('hidden');
+    
+    const payload = { action: 'search_orders' };
+    if (filtros && Object.keys(filtros).length > 0) {
+        payload.filtros = filtros;
+    }
+    
+    try {
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            body: JSON.stringify(payload)
+        });
+        const result = await response.json();
+        
+        DOM.admin.ordenes.loadingState.classList.add('hidden');
+        
+        if (result.status === 'success' && result.data && result.data.length > 0) {
+            currentOrdenes = result.data;
+            ordenesCurrentPage = 1;
+            renderOrdenes();
+        } else {
+            currentOrdenes = [];
+            DOM.admin.ordenes.emptyState.classList.remove('hidden');
+        }
+    } catch (error) {
+        console.error('Error fetching órdenes:', error);
+        DOM.admin.ordenes.loadingState.classList.add('hidden');
+        Swal.fire({ icon: 'error', title: 'Error de Red', text: 'No se pudieron cargar las órdenes.', background: '#151515', color: '#fff' });
+    }
+}
+
+function renderOrdenes() {
+    const container = DOM.admin.ordenes.listContainer;
+    container.innerHTML = '';
+    
+    const paginationEl = document.getElementById('admin-ordenes-pagination');
+    const pageInfoEl = document.getElementById('admin-ordenes-page-info');
+    
+    let ordersToRender = currentOrdenes;
+    
+    if (currentOrdenes.length > ordenesPerPage) {
+        if (paginationEl) {
+            paginationEl.classList.remove('hidden');
+            paginationEl.classList.add('flex');
+        }
+        const start = (ordenesCurrentPage - 1) * ordenesPerPage;
+        const end = Math.min(start + ordenesPerPage, currentOrdenes.length);
+        if (pageInfoEl) pageInfoEl.textContent = `Mostrando ${start + 1} - ${end} de ${currentOrdenes.length}`;
+        
+        ordersToRender = currentOrdenes.slice(start, start + ordenesPerPage);
+    } else {
+        if (paginationEl) {
+            paginationEl.classList.add('hidden');
+            paginationEl.classList.remove('flex');
+        }
+    }
+    
+    ordersToRender.forEach(orden => {
+        const dateObj = new Date(orden.fecha);
+        const dateStr = dateObj.toLocaleDateString() + ' ' + dateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        
+        let totalPiezas = 0;
+        let articulosHtml = '';
+        if (orden.articulos_carrito && orden.articulos_carrito.length > 0) {
+            articulosHtml = orden.articulos_carrito.map(art => {
+                totalPiezas += Number(art.cantidad) || 0;
+                
+                // Lookup product in adminProducts or productsData
+                const prod = (window.adminFilteredProducts && window.adminFilteredProducts.find(p => String(p.id) === String(art.id_producto))) 
+                    || (window.productsData && window.productsData.find(p => String(p.id) === String(art.id_producto))) 
+                    || {};
+                
+                const imgUrl = prod.foto || prod.imagen || 'https://images.unsplash.com/photo-1577212017184-807dd6acefd6?auto=format&fit=crop&q=80&w=100';
+                const nombre = prod.nombre || `Producto ${art.id_producto}`;
+                const genero = prod.genero || '-';
+                const tipo = prod.tipo || '-';
+                const version = prod.version || '-';
+                
+                const itemTotal = Number(art.subtotal_renglon);
+                const unitPrice = Number(art.precio_unitario_final) || (itemTotal / Number(art.cantidad));
+                
+                let persName = art.texto_personalizado ? 'Sí' : 'Ninguna';
+                if (art.id_personalizacion && art.id_personalizacion !== 'PERS-NONE') {
+                    const pObj = (window.allPersonalizaciones && window.allPersonalizaciones.find(x => String(x.id) === String(art.id_personalizacion))) 
+                        || (window.defaultPersonalizaciones && window.defaultPersonalizaciones.find(x => String(x.id) === String(art.id_personalizacion)));
+                    if (pObj) persName = pObj.nombre;
+                }
+
+                return `
+        <div class="flex items-center gap-3 bg-dark-200/20 p-2.5 rounded-xl border border-white/5 mb-2 last:mb-0">
+            <img src="${imgUrl}" alt="Foto" class="w-12 h-12 rounded-lg object-cover bg-dark flex-shrink-0">
+            <div class="flex-grow min-w-0">
+                <h4 class="font-bold text-white text-xs truncate leading-tight">${nombre}</h4>
+                <div class="text-[9px] text-gray-400 mt-0.5 font-medium uppercase tracking-wider">
+                    ${genero} | ${tipo} | ${version}
+                </div>
+                <div class="text-[10px] text-gray-500 mt-0.5">
+                    Talla: <span class="text-gray-300 font-semibold">${art.talla}</span> | 
+                    Cant: <span class="text-gray-300 font-semibold">${art.cantidad}</span>
+                </div>
+                <div class="text-[10px] text-gray-400 mt-0.5">
+                    Pers: <span class="text-navy-400 font-semibold">${persName}</span>
+                    ${art.texto_personalizado ? ` | <span class="text-emerald-400 font-mono">"${art.texto_personalizado}"</span>` : ''}
+                </div>
+            </div>
+            <div class="text-right flex-shrink-0 min-w-[70px]">
+                <div class="font-bold text-white text-xs">$${itemTotal.toFixed(2)}</div>
+                <div class="text-[9px] text-gray-500 mt-0.5">$${unitPrice.toFixed(2)} c/u</div>
+            </div>
+        </div>`;
+            }).join('');
+        } else {
+            articulosHtml = '<div class="text-xs text-gray-500 italic">Sin detalles de artículos</div>';
+        }
+        
+        let estatusColorClass = 'bg-gray-500/20 text-gray-400';
+        if (orden.estatus === 'Pendiente') estatusColorClass = 'bg-yellow-500/20 text-yellow-400';
+        if (orden.estatus === 'Entregado') estatusColorClass = 'bg-emerald-500/20 text-emerald-400';
+        if (orden.estatus === 'Enviado') estatusColorClass = 'bg-blue-500/20 text-blue-400';
+        if (orden.estatus === 'Cancelado') estatusColorClass = 'bg-red-500/20 text-red-400';
+        
+        const estatusOptionsHtml = (window.ordenesEstatusList || ['Pendiente', 'Enviado', 'Entregado', 'Cancelado'])
+            .map(e => `<option value="${e}">${e}</option>`)
+            .join('');
+        
+        const cardHtml = `
+            <div class="bg-dark-100 border border-white/10 rounded-xl overflow-hidden shadow-sm hover:border-navy-500/50 transition-colors">
+                <!-- Encabezado de Orden -->
+                <div onclick="openOrderDetailsModal('${orden.id_orden}')" class="p-4 bg-dark-200/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 cursor-pointer hover:bg-dark-200/70 transition-colors relative group">
+                    <div class="flex-grow">
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="font-mono text-sm font-bold text-white">${orden.id_orden}</span>
+                            <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${estatusColorClass}">${orden.estatus}</span>
+                        </div>
+                        <div class="text-xs text-gray-400">
+                            <strong>${orden.nombre_cliente}</strong> <span class="mx-1">|</span> ${dateStr} <span class="mx-1">|</span> <span class="text-white font-semibold">${totalPiezas} piezas</span>
+                        </div>
+                    </div>
+                    <div class="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full sm:w-auto" onclick="event.stopPropagation()">
+                        <div class="text-base text-emerald-400 font-black whitespace-nowrap">$${Number(orden.gran_total).toFixed(2)}</div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        container.insertAdjacentHTML('beforeend', cardHtml);
+    });
+}
+
+window.openOrderDetailsModal = function(id_orden) {
+    const orden = currentOrdenes.find(o => o.id_orden === id_orden);
+    if (!orden) return;
+    
+    let articulosHtml = '';
+    if (orden.articulos_carrito && orden.articulos_carrito.length > 0) {
+        articulosHtml = orden.articulos_carrito.map(art => {
+            const prod = (window.adminFilteredProducts && window.adminFilteredProducts.find(p => String(p.id) === String(art.id_producto))) 
+                || (window.productsData && window.productsData.find(p => String(p.id) === String(art.id_producto))) 
+                || {};
+            
+            const imgUrl = prod.foto || prod.imagen || 'https://images.unsplash.com/photo-1577212017184-807dd6acefd6?auto=format&fit=crop&q=80&w=100';
+            const nombre = prod.nombre || `Producto ${art.id_producto}`;
+            const genero = prod.genero || '-';
+            const tipo = prod.tipo || '-';
+            const version = prod.version || '-';
+            const itemTotal = Number(art.subtotal_renglon);
+            const unitPrice = Number(art.precio_unitario_final) || (itemTotal / Number(art.cantidad));
+            
+            let persName = art.texto_personalizado ? 'Sí' : 'Ninguna';
+            if (art.id_personalizacion && art.id_personalizacion !== 'PERS-NONE') {
+                const pObj = (window.allPersonalizaciones && window.allPersonalizaciones.find(x => String(x.id) === String(art.id_personalizacion))) 
+                    || (window.defaultPersonalizaciones && window.defaultPersonalizaciones.find(x => String(x.id) === String(art.id_personalizacion)));
+                if (pObj) persName = pObj.nombre;
+            }
+
+            return `
+    <div class="flex items-center gap-3 bg-dark-200/40 p-3 rounded-xl border border-white/10 mb-3 last:mb-0">
+        <img src="${imgUrl}" alt="Foto" class="w-16 h-16 rounded-lg object-cover bg-dark flex-shrink-0">
+        <div class="flex-grow min-w-0">
+            <h4 class="font-bold text-white text-sm truncate leading-tight">${nombre}</h4>
+            <div class="text-[10px] text-gray-400 mt-1 font-medium uppercase tracking-wider">
+                ${genero} | ${tipo} | ${version}
+            </div>
+            <div class="text-xs text-gray-400 mt-1">
+                Talla: <span class="text-gray-200 font-semibold">${art.talla}</span> | 
+                Cant: <span class="text-gray-200 font-semibold">${art.cantidad}</span>
+            </div>
+            <div class="text-xs text-gray-400 mt-0.5">
+                Pers: <span class="text-navy-400 font-semibold">${persName}</span>
+                ${art.texto_personalizado ? ` | <span class="text-emerald-400 font-mono">"${art.texto_personalizado}"</span>` : ''}
+            </div>
+        </div>
+        <div class="text-right flex-shrink-0 min-w-[70px]">
+            <div class="font-bold text-white text-sm">$${itemTotal.toFixed(2)}</div>
+            <div class="text-[10px] text-gray-500 mt-1">$${unitPrice.toFixed(2)} c/u</div>
+        </div>
+    </div>`;
+        }).join('');
+    } else {
+        articulosHtml = '<div class="text-sm text-gray-500 italic text-center py-4">Sin detalles de artículos</div>';
+    }
+
+    document.getElementById('admin-order-details-id').textContent = id_orden;
+    document.getElementById('admin-order-details-container').innerHTML = articulosHtml;
+    
+    // Set status options
+    const statusSelect = document.getElementById('admin-order-details-status');
+    if (statusSelect) {
+        const estatusOptionsHtml = (window.ordenesEstatusList || ['Pendiente', 'Enviado', 'Entregado', 'Cancelado'])
+            .map(e => `<option value="${e}">${e}</option>`)
+            .join('');
+        statusSelect.innerHTML = `<option value="">Cambiar Estatus...</option>${estatusOptionsHtml}`;
+        statusSelect.value = orden.estatus;
+    }
+    
+    const modal = document.getElementById('admin-order-details-modal');
+    modal.classList.remove('hidden');
+    void modal.offsetWidth;
+    modal.classList.remove('opacity-0');
+    modal.querySelector('.transform').classList.remove('scale-95');
+    modal.querySelector('.transform').classList.add('scale-100');
+    
+    const closeBtn = document.getElementById('close-order-details-modal');
+    if (closeBtn) {
+        closeBtn.onclick = () => {
+            modal.classList.add('opacity-0');
+            modal.querySelector('.transform').classList.remove('scale-100');
+            modal.querySelector('.transform').classList.add('scale-95');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 300);
+        };
+    }
+}
+
+async function updateOrderStatus(id_orden, nuevo_estatus) {
+    if (!nuevo_estatus) return;
+    
+    const selects = document.querySelectorAll(`select[onchange="updateOrderStatus('${id_orden}', this.value)"]`);
+    
+    const result = await Swal.fire({
+        title: '¿Cambiar estatus?',
+        text: `¿Estás seguro que deseas marcar la orden ${id_orden} como ${nuevo_estatus}?`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#1d4ed8',
+        cancelButtonColor: '#3f3f46',
+        confirmButtonText: 'Sí, cambiar',
+        cancelButtonText: 'Cancelar',
+        background: '#151515', color: '#fff'
+    });
+    
+    if (!result.isConfirmed) {
+        selects.forEach(sel => sel.value = ""); // Reset
+        return;
+    }
+    
+    const payload = {
+        action: 'update_order_status',
+        id_orden: id_orden,
+        nuevo_estatus: nuevo_estatus
+    };
+    
+    try {
+        Swal.fire({ title: 'Actualizando...', allowOutsideClick: false, background: '#151515', color: '#fff', didOpen: () => { Swal.showLoading(); }});
+        
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            body: JSON.stringify(payload)
+        });
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            Swal.fire({ icon: 'success', title: '¡Actualizado!', text: data.message, background: '#151515', color: '#fff', timer: 2000, showConfirmButton: false });
+            
+            const idx = currentOrdenes.findIndex(o => o.id_orden === id_orden);
+            if (idx !== -1) {
+                currentOrdenes[idx].estatus = nuevo_estatus;
+                renderOrdenes();
+            }
+        } else {
+            throw new Error(data.message || 'Error al actualizar.');
+        }
+    } catch (error) {
+        console.error('Error updating status:', error);
+        selects.forEach(sel => sel.value = ""); // Reset
+        Swal.fire({ icon: 'error', title: 'Error', text: error.message, background: '#151515', color: '#fff' });
+    }
+}

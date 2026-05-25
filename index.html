@@ -96,6 +96,10 @@
                                     <svg class="w-4 h-4 text-navy-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
                                     Clientes
                                 </button>
+                                <button class="action-open-orders w-full text-left px-4 py-2 text-sm text-gray-300 hover:text-white hover:bg-navy-500/20 rounded-lg transition-colors flex items-center gap-2 mt-1">
+                                    <svg class="w-4 h-4 text-navy-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
+                                    Órdenes/Pedidos
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -173,6 +177,10 @@
                     <button class="action-open-clients w-full text-left px-4 py-3 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-xl transition-colors flex items-center gap-3">
                         <svg class="w-5 h-5 text-navy-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
                         Clientes
+                    </button>
+                    <button class="action-open-orders w-full text-left px-4 py-3 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-xl transition-colors flex items-center gap-3">
+                        <svg class="w-5 h-5 text-navy-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
+                        Órdenes/Pedidos
                     </button>
                 </div>
                 
@@ -506,10 +514,14 @@
                     </div>
                 </div>
 
-                <!-- Formulario para Actualizar Precios -->
+                <!-- Formulario para Actualizar Detalles -->
                 <div class="pt-6 border-t border-white/5">
-                    <h3 class="text-sm font-semibold text-gray-300 mb-3 uppercase tracking-wider">Actualizar Precios</h3>
+                    <h3 class="text-sm font-semibold text-gray-300 mb-3 uppercase tracking-wider">Actualizar Datos del Jersey</h3>
                     <form id="form-update-precios" class="space-y-4 bg-dark-200/30 p-4 rounded-xl border border-white/5">
+                        <div>
+                            <label class="block text-[10px] font-semibold text-gray-400 mb-1 uppercase tracking-wider">URL de la Foto</label>
+                            <input type="url" id="update-foto-url" placeholder="https://..." class="w-full bg-dark-200/50 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-navy-400 text-white">
+                        </div>
                         <div class="grid grid-cols-3 gap-3">
                             <div>
                                 <label class="block text-[10px] font-semibold text-gray-400 mb-1 uppercase tracking-wider">Menudeo</label>
@@ -526,7 +538,7 @@
                         </div>
                         <div class="flex justify-end">
                             <button type="submit" id="btn-submit-update-precios" class="px-5 py-2.5 rounded-lg bg-navy-500 hover:bg-navy-400 text-white font-bold transition-all duration-300 shadow hover:shadow-navy-500/30 text-sm h-[40px] flex items-center justify-center gap-2">
-                                Actualizar Precios
+                                Actualizar Datos
                             </button>
                         </div>
                     </form>
@@ -554,7 +566,122 @@
         </div>
     </div>
 
-    <!-- Modal de Administración: Gestión de Clientes -->
+    <!-- Modal de Administración: Órdenes/Pedidos -->
+    <div id="admin-ordenes-modal" class="fixed inset-0 z-[60] flex items-center justify-center hidden bg-dark/90 backdrop-blur-sm transition-opacity duration-300 opacity-0 overflow-y-auto py-6 sm:py-10">
+        <div class="bg-dark-100 border border-white/10 rounded-2xl w-full max-w-4xl mx-4 shadow-2xl shadow-navy-500/10 transform scale-95 transition-transform duration-300 flex flex-col my-auto relative max-h-none sm:max-h-[85vh]">
+            <div class="p-4 sm:p-6 border-b border-white/5 flex justify-between items-center bg-dark-100/90 backdrop-blur-md rounded-t-2xl z-10 flex-shrink-0">
+                <div>
+                    <h2 class="text-xl sm:text-2xl font-bold text-white flex items-center gap-3">
+                        <span class="bg-navy-500/20 text-navy-400 p-2 rounded-lg">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
+                        </span>
+                        Órdenes / Pedidos
+                    </h2>
+                    <p class="text-xs sm:text-sm text-gray-400 mt-1">Consulta y administra el historial de órdenes.</p>
+                </div>
+                <button id="close-ordenes-modal" class="text-white/50 hover:text-white transition-colors p-2 bg-white/5 rounded-full hover:bg-white/10">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            
+            <div class="p-4 sm:p-6 flex-grow overflow-y-auto flex flex-col">
+                <!-- Filtros -->
+                <div class="mb-4 bg-dark-200/50 p-4 rounded-xl border border-white/5 flex flex-wrap gap-3 items-end">
+                    <div class="flex-grow min-w-[150px]">
+                        <label class="block text-[10px] text-gray-400 mb-1 uppercase tracking-wider">Nombre Cliente</label>
+                        <input type="text" id="admin-ordenes-filtro-nombre" placeholder="Ej. Carlos" class="w-full bg-dark-100 border border-white/10 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-navy-400 text-white placeholder-gray-500 transition-colors">
+                    </div>
+                    <div class="flex-grow min-w-[150px]">
+                        <label class="block text-[10px] text-gray-400 mb-1 uppercase tracking-wider">ID Orden</label>
+                        <input type="text" id="admin-ordenes-filtro-id" placeholder="Ej. ORD-..." class="w-full bg-dark-100 border border-white/10 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-navy-400 text-white placeholder-gray-500 transition-colors">
+                    </div>
+                    <div class="w-full sm:w-[150px]">
+                        <label class="block text-[10px] text-gray-400 mb-1 uppercase tracking-wider">Estatus</label>
+                        <select id="admin-ordenes-filtro-estatus" class="w-full bg-dark-100 border border-white/10 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-navy-400 text-white appearance-none cursor-pointer">
+                            <option value="">Todos</option>
+                            <option value="Pendiente">Pendiente</option>
+                            <option value="Enviado">Enviado</option>
+                            <option value="Entregado">Entregado</option>
+                            <option value="Cancelado">Cancelado</option>
+                        </select>
+                    </div>
+                    <button id="btn-admin-ordenes-buscar" class="px-5 py-2 rounded-lg bg-navy-500 hover:bg-navy-400 text-white font-bold transition-all shadow hover:shadow-navy-500/30 text-sm flex items-center gap-2 h-[38px]">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                        Buscar
+                    </button>
+                </div>
+                
+                <div class="flex-grow min-h-[300px] flex flex-col">
+                    <div id="admin-ordenes-list" class="space-y-4">
+                        <!-- Orders will be rendered here -->
+                    </div>
+                    <div id="admin-ordenes-empty" class="hidden m-auto text-center p-8 bg-dark-200/30 rounded-2xl border border-white/5 w-full">
+                        <svg class="w-16 h-16 text-gray-600 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2"></path></svg>
+                        <h3 class="text-white font-bold text-lg mb-1">No se encontraron órdenes</h3>
+                        <p class="text-sm text-gray-500 max-w-sm mx-auto">Ajusta tus filtros o realiza una nueva búsqueda.</p>
+                    </div>
+                    <div id="admin-ordenes-loading" class="hidden m-auto text-center p-8 w-full">
+                        <div class="w-10 h-10 border-4 border-navy-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                        <p class="text-sm text-gray-400">Cargando órdenes...</p>
+                    </div>
+                    
+                    <!-- Paginación de Órdenes -->
+                    <div id="admin-ordenes-pagination" class="hidden flex-col sm:flex-row justify-between items-center gap-4 mt-6 bg-dark-200/30 p-4 rounded-xl border border-white/5 mt-auto">
+                        <div class="flex items-center gap-3">
+                            <select id="admin-ordenes-per-page" class="bg-dark-100 border border-white/10 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-navy-400 text-white cursor-pointer">
+                                <option value="5">5 por pág.</option>
+                                <option value="10">10 por pág.</option>
+                                <option value="20">20 por pág.</option>
+                                <option value="50">50 por pág.</option>
+                            </select>
+                            <span id="admin-ordenes-page-info" class="text-sm text-gray-400 font-medium">
+                                Mostrando 0 - 0 de 0
+                            </span>
+                        </div>
+                        <div class="flex gap-2">
+                            <button id="admin-ordenes-page-prev" class="px-4 py-2 rounded-lg bg-dark-100 hover:bg-white/5 border border-white/10 text-white transition-colors flex items-center gap-2">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                                Anterior
+                            </button>
+                            <button id="admin-ordenes-page-next" class="px-4 py-2 rounded-lg bg-dark-100 hover:bg-white/5 border border-white/10 text-white transition-colors flex items-center gap-2">
+                                Siguiente
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Modal de Detalles de Orden -->
+    <div id="admin-order-details-modal" class="fixed inset-0 z-[70] flex items-center justify-center hidden bg-dark/90 backdrop-blur-sm transition-opacity duration-300 opacity-0 overflow-y-auto py-6 sm:py-10">
+        <div class="bg-dark-100 border border-white/10 rounded-2xl w-full max-w-2xl mx-4 shadow-2xl shadow-navy-500/10 transform scale-95 transition-transform duration-300 flex flex-col relative max-h-[85vh]">
+            <div class="p-4 sm:p-6 border-b border-white/5 flex justify-between items-center bg-dark-100/90 backdrop-blur-md rounded-t-2xl z-10 flex-shrink-0">
+                <div>
+                    <h2 class="text-xl sm:text-2xl font-bold text-white flex items-center gap-3">
+                        <span class="bg-navy-500/20 text-navy-400 p-2 rounded-lg">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
+                        </span>
+                        Detalle de la Orden
+                    </h2>
+                    <p id="admin-order-details-id" class="text-xs sm:text-sm text-gray-400 mt-1 font-mono">ORD-000</p>
+                </div>
+                <div class="flex items-center gap-2 sm:gap-4">
+                    <select id="admin-order-details-status" onchange="updateOrderStatus(document.getElementById('admin-order-details-id').textContent, this.value)" class="bg-dark-200 border border-white/10 rounded-lg px-2 py-1.5 sm:px-3 sm:py-2 text-[10px] sm:text-xs focus:outline-none focus:border-navy-400 text-white cursor-pointer uppercase tracking-wider">
+                        <!-- Options injected via JS -->
+                    </select>
+                    <button id="close-order-details-modal" class="text-white/50 hover:text-white transition-colors p-2 bg-white/5 rounded-full hover:bg-white/10 flex-shrink-0">
+                        <svg class="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                </div>
+            </div>
+            <div class="p-4 sm:p-6 flex-grow overflow-auto bg-black/20" id="admin-order-details-container">
+                <!-- Articles injected here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Administración: Catálogo de Clientes -->
     <div id="admin-clients-modal" class="fixed inset-0 z-[60] flex items-center justify-center hidden bg-dark/90 backdrop-blur-sm transition-opacity duration-300 opacity-0 overflow-y-auto py-6 sm:py-10">
         <div class="bg-dark-100 border border-white/10 rounded-2xl w-full max-w-4xl mx-4 shadow-2xl shadow-navy-500/10 transform scale-95 transition-transform duration-300 flex flex-col my-auto relative max-h-none sm:max-h-[85vh]">
             <div class="p-4 sm:p-6 border-b border-white/5 flex justify-between items-center bg-dark-100/90 backdrop-blur-md rounded-t-2xl z-10 flex-shrink-0">
@@ -870,6 +997,6 @@
     </div>
 
     <!-- Módulo Principal JS -->
-    <script src="./js/app.js?v=1.0.1"></script>
+    <script src="./js/app.js?v=1.0.2"></script>
 </body>
 </html>
