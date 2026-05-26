@@ -1,4 +1,4 @@
-const API_URL = "https://script.google.com/macros/s/AKfycbxmcNdzNin1dmn2OM8oPiuBtric6COHvDJQWGqVu3vNQmYaFaH47wl-C6r_uEEgTnaKEw/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbwULEhsXYj5cagJh_UJk-tOdZMSSOIomakSfsS4sR6n41QnRbbIsJlGYr-BHe8jC9tZpQ/exec";
 
 async function get_configs() {
     try {
@@ -437,6 +437,9 @@ async function initApp() {
     if (DOM.actions.openOrders) DOM.actions.openOrders.forEach(btn => btn.addEventListener('click', () => { openOrdenesModal(); closeMobileMenu(); }));
     if (DOM.admin.ordenes?.closeBtn) DOM.admin.ordenes.closeBtn.addEventListener('click', closeOrdenesModal);
     if (DOM.admin.ordenes?.btnBuscar) DOM.admin.ordenes.btnBuscar.addEventListener('click', handleSearchOrdenes);
+    if (DOM.admin.ordenes?.filtros?.nombre) DOM.admin.ordenes.filtros.nombre.addEventListener('input', handleSearchOrdenes);
+    if (DOM.admin.ordenes?.filtros?.id) DOM.admin.ordenes.filtros.id.addEventListener('input', handleSearchOrdenes);
+    if (DOM.admin.ordenes?.filtros?.estatus) DOM.admin.ordenes.filtros.estatus.addEventListener('change', handleSearchOrdenes);
     
     const ordenesPagePrev = document.getElementById('admin-ordenes-page-prev');
     const ordenesPageNext = document.getElementById('admin-ordenes-page-next');
@@ -527,7 +530,7 @@ function closeModal() {
 
 async function loadCatalogs() {
     let configs = null;
-    const CACHE_KEY = 'jerseys_configs_v5';
+    const CACHE_KEY = 'jerseys_configs_v10';
     const CACHE_TTL = 60 * 60 * 1000; // 1 hora en milisegundos
     
     // 1. Intentar cargar y parsear del localStorage de manera segura considerando la expiración (TTL)
@@ -589,7 +592,7 @@ async function loadCatalogs() {
     
     // Cargar Catálogo de Personalizaciones
     let pers = null;
-    const PERS_CACHE_KEY = 'jerseys_personalizations_v5';
+    const PERS_CACHE_KEY = 'jerseys_personalizations_v10';
     try {
         const cachedPersStr = localStorage.getItem(PERS_CACHE_KEY);
         if (cachedPersStr) {
@@ -2598,7 +2601,13 @@ async function submitOrder() {
                     </div>
                 </div>
             `;
-            const waText = encodeURIComponent(`Hola, Acabo de Realizar un pedido de *${totalQty}* jerseys, el ID es el: *${orderIdStr}* por un total de *$${subtotal.toFixed(2)}*`);
+            const waText = encodeURIComponent(
+                `*¡Hola! Acabo de realizar un nuevo pedido* 🛒👕\n\n` +
+                `*ID de Orden:* ${orderIdStr}\n` +
+                `*Total de Jerseys:* ${totalQty} piezas\n` +
+                `*Total a Pagar:* $${subtotal.toFixed(2)}\n\n` +
+                `Quedo en espera de la confirmación. ¡Muchas gracias!`
+            );
             const waUrl = `https://wa.me/5218132698182?text=${waText}`;
             
             Swal.fire({
@@ -2639,6 +2648,7 @@ async function submitOrder() {
 // --- ÓRDENES / PEDIDOS ---
 
 let currentOrdenes = []; // Guarda las órdenes actuales cargadas
+let allFetchedOrdenes = []; // Guarda todas las órdenes originales
 let ordenesCurrentPage = 1;
 let ordenesPerPage = 5;
 
@@ -2672,27 +2682,31 @@ function closeOrdenesModal() {
 }
 
 function handleSearchOrdenes() {
-    const filtros = {};
-    const nombre = DOM.admin.ordenes.filtros.nombre.value.trim();
-    const id = DOM.admin.ordenes.filtros.id.value.trim();
+    const nombre = DOM.admin.ordenes.filtros.nombre.value.trim().toLowerCase();
+    const id = DOM.admin.ordenes.filtros.id.value.trim().toLowerCase();
     const estatus = DOM.admin.ordenes.filtros.estatus.value;
     
-    if (nombre) filtros.nombre_cliente = nombre;
-    if (id) filtros.id_orden = id;
-    if (estatus) filtros.estatus = estatus;
+    currentOrdenes = allFetchedOrdenes.filter(orden => {
+        const clientObj = window.allClients ? window.allClients.find(c => String(c.id_cliente) === String(orden.id_cliente)) : null;
+        const nombreCliente = (orden.nombre_cliente || (clientObj ? clientObj.nombre_completo : null) || orden.id_cliente || '').toLowerCase();
+        
+        const matchNombre = !nombre || nombreCliente.includes(nombre);
+        const matchId = !id || orden.id_orden.toLowerCase().includes(id);
+        const matchEstatus = !estatus || orden.estatus === estatus;
+        
+        return matchNombre && matchId && matchEstatus;
+    });
     
-    fetchOrdenes(filtros);
+    ordenesCurrentPage = 1;
+    renderOrdenes();
 }
 
-async function fetchOrdenes(filtros = null) {
+async function fetchOrdenes() {
     DOM.admin.ordenes.listContainer.innerHTML = '';
     DOM.admin.ordenes.emptyState.classList.add('hidden');
     DOM.admin.ordenes.loadingState.classList.remove('hidden');
     
     const payload = { action: 'search_orders' };
-    if (filtros && Object.keys(filtros).length > 0) {
-        payload.filtros = filtros;
-    }
     
     try {
         const response = await fetch(API_URL, {
@@ -2704,10 +2718,10 @@ async function fetchOrdenes(filtros = null) {
         DOM.admin.ordenes.loadingState.classList.add('hidden');
         
         if (result.status === 'success' && result.data && result.data.length > 0) {
-            currentOrdenes = result.data;
-            ordenesCurrentPage = 1;
-            renderOrdenes();
+            allFetchedOrdenes = result.data;
+            handleSearchOrdenes();
         } else {
+            allFetchedOrdenes = [];
             currentOrdenes = [];
             DOM.admin.ordenes.emptyState.classList.remove('hidden');
         }
@@ -2755,12 +2769,18 @@ function renderOrdenes() {
                 totalPiezas += Number(art.cantidad) || 0;
                 
                 // Lookup product in adminProducts or productsData
-                const prod = (window.adminFilteredProducts && window.adminFilteredProducts.find(p => String(p.id) === String(art.id_producto))) 
-                    || (window.productsData && window.productsData.find(p => String(p.id) === String(art.id_producto))) 
-                    || {};
+                let prod = {};
+                if (art.id_playera && typeof art.id_playera === 'object') {
+                    prod = art.id_playera;
+                } else {
+                    const prodId = art.id_producto || art.id_playera;
+                    prod = (window.adminFilteredProducts && window.adminFilteredProducts.find(p => String(p.id) === String(prodId))) 
+                        || (window.productsData && window.productsData.find(p => String(p.id) === String(prodId))) 
+                        || {};
+                }
                 
                 const imgUrl = prod.foto || prod.imagen || 'https://images.unsplash.com/photo-1577212017184-807dd6acefd6?auto=format&fit=crop&q=80&w=100';
-                const nombre = prod.nombre || `Producto ${art.id_producto}`;
+                const nombre = prod.nombre || `Producto ${art.id_producto || (art.id_playera && art.id_playera.id) || 'Desconocido'}`;
                 const genero = prod.genero || '-';
                 const tipo = prod.tipo || '-';
                 const version = prod.version || '-';
@@ -2769,7 +2789,13 @@ function renderOrdenes() {
                 const unitPrice = Number(art.precio_unitario_final) || (itemTotal / Number(art.cantidad));
                 
                 let persName = art.texto_personalizado ? 'Sí' : 'Ninguna';
-                if (art.id_personalizacion && art.id_personalizacion !== 'PERS-NONE') {
+                if (art.id_personalizacion && typeof art.id_personalizacion === 'object') {
+                    if (art.id_personalizacion.id_personalizacion !== 'PERS-NONE' && art.id_personalizacion.concepto) {
+                        persName = art.id_personalizacion.concepto;
+                    } else {
+                        persName = 'Ninguna';
+                    }
+                } else if (art.id_personalizacion && art.id_personalizacion !== 'PERS-NONE') {
                     const pObj = (window.allPersonalizaciones && window.allPersonalizaciones.find(x => String(x.id) === String(art.id_personalizacion))) 
                         || (window.defaultPersonalizaciones && window.defaultPersonalizaciones.find(x => String(x.id) === String(art.id_personalizacion)));
                     if (pObj) persName = pObj.nombre;
@@ -2802,15 +2828,23 @@ function renderOrdenes() {
             articulosHtml = '<div class="text-xs text-gray-500 italic">Sin detalles de artículos</div>';
         }
         
-        let estatusColorClass = 'bg-gray-500/20 text-gray-400';
-        if (orden.estatus === 'Pendiente') estatusColorClass = 'bg-yellow-500/20 text-yellow-400';
-        if (orden.estatus === 'Entregado') estatusColorClass = 'bg-emerald-500/20 text-emerald-400';
-        if (orden.estatus === 'Enviado') estatusColorClass = 'bg-blue-500/20 text-blue-400';
-        if (orden.estatus === 'Cancelado') estatusColorClass = 'bg-red-500/20 text-red-400';
+        let estatusColorClass = 'bg-gray-500/20 text-gray-400 border border-gray-500/20';
+        switch (orden.estatus) {
+            case 'Pendiente': estatusColorClass = 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/20'; break;
+            case 'Revisando': estatusColorClass = 'bg-purple-500/20 text-purple-400 border border-purple-500/20'; break;
+            case 'Disponible - Para recoger': estatusColorClass = 'bg-teal-500/20 text-teal-400 border border-teal-500/20'; break;
+            case 'Disponible - Para enviar': estatusColorClass = 'bg-blue-500/20 text-blue-400 border border-blue-500/20'; break;
+            case 'Entregada - Paqueteria':
+            case 'Finalizada': estatusColorClass = 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/20'; break;
+            case 'Cancelada': estatusColorClass = 'bg-red-500/20 text-red-400 border border-red-500/20'; break;
+        }
         
         const estatusOptionsHtml = (window.ordenesEstatusList || ['Pendiente', 'Enviado', 'Entregado', 'Cancelado'])
             .map(e => `<option value="${e}">${e}</option>`)
             .join('');
+            
+        const clientObj = window.allClients ? window.allClients.find(c => String(c.id_cliente) === String(orden.id_cliente)) : null;
+        const finalNombreCliente = orden.nombre_cliente || (clientObj ? clientObj.nombre_completo : null) || orden.id_cliente || 'Cliente Desconocido';
         
         const cardHtml = `
             <div class="bg-dark-100 border border-white/10 rounded-xl overflow-hidden shadow-sm hover:border-navy-500/50 transition-colors">
@@ -2822,7 +2856,7 @@ function renderOrdenes() {
                             <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${estatusColorClass}">${orden.estatus}</span>
                         </div>
                         <div class="text-xs text-gray-400">
-                            <strong>${orden.nombre_cliente}</strong> <span class="mx-1">|</span> ${dateStr} <span class="mx-1">|</span> <span class="text-white font-semibold">${totalPiezas} piezas</span>
+                            <strong>${finalNombreCliente}</strong> <span class="mx-1">|</span> ${dateStr} <span class="mx-1">|</span> <span class="text-white font-semibold">${totalPiezas} piezas</span>
                         </div>
                     </div>
                     <div class="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full sm:w-auto" onclick="event.stopPropagation()">
@@ -2843,12 +2877,18 @@ window.openOrderDetailsModal = function(id_orden) {
     let articulosHtml = '';
     if (orden.articulos_carrito && orden.articulos_carrito.length > 0) {
         articulosHtml = orden.articulos_carrito.map(art => {
-            const prod = (window.adminFilteredProducts && window.adminFilteredProducts.find(p => String(p.id) === String(art.id_producto))) 
-                || (window.productsData && window.productsData.find(p => String(p.id) === String(art.id_producto))) 
-                || {};
+            let prod = {};
+            if (art.id_playera && typeof art.id_playera === 'object') {
+                prod = art.id_playera;
+            } else {
+                const prodId = art.id_producto || art.id_playera;
+                prod = (window.adminFilteredProducts && window.adminFilteredProducts.find(p => String(p.id) === String(prodId))) 
+                    || (window.productsData && window.productsData.find(p => String(p.id) === String(prodId))) 
+                    || {};
+            }
             
             const imgUrl = prod.foto || prod.imagen || 'https://images.unsplash.com/photo-1577212017184-807dd6acefd6?auto=format&fit=crop&q=80&w=100';
-            const nombre = prod.nombre || `Producto ${art.id_producto}`;
+            const nombre = prod.nombre || `Producto ${art.id_producto || (art.id_playera && art.id_playera.id) || 'Desconocido'}`;
             const genero = prod.genero || '-';
             const tipo = prod.tipo || '-';
             const version = prod.version || '-';
@@ -2856,16 +2896,22 @@ window.openOrderDetailsModal = function(id_orden) {
             const unitPrice = Number(art.precio_unitario_final) || (itemTotal / Number(art.cantidad));
             
             let persName = art.texto_personalizado ? 'Sí' : 'Ninguna';
-            if (art.id_personalizacion && art.id_personalizacion !== 'PERS-NONE') {
+            if (art.id_personalizacion && typeof art.id_personalizacion === 'object') {
+                if (art.id_personalizacion.id_personalizacion !== 'PERS-NONE' && art.id_personalizacion.concepto) {
+                    persName = art.id_personalizacion.concepto;
+                } else {
+                    persName = 'Ninguna';
+                }
+            } else if (art.id_personalizacion && art.id_personalizacion !== 'PERS-NONE') {
                 const pObj = (window.allPersonalizaciones && window.allPersonalizaciones.find(x => String(x.id) === String(art.id_personalizacion))) 
                     || (window.defaultPersonalizaciones && window.defaultPersonalizaciones.find(x => String(x.id) === String(art.id_personalizacion)));
                 if (pObj) persName = pObj.nombre;
             }
 
             return `
-    <div class="flex items-center gap-3 bg-dark-200/40 p-3 rounded-xl border border-white/10 mb-3 last:mb-0">
+    <div class="flex items-center gap-3 bg-dark-200/40 p-3 rounded-xl border border-white/10 mb-3 last:mb-0 relative group">
         <img src="${imgUrl}" alt="Foto" class="w-16 h-16 rounded-lg object-cover bg-dark flex-shrink-0">
-        <div class="flex-grow min-w-0">
+        <div class="flex-grow min-w-0 pr-2">
             <h4 class="font-bold text-white text-sm truncate leading-tight">${nombre}</h4>
             <div class="text-[10px] text-gray-400 mt-1 font-medium uppercase tracking-wider">
                 ${genero} | ${tipo} | ${version}
@@ -2879,9 +2925,16 @@ window.openOrderDetailsModal = function(id_orden) {
                 ${art.texto_personalizado ? ` | <span class="text-emerald-400 font-mono">"${art.texto_personalizado}"</span>` : ''}
             </div>
         </div>
-        <div class="text-right flex-shrink-0 min-w-[70px]">
-            <div class="font-bold text-white text-sm">$${itemTotal.toFixed(2)}</div>
-            <div class="text-[10px] text-gray-500 mt-1">$${unitPrice.toFixed(2)} c/u</div>
+        <div class="text-right flex-shrink-0 min-w-[70px] flex flex-col justify-between items-end self-stretch py-1">
+            ${art.id_detalle ? `
+            <button onclick="deleteOrderItem('${orden.id_orden}', '${art.id_detalle}')" class="text-gray-500 hover:text-red-500 transition-colors p-1" title="Eliminar artículo">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+            </button>
+            ` : '<div></div>'}
+            <div>
+                <div class="font-bold text-white text-sm">$${itemTotal.toFixed(2)}</div>
+                <div class="text-[10px] text-gray-500 mt-0.5">$${unitPrice.toFixed(2)} c/u</div>
+            </div>
         </div>
     </div>`;
         }).join('');
@@ -2891,6 +2944,34 @@ window.openOrderDetailsModal = function(id_orden) {
 
     document.getElementById('admin-order-details-id').textContent = id_orden;
     document.getElementById('admin-order-details-container').innerHTML = articulosHtml;
+    
+    const phoneElement = document.getElementById('admin-order-details-phone');
+    const phoneTextElement = document.getElementById('admin-order-details-phone-text');
+    
+    // El telefono viene directamente en la orden como telefono_cliente
+    let rawPhone = orden.telefono_cliente;
+    
+    // Si no está en la orden por alguna razón, intentamos buscarlo en el catálogo de clientes
+    if (!rawPhone) {
+        const clientObj = window.allClients ? window.allClients.find(c => String(c.id_cliente) === String(orden.id_cliente)) : null;
+        rawPhone = clientObj ? (clientObj.telefono_cliente || clientObj.telefono) : null;
+    }
+    
+    let finalPhone = rawPhone ? String(rawPhone).replace(/\D/g, '') : null;
+    
+    if (finalPhone) {
+        phoneTextElement.textContent = finalPhone;
+        if (phoneElement) {
+            phoneElement.classList.remove('hidden');
+            phoneElement.classList.remove('opacity-50');
+        }
+    } else {
+        phoneTextElement.textContent = 'Sin teléfono registrado';
+        if (phoneElement) {
+            phoneElement.classList.remove('hidden');
+            phoneElement.classList.add('opacity-50');
+        }
+    }
     
     // Set status options
     const statusSelect = document.getElementById('admin-order-details-status');
@@ -2922,6 +3003,58 @@ window.openOrderDetailsModal = function(id_orden) {
     }
 }
 
+window.deleteOrderItem = async function(id_orden, id_detalle) {
+    const result = await Swal.fire({
+        title: '¿Eliminar artículo?',
+        text: `¿Estás seguro de que deseas eliminar este artículo de la orden? Esta acción no se puede deshacer.`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        cancelButtonColor: '#3f3f46',
+        confirmButtonText: 'Sí, eliminar',
+        cancelButtonText: 'Cancelar',
+        background: '#151515', color: '#fff'
+    });
+    
+    if (!result.isConfirmed) return;
+    
+    const payload = {
+        action: 'delete_order_item',
+        id_detalle: id_detalle
+    };
+    
+    try {
+        Swal.fire({ title: 'Eliminando...', allowOutsideClick: false, background: '#151515', color: '#fff', didOpen: () => { Swal.showLoading(); }});
+        
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            body: JSON.stringify(payload)
+        });
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            Swal.fire({ icon: 'success', title: '¡Eliminado!', text: data.message || 'Artículo removido del pedido con éxito.', background: '#151515', color: '#fff', timer: 2000, showConfirmButton: false });
+            
+            // Re-fetch orders to get the updated totals and items
+            await fetchOrdenes();
+            
+            // Re-open modal to reflect changes
+            const updatedOrden = allFetchedOrdenes.find(o => o.id_orden === id_orden);
+            if (updatedOrden && updatedOrden.articulos_carrito && updatedOrden.articulos_carrito.length > 0) {
+                openOrderDetailsModal(id_orden);
+            } else {
+                // All items were deleted, close modal
+                document.getElementById('close-order-details-modal')?.click();
+            }
+        } else {
+            Swal.fire({ icon: 'error', title: 'Error', text: data.message || 'No se pudo eliminar el artículo.', background: '#151515', color: '#fff' });
+        }
+    } catch (error) {
+        console.error('Error eliminando artículo:', error);
+        Swal.fire({ icon: 'error', title: 'Error', text: error.message, background: '#151515', color: '#fff' });
+    }
+};
+
 async function updateOrderStatus(id_orden, nuevo_estatus) {
     if (!nuevo_estatus) return;
     
@@ -2940,7 +3073,12 @@ async function updateOrderStatus(id_orden, nuevo_estatus) {
     });
     
     if (!result.isConfirmed) {
-        selects.forEach(sel => sel.value = ""); // Reset
+        const ordenOriginal = currentOrdenes.find(o => o.id_orden === id_orden) || allFetchedOrdenes.find(o => o.id_orden === id_orden);
+        selects.forEach(sel => sel.value = ordenOriginal ? ordenOriginal.estatus : "");
+        const modalSelect = document.getElementById('admin-order-details-status');
+        if (modalSelect && document.getElementById('admin-order-details-id')?.textContent === id_orden) {
+            modalSelect.value = ordenOriginal ? ordenOriginal.estatus : "";
+        }
         return;
     }
     
@@ -2960,7 +3098,52 @@ async function updateOrderStatus(id_orden, nuevo_estatus) {
         const data = await response.json();
         
         if (data.status === 'success') {
-            Swal.fire({ icon: 'success', title: '¡Actualizado!', text: data.message, background: '#151515', color: '#fff', timer: 2000, showConfirmButton: false });
+            await Swal.fire({ icon: 'success', title: '¡Actualizado!', text: data.message, background: '#151515', color: '#fff', timer: 1500, showConfirmButton: false });
+            
+            const ordenOriginal = currentOrdenes.find(o => o.id_orden === id_orden) || allFetchedOrdenes.find(o => o.id_orden === id_orden);
+            
+            // El telefono viene directamente en la orden como telefono_cliente
+            let rawPhone = ordenOriginal?.telefono_cliente;
+            
+            // Si no está, intentamos el catálogo
+            if (!rawPhone) {
+                const clientObj = window.allClients ? window.allClients.find(c => String(c.id_cliente) === String(ordenOriginal?.id_cliente)) : null;
+                rawPhone = clientObj ? (clientObj.telefono_cliente || clientObj.telefono) : null;
+            }
+            
+            let finalPhone = rawPhone ? String(rawPhone).replace(/\D/g, '') : null;
+            
+            if (finalPhone && finalPhone.length === 10) {
+                finalPhone = '52' + finalPhone;
+            }
+            
+            if (finalPhone) {
+                let nombreCorto = 'Cliente';
+                if (ordenOriginal?.nombre_cliente) {
+                    nombreCorto = ordenOriginal.nombre_cliente.split(' ')[0];
+                }
+                
+                const waText = encodeURIComponent(`*Actualización de Pedido* 📦\n\nHola ${nombreCorto},\nEl estatus de tu orden *${id_orden}* ha cambiado a: *${nuevo_estatus}*.\n\n¡Gracias por tu preferencia!`);
+                const waUrl = `https://wa.me/${finalPhone}?text=${waText}`;
+                
+                const htmlContent = `
+                    <p class="mb-4 text-sm font-semibold text-white">¿Quisieras notificarle al cliente por WhatsApp?</p>
+                    <a href="${waUrl}" target="_blank" onclick="Swal.close()" class="inline-flex items-center justify-center gap-2 bg-[#25D366] text-white px-5 py-2.5 rounded-xl font-bold hover:bg-[#20b858] transition-colors shadow-lg shadow-[#25D366]/20 w-full mb-2">
+                        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
+                        Notificar por WhatsApp
+                    </a>
+                `;
+                
+                Swal.fire({
+                    title: 'Aviso Opcional',
+                    html: htmlContent,
+                    background: '#151515', color: '#fff',
+                    showConfirmButton: true,
+                    confirmButtonText: 'No, gracias',
+                    confirmButtonColor: '#3f3f46',
+                    customClass: { popup: 'border border-white/10 rounded-2xl max-w-sm' }
+                });
+            }
             
             const idx = currentOrdenes.findIndex(o => o.id_orden === id_orden);
             if (idx !== -1) {
@@ -2972,7 +3155,12 @@ async function updateOrderStatus(id_orden, nuevo_estatus) {
         }
     } catch (error) {
         console.error('Error updating status:', error);
-        selects.forEach(sel => sel.value = ""); // Reset
+        const ordenOriginal = currentOrdenes.find(o => o.id_orden === id_orden) || allFetchedOrdenes.find(o => o.id_orden === id_orden);
+        selects.forEach(sel => sel.value = ordenOriginal ? ordenOriginal.estatus : "");
+        const modalSelect = document.getElementById('admin-order-details-status');
+        if (modalSelect && document.getElementById('admin-order-details-id')?.textContent === id_orden) {
+            modalSelect.value = ordenOriginal ? ordenOriginal.estatus : "";
+        }
         Swal.fire({ icon: 'error', title: 'Error', text: error.message, background: '#151515', color: '#fff' });
     }
 }
