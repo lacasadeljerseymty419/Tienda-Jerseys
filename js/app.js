@@ -273,9 +273,50 @@ function getGenderColorClass(genero) {
     return 'bg-white/5 text-gray-400 border-white/10';
 }
 
+// --- Control de Sesión por Inactividad ---
+let inactivityTimer = null;
+const INACTIVITY_LIMIT_MS = 30 * 60 * 1000; // 30 minutos
+
+function resetInactivityTimer() {
+    if (inactivityTimer) clearTimeout(inactivityTimer);
+    
+    // Solo inicia el contador si hay un usuario logueado
+    if (localStorage.getItem('logged_user')) {
+        inactivityTimer = setTimeout(() => {
+            // Se agotó el tiempo
+            localStorage.removeItem('logged_user');
+            localStorage.removeItem('current_perfil');
+            localStorage.removeItem('current_subperfil');
+            
+            Swal.fire({
+                icon: 'warning',
+                title: 'Sesión Expirada',
+                text: 'Tu sesión se ha cerrado por inactividad. Por favor, inicia sesión de nuevo.',
+                background: '#151515', color: '#fff',
+                confirmButtonColor: '#1d4ed8',
+                allowOutsideClick: false,
+                allowEscapeKey: false
+            }).then(() => {
+                window.location.reload();
+            });
+        }, INACTIVITY_LIMIT_MS);
+    }
+}
+
+function startInactivityMonitor() {
+    const events = ['mousemove', 'keydown', 'scroll', 'click', 'touchstart'];
+    events.forEach(event => {
+        document.addEventListener(event, resetInactivityTimer, { passive: true });
+    });
+    // Iniciar el timer por primera vez
+    resetInactivityTimer();
+}
+
 document.addEventListener('DOMContentLoaded', initApp);
 
 async function initApp() {
+    startInactivityMonitor();
+    
     const loggedUserStr = localStorage.getItem('logged_user');
     if (!loggedUserStr) {
         DOM.login.overlay.classList.remove('hidden');
@@ -736,6 +777,9 @@ async function handleLoginSubmit(e) {
         if (res.status === 'success' && res.data) {
             localStorage.setItem('logged_user', JSON.stringify(res.data));
             localStorage.setItem('current_perfil', res.data.perfil || 'Menudeo');
+            
+            // Al hacer login exitoso, reiniciamos el contador de inactividad
+            resetInactivityTimer();
             
             DOM.login.overlay.classList.add('opacity-0', 'pointer-events-none');
             setTimeout(() => {
