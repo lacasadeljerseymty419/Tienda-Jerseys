@@ -1,4 +1,4 @@
-const API_URL = "https://script.google.com/macros/s/AKfycbwULEhsXYj5cagJh_UJk-tOdZMSSOIomakSfsS4sR6n41QnRbbIsJlGYr-BHe8jC9tZpQ/exec";
+﻿const API_URL = "https://script.google.com/macros/s/AKfycbwOzXK6hH-MA0EDNhtx1SLTxWP3iBJfRw_Acl0u4p642_mKkYAQmnMnQ4e3Vth9tapZWA/exec";
 
 async function get_configs() {
     try {
@@ -2544,6 +2544,7 @@ async function submitOrder() {
         
         return {
             id_producto: item.producto.id,
+            categoria: item.producto.genero || 'Adulto',
             talla: item.talla,
             cantidad: item.cantidad,
             id_personalizacion: item.personalizacionId,
@@ -2778,7 +2779,7 @@ async function fetchOrdenes() {
 
 function renderOrdenes() {
     const container = DOM.admin.ordenes.listContainer;
-    container.innerHTML = '';
+    if (container) container.innerHTML = '';
     
     const paginationEl = document.getElementById('admin-ordenes-pagination');
     const pageInfoEl = document.getElementById('admin-ordenes-page-info');
@@ -3206,5 +3207,435 @@ async function updateOrderStatus(id_orden, nuevo_estatus) {
             modalSelect.value = ordenOriginal ? ordenOriginal.estatus : "";
         }
         Swal.fire({ icon: 'error', title: 'Error', text: error.message, background: '#151515', color: '#fff' });
+    }
+}
+
+// ============================================================================
+// MODULO: MIS PEDIDOS (USUARIO)
+// ============================================================================
+let allUserOrdenesFetched = [];
+
+setTimeout(() => {
+    const btnMisPedidos = document.querySelectorAll('.action-nav-mis-pedidos-view');
+    btnMisPedidos.forEach(btn => btn.addEventListener('click', () => {
+        openUserOrdenesModal();
+    }));
+
+    document.getElementById('close-user-ordenes-modal')?.addEventListener('click', () => {
+        document.getElementById('user-ordenes-modal').classList.add('hidden');
+    });
+
+    document.getElementById('close-user-order-details-modal')?.addEventListener('click', () => {
+        document.getElementById('user-order-details-modal').classList.add('hidden');
+    });
+    
+    // Si queremos cerrar con click fuera
+    document.getElementById('user-ordenes-modal')?.addEventListener('click', (e) => {
+        if (e.target.id === 'user-ordenes-modal') e.target.classList.add('hidden');
+    });
+    document.getElementById('user-order-details-modal')?.addEventListener('click', (e) => {
+        if (e.target.id === 'user-order-details-modal') e.target.classList.add('hidden');
+    });
+    
+    // Save changes button
+    document.getElementById('btn-save-user-order-changes')?.addEventListener('click', async () => {
+        await saveUserOrderChanges();
+    });
+});
+
+async function fetchUserOrdenes(force = false) {
+    const loggedUserStr = localStorage.getItem('logged_user');
+    if (!loggedUserStr) return null;
+    const loggedUser = JSON.parse(loggedUserStr);
+    
+    // Reuse admin fetch if it exists, otherwise do our own
+    // Para simplificar, obtenemos todas las �rdenes de este cliente.
+    if (allFetchedOrdenes && allFetchedOrdenes.length > 0 && !force) {
+        return allFetchedOrdenes.filter(o => String(o.id_cliente).trim() === String(loggedUser.id_cliente).trim());
+    }
+    
+    try {
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({ action: "search_orders", filtros: { id_cliente: loggedUser.id_cliente } })
+        });
+        const data = await response.json();
+        if (data.status === "success") {
+            allFetchedOrdenes = data.data || [];
+            return allFetchedOrdenes.filter(o => String(o.id_cliente).trim() === String(loggedUser.id_cliente).trim());
+        } else {
+            console.error('Error fetching orders:', data.message);
+            return [];
+        }
+    } catch (e) {
+        console.error('Error in fetchUserOrdenes:', e); Swal.fire({ icon: 'error', title: 'Error API', text: String(e), background: '#151515', color: '#fff' });
+        return [];
+    }
+}
+
+async function openUserOrdenesModal() {
+    const loggedUserStr = localStorage.getItem('logged_user');
+    if (!loggedUserStr) {
+        Swal.fire({ icon: 'warning', title: 'No Autenticado', text: 'Inicia sesi�n para ver tus pedidos.', background: '#151515', color: '#fff' });
+        return;
+    }
+    
+    // Cerrar men� m�vil si est� abierto
+    if (typeof DOM !== 'undefined' && DOM.mobileMenu) {
+        if(DOM.mobileMenu.drawer) DOM.mobileMenu.drawer.classList.add('translate-x-full'); if(DOM.mobileMenu.overlay) { DOM.mobileMenu.overlay.classList.add('opacity-0'); setTimeout(() => DOM.mobileMenu.overlay.classList.add('hidden'), 300); }
+    }
+    
+    const modal = document.getElementById('user-ordenes-modal');
+    const loading = document.getElementById('user-ordenes-loading');
+    const empty = document.getElementById('user-ordenes-empty');
+    const list = document.getElementById('user-ordenes-list');
+    
+    modal.classList.remove('hidden');
+    // pecar opacity in setTimeout para la transici�n
+    setTimeout(() => { modal.classList.remove('opacity-0'); }, 10);
+    
+    loading.classList.remove('hidden');
+    empty.classList.add('hidden');
+    if (list) list.innerHTML = '';
+    
+    allUserOrdenesFetched = await fetchUserOrdenes(true);
+    
+    loading.classList.add('hidden');
+    renderUserOrdenesList();
+}
+
+function renderUserOrdenesList() {
+    const list = document.getElementById('user-ordenes-list');
+    const empty = document.getElementById('user-ordenes-empty');
+    
+    if (list) list.innerHTML = '';
+    
+    if (!allUserOrdenesFetched || allUserOrdenesFetched.length === 0) {
+        empty.classList.remove('hidden');
+        return;
+    }
+    
+    empty.classList.add('hidden');
+    
+    // Sort orders by date desc
+    const sortedOrders = [...allUserOrdenesFetched].sort((a,b) => new Date(b.fecha) - new Date(a.fecha));
+    
+    sortedOrders.forEach(orden => {
+        const estatusInfo = getEstatusColor(orden.estatus);
+        const numItems = orden.articulos_carrito ? orden.articulos_carrito.length : 0;
+        
+        const card = document.createElement('div');
+        card.className = "bg-dark-200/50 border border-white/5 rounded-xl p-4 sm:p-5 hover:border-white/10 transition-colors flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center";
+        
+        const dateObj = new Date(orden.fecha);
+        const formattedDate = !isNaN(dateObj) ? dateObj.toLocaleDateString('es-MX', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Fecha Inv�lida';
+        
+        card.innerHTML = `
+            <div class="flex flex-col gap-1">
+                <div class="flex items-center gap-3">
+                    <h4 class="text-white font-bold text-sm sm:text-base tracking-wide">${orden.id_orden}</h4>
+                    <span class="${estatusInfo.bg} ${estatusInfo.text} ${estatusInfo.border} px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider">${orden.estatus}</span>
+                </div>
+                <p class="text-xs text-gray-400 mt-1">${formattedDate}</p>
+                <div class="flex items-center gap-3 mt-2 text-xs font-semibold text-gray-300">
+                    <span class="flex items-center gap-1.5"><svg class="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path></svg>${numItems} art�cul${numItems !== 1 ? 'os' : 'o'}</span>
+                    <span class="text-gray-600">�</span>
+                    <span class="text-emerald-400 font-bold">Total: $${(orden.gran_total || 0).toFixed(2)}</span>
+                </div>
+            </div>
+            <div class="w-full sm:w-auto mt-2 sm:mt-0 flex gap-2 justify-end">
+                <button onclick="openUserOrderDetailsModal('${orden.id_orden}')" class="flex-grow sm:flex-grow-0 px-4 py-2 bg-white/5 hover:bg-white/10 text-white text-xs font-bold rounded-lg transition-colors border border-white/10 flex items-center justify-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                    Ver Detalle
+                </button>
+            </div>
+        `;
+        list.appendChild(card);
+    });
+}
+
+// Variables temporales para edici�n
+let currentUserOrderEditing = null;
+let currentUserOrderEdits = [];
+
+function openUserOrderDetailsModal(id_orden) {
+    const orden = allUserOrdenesFetched.find(o => o.id_orden === id_orden);
+    if (!orden) return;
+    
+    currentUserOrderEditing = JSON.parse(JSON.stringify(orden)); // Clon profundo
+    currentUserOrderEdits = []; // Limpiar cambios sin guardar
+    
+    const isEditable = (orden.estatus === 'Pendiente' || orden.estatus === 'Revisando');
+    
+    const modal = document.getElementById('user-order-details-modal');
+    document.getElementById('user-order-details-id').textContent = orden.id_orden;
+    
+    const statusBadge = document.getElementById('user-order-details-status-badge');
+    statusBadge.textContent = orden.estatus;
+    const sColor = getEstatusColor(orden.estatus);
+    statusBadge.className = `px-2 py-1 rounded-lg text-xs font-bold uppercase tracking-wider ${sColor.bg} ${sColor.text} ${sColor.border}`;
+    
+    if (isEditable) {
+        document.getElementById('user-order-edit-warning').classList.remove('hidden');
+        document.getElementById('btn-save-user-order-changes').classList.remove('hidden');
+    } else {
+        document.getElementById('user-order-edit-warning').classList.add('hidden');
+        document.getElementById('btn-save-user-order-changes').classList.add('hidden');
+    }
+    
+    modal.classList.remove('hidden');
+    setTimeout(() => { modal.classList.remove('opacity-0'); }, 10);
+    
+    renderUserOrderDetailsUI();
+}
+
+function renderUserOrderDetailsUI() {
+    const container = document.getElementById('user-order-details-container');
+    if (container) container.innerHTML = '';
+    
+    if (!currentUserOrderEditing.articulos_carrito || currentUserOrderEditing.articulos_carrito.length === 0) {
+        if (container) container.innerHTML = '<p class="text-center text-gray-500 py-8">No hay art�culos en esta orden.</p>';
+        calculateUserOrderTotals();
+        return;
+    }
+    
+    const isEditable = (currentUserOrderEditing.estatus === 'Pendiente' || currentUserOrderEditing.estatus === 'Revisando');
+    
+    currentUserOrderEditing.articulos_carrito.forEach((item, index) => {
+        const art = document.createElement('div');
+        art.className = "bg-dark-100 border border-white/5 rounded-xl p-3 sm:p-4 flex flex-col sm:flex-row gap-3 sm:gap-4 items-start sm:items-center mb-3 relative overflow-hidden group";
+        
+        let persText = "Ninguna";
+        if (item.id_personalizacion && item.id_personalizacion.id_personalizacion && item.id_personalizacion.id_personalizacion !== "PERS-NONE") {
+            persText = item.id_personalizacion.concepto;
+            if (item.texto_personalizado) persText += ` (${item.texto_personalizado})`;
+        }
+        
+        // Render view/edit modes
+        let quantityHtml = `<span class="text-white font-bold">${item.cantidad}</span>`;
+        let persHtml = `<span class="text-blue-400 font-semibold">${persText}</span>`;
+        let actionHtml = '';
+        
+        if (isEditable) {
+            quantityHtml = `
+                <div class="flex items-center gap-2 border border-white/10 rounded-lg p-0.5 bg-black/20">
+                    <button class="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/10 rounded" onclick="changeUserOrderItemQty(${index}, -1)">-</button>
+                    <span class="text-sm font-bold w-4 text-center text-white">${item.cantidad}</span>
+                    <button class="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/10 rounded" onclick="changeUserOrderItemQty(${index}, 1)">+</button>
+                </div>
+            `;
+            
+            if (item.id_personalizacion && item.id_personalizacion.id_personalizacion !== "PERS-NONE") {
+                persHtml = `
+                    <div class="mt-2 w-full">
+                        <label class="block text-[10px] text-gray-400 uppercase tracking-wider mb-1">Texto de Pers. (${item.id_personalizacion.concepto})</label>
+                        <input type="text" value="${item.texto_personalizado || ''}" onchange="changeUserOrderItemPersText(${index}, this.value)" class="w-full bg-dark-200/50 border border-white/10 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-navy-400 focus:ring-1 focus:ring-navy-400 text-white placeholder-gray-600 uppercase" placeholder="Escribe el nombre/n�mero...">
+                    </div>
+                `;
+            }
+            
+            actionHtml = `
+                <button onclick="removeUserOrderItem(${index})" class="absolute top-2 right-2 sm:relative sm:top-auto sm:right-auto sm:ml-auto w-8 h-8 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 flex items-center justify-center transition-colors border border-red-500/20" title="Eliminar art�culo">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                </button>
+            `;
+        }
+        
+        art.innerHTML = `
+            <div class="w-16 h-16 sm:w-20 sm:h-20 bg-dark-200 rounded-lg overflow-hidden flex-shrink-0 relative border border-white/5">
+                <img src="${item.id_playera.foto}" class="w-full h-full object-cover" alt="Jersey">
+            </div>
+            <div class="flex-grow min-w-0 pr-6 sm:pr-0">
+                <h4 class="text-white font-bold text-sm sm:text-base leading-tight truncate">${item.id_playera.nombre}</h4>
+                <div class="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1">
+                    <span class="text-[10px] text-gray-400 uppercase tracking-wider">${item.id_playera.genero} | ${item.id_playera.tipo} | ${item.id_playera.version}</span>
+                </div>
+                <div class="flex items-center gap-3 mt-2 text-xs">
+                    <div class="flex items-center gap-1"><span class="text-gray-500">Talla:</span><span class="text-white font-bold bg-white/10 px-1.5 rounded">${item.talla}</span></div>
+                    <div class="flex items-center gap-1"><span class="text-gray-500">Cant:</span>${quantityHtml}</div>
+                </div>
+                ${!isEditable ? `<div class="mt-1.5 text-xs text-gray-500 flex items-center gap-1">Pers: ${persHtml}</div>` : persHtml}
+            </div>
+            <div class="flex flex-col items-end gap-1 mt-2 sm:mt-0 ml-auto pl-2 border-l border-white/5 sm:border-none">
+                <span class="text-white font-bold text-base sm:text-lg">$${item.subtotal_renglon.toFixed(2)}</span>
+                <span class="text-gray-500 text-[10px]">C/U $${item.precio_unitario_final.toFixed(2)}</span>
+            </div>
+            ${actionHtml}
+        `;
+        container.appendChild(art);
+    });
+    
+    calculateUserOrderTotals();
+}
+
+function changeUserOrderItemQty(index, delta) {
+    const item = currentUserOrderEditing.articulos_carrito[index];
+    const newQty = item.cantidad + delta;
+    if (newQty < 1) return;
+    
+    item.cantidad = newQty;
+    item.subtotal_renglon = item.precio_unitario_final * newQty;
+    
+    // Registrar cambio
+    trackUserOrderEdit(item.id_detalle, 'update_qty', newQty);
+    
+    renderUserOrderDetailsUI();
+}
+
+function changeUserOrderItemPersText(index, text) {
+    const item = currentUserOrderEditing.articulos_carrito[index];
+    item.texto_personalizado = String(text).toUpperCase();
+    
+    trackUserOrderEdit(item.id_detalle, 'update_pers_text', item.texto_personalizado);
+}
+
+function removeUserOrderItem(index) {
+    const item = currentUserOrderEditing.articulos_carrito[index];
+    
+    Swal.fire({
+        title: '�Eliminar art�culo?',
+        text: "Este art�culo se quitar� del pedido.",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        cancelButtonColor: '#374151',
+        confirmButtonText: 'S�, eliminar',
+        cancelButtonText: 'Cancelar',
+        background: '#151515', color: '#fff'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            trackUserOrderEdit(item.id_detalle, 'delete', null);
+            currentUserOrderEditing.articulos_carrito.splice(index, 1);
+            renderUserOrderDetailsUI();
+        }
+    });
+}
+
+function trackUserOrderEdit(id_detalle, actionType, value) {
+    const existing = currentUserOrderEdits.find(e => e.id_detalle === id_detalle);
+    if (existing) {
+        if (actionType === 'delete') {
+            existing.actionType = 'delete';
+        } else if (actionType === 'update_qty') {
+            if (existing.actionType !== 'delete') existing.cantidad = value;
+        } else if (actionType === 'update_pers_text') {
+            if (existing.actionType !== 'delete') existing.texto_personalizado = value;
+        }
+    } else {
+        const edit = { id_detalle, actionType };
+        if (actionType === 'update_qty') edit.cantidad = value;
+        if (actionType === 'update_pers_text') edit.texto_personalizado = value;
+        currentUserOrderEdits.push(edit);
+    }
+}
+
+function calculateUserOrderTotals() {
+    let subJers = 0;
+    
+    if (currentUserOrderEditing.articulos_carrito) {
+        currentUserOrderEditing.articulos_carrito.forEach(item => {
+            subJers += item.subtotal_renglon;
+        });
+    }
+    
+    // We update the local object total so it reflects correctly
+    currentUserOrderEditing.gran_total = subJers;
+    
+    document.getElementById('user-order-subtotal').textContent = '$' + subJers.toFixed(2);
+    document.getElementById('user-order-pers-total').textContent = 'Incluido';
+    document.getElementById('user-order-total').textContent = '$' + subJers.toFixed(2);
+}
+
+async function saveUserOrderChanges() {
+    if (currentUserOrderEdits.length === 0) {
+        Swal.fire({ icon: 'info', title: 'Sin cambios', text: 'No has realizado ninguna modificaci�n.', background: '#151515', color: '#fff', timer: 1500, showConfirmButton: false });
+        return;
+    }
+    
+    // Process deletes first, then updates
+    const deletes = currentUserOrderEdits.filter(e => e.actionType === 'delete');
+    const updates = currentUserOrderEdits.filter(e => e.actionType !== 'delete');
+    
+    // Assuming backend logic supports 'update_order_item' and 'delete_order_item'
+    
+    Swal.fire({
+        title: 'Guardando...',
+        text: 'Por favor espera mientras actualizamos tu pedido.',
+        background: '#151515', color: '#fff',
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading()
+    });
+    
+    try {
+        // Enviar deletes
+        for (const del of deletes) {
+            await fetch(API_URL, {
+                method: 'POST',
+                body: JSON.stringify({ action: 'delete_order_item', id_detalle: del.id_detalle })
+            });
+        }
+        
+        // Enviar updates
+        // ATENCI�N: Se asume que el backend tiene la acci�n 'update_order_item'
+        for (const upd of updates) {
+            const item = currentUserOrderEditing.articulos_carrito.find(a => a.id_detalle === upd.id_detalle);
+            if (item) {
+                await fetch(API_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({ 
+                        action: 'update_order_item', 
+                        id_detalle: item.id_detalle,
+                        cantidad: item.cantidad,
+                        texto_personalizado: item.texto_personalizado || ''
+                    })
+                });
+            }
+        }
+        
+        Swal.fire({ icon: 'success', title: '�Actualizado!', text: 'Tus cambios se han guardado exitosamente.', background: '#151515', color: '#fff', timer: 2000, showConfirmButton: false });
+        
+        // Refresh data
+        allUserOrdenesFetched = await fetchUserOrdenes(true);
+        // Refresh global orders if admin cache exists
+        if (typeof fetchOrdenes !== 'undefined') {
+            fetchOrdenes(); // Fire and forget update global cache
+        }
+        
+        // Re-open detail with updated data
+        openUserOrderDetailsModal(currentUserOrderEditing.id_orden);
+        // Refresh list
+        renderUserOrdenesList();
+        
+    } catch (e) {
+        console.error('Error saving order changes:', e);
+        Swal.fire({ icon: 'error', title: 'Error', text: 'Hubo un problema al guardar los cambios.', background: '#151515', color: '#fff' });
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+function getEstatusColor(estatus) {
+    switch (estatus) {
+        case 'Pendiente': return { color: 'yellow', bg: 'bg-yellow-500/20', text: 'text-yellow-400', border: 'border-yellow-500/20' };
+        case 'Revisando': return { color: 'purple', bg: 'bg-purple-500/20', text: 'text-purple-400', border: 'border-purple-500/20' };
+        case 'Disponible - Para recoger': return { color: 'teal', bg: 'bg-teal-500/20', text: 'text-teal-400', border: 'border-teal-500/20' };
+        case 'Disponible - Para enviar': return { color: 'blue', bg: 'bg-blue-500/20', text: 'text-blue-400', border: 'border-blue-500/20' };
+        case 'Entregada - Paqueteria':
+        case 'Finalizada': return { color: 'emerald', bg: 'bg-emerald-500/20', text: 'text-emerald-400', border: 'border-emerald-500/20' };
+        case 'Cancelada': return { color: 'red', bg: 'bg-red-500/20', text: 'text-red-400', border: 'border-red-500/20' };
+        default: return { color: 'gray', bg: 'bg-gray-500/20', text: 'text-gray-400', border: 'border-gray-500/20' };
     }
 }

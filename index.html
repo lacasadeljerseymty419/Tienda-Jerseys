@@ -108,7 +108,13 @@
                 <!-- Botón Ordenar (Siempre visible) -->
                 <button class="action-nav-jerseys-view text-xs sm:text-sm font-semibold text-gray-400 hover:text-white transition-colors flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg hover:bg-white/5">
                     <svg class="w-4 h-4 sm:w-5 sm:h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path></svg>
-                    <span>Ordenar</span>
+                    <span class="hidden md:inline">Ordenar</span>
+                </button>
+                
+                <!-- Botón Mis Pedidos -->
+                <button class="action-nav-mis-pedidos-view text-xs sm:text-sm font-semibold text-gray-400 hover:text-white transition-colors flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg hover:bg-white/5" title="Mis Pedidos">
+                    <svg class="w-4 h-4 sm:w-5 sm:h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
+                    <span class="hidden md:inline">Mis Pedidos</span>
                 </button>
                 
                 <!-- Botón Mi Pedido (Siempre visible) -->
@@ -146,6 +152,10 @@
                     <button class="action-nav-jerseys-view w-full text-left px-4 py-3 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-xl transition-colors flex items-center gap-3">
                         <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path></svg>
                         Ordenar
+                    </button>
+                    <button class="action-nav-mis-pedidos-view w-full text-left px-4 py-3 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-xl transition-colors flex items-center gap-3">
+                        <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
+                        Mis Pedidos
                     </button>
                 </div>
 
@@ -1000,8 +1010,105 @@
         </div>
     </div>
 
+    <!-- Modal: Mis Pedidos (Usuario) -->
+    <div id="user-ordenes-modal" class="fixed inset-0 z-[60] flex items-center justify-center hidden bg-dark/90 backdrop-blur-sm transition-opacity duration-300 opacity-0 overflow-y-auto py-6 sm:py-10">
+        <div class="bg-dark-100 border border-white/10 rounded-2xl w-full max-w-4xl mx-4 shadow-2xl shadow-navy-500/10 transform scale-95 transition-transform duration-300 flex flex-col my-auto relative max-h-none sm:max-h-[85vh]">
+            <div class="p-4 sm:p-6 border-b border-white/5 flex justify-between items-center bg-black/20 sticky top-0 z-10">
+                <div class="flex flex-col">
+                    <h2 class="text-xl sm:text-2xl font-black text-white flex items-center gap-2 sm:gap-3 tracking-tight">
+                        <span class="bg-navy-500/20 text-navy-400 p-2 rounded-lg">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
+                        </span>
+                        Mis Pedidos
+                    </h2>
+                    <p class="text-xs sm:text-sm text-gray-400 mt-1">Consulta el historial de tus pedidos.</p>
+                </div>
+                <button id="close-user-ordenes-modal" class="text-white/50 hover:text-white transition-colors p-2 bg-white/5 rounded-full hover:bg-white/10">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            
+            <div class="p-4 sm:p-6 flex-grow overflow-auto flex flex-col">
+                <div class="flex-grow min-h-[300px] flex flex-col">
+                    <div id="user-ordenes-list" class="space-y-4">
+                        <!-- User orders will be rendered here -->
+                    </div>
+                    <div id="user-ordenes-empty" class="hidden m-auto text-center p-8 bg-dark-200/30 rounded-2xl border border-white/5 w-full">
+                        <svg class="w-16 h-16 text-gray-600 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2"></path></svg>
+                        <h3 class="text-white font-bold text-lg mb-1">Aún no tienes pedidos</h3>
+                        <p class="text-sm text-gray-500 max-w-sm mx-auto">Cuando realices una orden, aparecerá aquí.</p>
+                    </div>
+                    <div id="user-ordenes-loading" class="hidden m-auto text-center p-8 w-full">
+                        <div class="w-10 h-10 border-4 border-navy-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                        <p class="text-sm text-gray-400">Cargando tus pedidos...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Detalle de Mi Pedido -->
+    <div id="user-order-details-modal" class="fixed inset-0 z-[70] flex items-center justify-center hidden bg-dark/95 backdrop-blur-md transition-opacity duration-300 opacity-0 py-6 sm:py-10">
+        <div class="bg-dark-100 border border-white/10 rounded-2xl w-full max-w-2xl mx-4 shadow-2xl transform scale-95 transition-transform duration-300 flex flex-col my-auto relative max-h-[90vh]">
+            <div class="p-4 sm:p-6 border-b border-white/5 flex justify-between items-center">
+                <div class="flex flex-col">
+                    <h2 class="text-xl sm:text-2xl font-black text-white flex items-center gap-2 tracking-tight">
+                        <span class="bg-navy-500/20 text-navy-400 p-2 rounded-lg">
+                            <svg class="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                        </span>
+                        Detalle de mi Pedido
+                    </h2>
+                    <p id="user-order-details-id" class="text-xs sm:text-sm text-gray-400 mt-1 font-mono">ORD-000</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span id="user-order-details-status-badge" class="px-2 py-1 rounded-lg text-xs font-bold uppercase tracking-wider">ESTATUS</span>
+                    <button id="close-user-order-details-modal" class="text-white/50 hover:text-white transition-colors p-2 bg-white/5 rounded-full hover:bg-white/10 flex-shrink-0">
+                        <svg class="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                </div>
+            </div>
+            <div class="px-4 pt-4 hidden" id="user-order-edit-warning">
+                <div class="bg-blue-500/10 border border-blue-500/20 rounded-xl p-3 flex items-start gap-3">
+                    <svg class="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    <p class="text-xs sm:text-sm text-blue-200">
+                        Solo puedes modificar cantidades y texto de personalización, o eliminar artículos si tu pedido está <strong class="text-blue-300">Pendiente</strong> o <strong class="text-blue-300">Revisando</strong>. <br>Para agregar nuevos artículos, deberás crear un nuevo pedido.
+                    </p>
+                </div>
+            </div>
+            <div class="p-4 sm:p-6 flex-grow overflow-auto bg-black/20" id="user-order-details-container">
+                <!-- Articles injected here -->
+            </div>
+            <div class="p-4 sm:p-6 border-t border-white/5 bg-dark-100 flex flex-col gap-3">
+                <div class="flex justify-between items-center">
+                    <span class="text-sm sm:text-base text-gray-400 font-medium">Subtotal Jerseys:</span>
+                    <span class="text-sm sm:text-base text-white font-bold" id="user-order-subtotal"></span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-sm sm:text-base text-gray-400 font-medium">Personalizaciones:</span>
+                    <span class="text-sm sm:text-base text-white font-bold" id="user-order-pers-total"></span>
+                </div>
+                <div class="h-px w-full bg-white/10 my-1"></div>
+                <div class="flex justify-between items-center">
+                    <span class="text-base sm:text-lg text-white font-black">Total de la Orden:</span>
+                    <span class="text-lg sm:text-2xl text-emerald-400 font-black tracking-tight" id="user-order-total"></span>
+                </div>
+                <button id="btn-save-user-order-changes" class="hidden w-full mt-2 bg-navy-500 hover:bg-navy-400 text-white font-bold py-3.5 rounded-xl transition-all shadow-[0_0_15px_rgba(59,130,246,0.3)]">Guardar Cambios</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Módulo Principal JS -->
-    <script src="./js/app.js?v=1.0.2"></script>
+    <script src="./js/app.js?v=1.0.12"></script>
 </body>
 </html>
+
+
+
+
+
+
+
+
+
+
 
