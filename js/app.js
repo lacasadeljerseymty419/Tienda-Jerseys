@@ -89,10 +89,10 @@ const DOM = {
         openOrders: document.querySelectorAll('.action-open-orders')
     },
     mobileMenu: {
-        toggleBtn: document.getElementById('btn-mobile-menu-toggle'),
-        closeBtn: document.getElementById('btn-close-mobile-menu'),
-        overlay: document.getElementById('mobile-menu-overlay'),
-        drawer: document.getElementById('mobile-menu-drawer'),
+        toggleBtn: document.getElementById('btn-mobile-Menúu-toggle'),
+        closeBtn: document.getElementById('btn-close-mobile-Menúu'),
+        overlay: document.getElementById('mobile-Menúu-overlay'),
+        drawer: document.getElementById('mobile-Menúu-drawer'),
         userName: document.getElementById('mobile-nav-user-name'),
         adminSection: document.getElementById('mobile-admin-section'),
         adminSubperfilSelect: document.getElementById('mobile-admin-subperfil-select')
@@ -160,26 +160,14 @@ const DOM = {
         },
         fotoInput: document.getElementById('create-foto'),
         fotoPreviewContainer: document.getElementById('preview-foto-container'),
-        fotoPreview: document.getElementById('preview-foto'),
-        listModal: document.getElementById('admin-list-modal'),
-        closeListModal: document.getElementById('close-list-modal'),
-        tableBody: document.getElementById('admin-table-body'),
-        listEmpty: document.getElementById('admin-list-empty'),
-        invModal: document.getElementById('admin-inventory-modal'),
-        closeInvModal: document.getElementById('close-inventory-modal'),
-        invTitle: document.getElementById('inv-modal-title'),
-        invId: document.getElementById('inv-modal-id'),
-        invImg: document.getElementById('inv-modal-img'),
-        invTallasList: document.getElementById('inv-tallas-list'),
-        formAddTalla: document.getElementById('form-add-talla'),
         newTallaVal: document.getElementById('new-talla-val'),
         newStockVal: document.getElementById('new-stock-val'),
-        precioMenudeo: document.getElementById('create-precio-menudeo'),
+        precioMenudeo: document.getElementById('create-precio-Menudeo'),
         precioMayoreo: document.getElementById('create-precio-mayoreo'),
         precioMayoreoSuper: document.getElementById('create-precio-mayoreo-super'),
         formUpdatePrecios: document.getElementById('form-update-precios'),
         updateFotoUrl: document.getElementById('update-foto-url'),
-        updatePrecioMenudeo: document.getElementById('update-precio-menudeo'),
+        updatePrecioMenudeo: document.getElementById('update-precio-Menudeo'),
         updatePrecioMayoreo: document.getElementById('update-precio-mayoreo'),
         updatePrecioMayoreoSuper: document.getElementById('update-precio-mayoreo-super'),
         filterSearch: document.getElementById('admin-filter-search'),
@@ -189,7 +177,7 @@ const DOM = {
         pagePrev: document.getElementById('admin-page-prev'),
         pageNext: document.getElementById('admin-page-next'),
         pageInfo: document.getElementById('admin-pagination-info'),
-        adminMenuWrapper: document.getElementById('admin-menu-wrapper'),
+        adminMenúuWrapper: document.getElementById('admin-Menúu-wrapper'),
         clientsModal: document.getElementById('admin-clients-modal'),
         closeClientsModal: document.getElementById('close-clients-modal'),
         clientFilterSearch: document.getElementById('client-filter-search'),
@@ -217,9 +205,9 @@ const DOM = {
             cp: document.getElementById('client-cp'),
             referencias: document.getElementById('client-referencias')
         },
-        ordenes: {
+        Ordenes: {
             modal: document.getElementById('admin-ordenes-modal'),
-            closeBtn: document.getElementById('close-ordenes-modal'),
+            closeBtn: document.getElementById('close-Ordenes-modal'),
             btnBuscar: document.getElementById('btn-admin-ordenes-buscar'),
             filtros: {
                 nombre: document.getElementById('admin-ordenes-filtro-nombre'),
@@ -253,10 +241,10 @@ let cart = []; // Artículos en el carrito
 let allPersonalizaciones = []; // Catálogo de personalizaciones
 let reglasMayoreoSuper = { piezas_jugador: 10, piezas_fan: 15 };
 const defaultPersonalizaciones = [
-    { id: "PERS-001", nombre: "Pers 22 Cm", precio_menudeo: 70, precio_mayoreo: 100 },
-    { id: "PERS-002", nombre: "Pers 26.5 Cm", precio_menudeo: 85, precio_mayoreo: 120 },
-    { id: "PERS-003", nombre: "Pers 26.5 Cm y 10 Cm (Atras y Adelante)", precio_menudeo: 95, precio_mayoreo: 130 },
-    { id: "PERS-004", nombre: "Personalizacion Oficial (Atras y Adelante)", precio_menudeo: 125, precio_mayoreo: 150 }
+    { id: "PERS-001", nombre: "Pers 22 Cm", precio_Menudeo: 70, precio_mayoreo: 100 },
+    { id: "PERS-002", nombre: "Pers 26.5 Cm", precio_Menudeo: 85, precio_mayoreo: 120 },
+    { id: "PERS-003", nombre: "Pers 26.5 Cm y 10 Cm (Atras y Adelante)", precio_Menudeo: 95, precio_mayoreo: 130 },
+    { id: "PERS-004", nombre: "Personalizacion Oficial (Atras y Adelante)", precio_Menudeo: 125, precio_mayoreo: 150 }
 ];
 let currentJerseyForPedido = null; // Jersey activo para configurar en el modal
 
@@ -328,7 +316,7 @@ async function initApp() {
         if (DOM.mobileMenu.userName) DOM.mobileMenu.userName.textContent = loggedUser.nombre_completo || loggedUser.usuario || 'Usuario';
         DOM.navUserBadge.classList.remove('hidden');
         if (loggedUser.perfil === "Administrador") {
-            if (DOM.admin.adminMenuWrapper) DOM.admin.adminMenuWrapper.classList.remove('hidden');
+            if (DOM.admin.adminMenúuWrapper) DOM.admin.adminMenúuWrapper.classList.remove('hidden');
             if (DOM.mobileMenu.adminSection) DOM.mobileMenu.adminSection.classList.remove('hidden');
             const savedSub = localStorage.getItem('current_subperfil') || 'Menudeo';
             if (DOM.adminSubperfilSelect) {
@@ -339,7 +327,7 @@ async function initApp() {
                 DOM.mobileMenu.adminSubperfilSelect.value = savedSub;
             }
         } else {
-            if (DOM.admin.adminMenuWrapper) DOM.admin.adminMenuWrapper.classList.add('hidden');
+            if (DOM.admin.adminMenúuWrapper) DOM.admin.adminMenúuWrapper.classList.add('hidden');
             if (DOM.mobileMenu.adminSection) DOM.mobileMenu.adminSection.classList.add('hidden');
             if (DOM.adminSubperfilSelect) DOM.adminSubperfilSelect.classList.add('hidden');
         }
@@ -354,8 +342,8 @@ async function initApp() {
     
     // Listeners de Vistas del Header (Navegación)
     if (DOM.actions.logout) DOM.actions.logout.forEach(btn => btn.addEventListener('click', handleLogout));
-    if (DOM.actions.navCatalogo) DOM.actions.navCatalogo.forEach(btn => btn.addEventListener('click', () => { switchView('mis-jerseys'); closeMobileMenu(); }));
-    if (DOM.actions.navJerseysView) DOM.actions.navJerseysView.forEach(btn => btn.addEventListener('click', () => { switchView('jerseys-pedido'); closeMobileMenu(); }));
+    if (DOM.actions.navCatalogo) DOM.actions.navCatalogo.forEach(btn => btn.addEventListener('click', () => { switchView('mis-jerseys'); closemobileMenu(); }));
+    if (DOM.actions.navJerseysView) DOM.actions.navJerseysView.forEach(btn => btn.addEventListener('click', () => { switchView('jerseys-pedido'); closemobileMenu(); }));
     if (DOM.btnOpenCart) {
         DOM.btnOpenCart.addEventListener('click', openCartModal);
     }
@@ -370,7 +358,7 @@ async function initApp() {
     if (DOM.adminSubperfilSelect) DOM.adminSubperfilSelect.addEventListener('change', handleSubperfilChange);
     if (DOM.mobileMenu.adminSubperfilSelect) DOM.mobileMenu.adminSubperfilSelect.addEventListener('change', handleSubperfilChange);
 
-    // Mobile Menu Toggle
+    // Mobile Menúu Toggle
     if (DOM.mobileMenu.toggleBtn) {
         DOM.mobileMenu.toggleBtn.addEventListener('click', () => {
             if (DOM.mobileMenu.overlay) DOM.mobileMenu.overlay.classList.remove('hidden');
@@ -380,14 +368,14 @@ async function initApp() {
             }, 10);
         });
     }
-    if (DOM.mobileMenu.closeBtn) DOM.mobileMenu.closeBtn.addEventListener('click', closeMobileMenu);
+    if (DOM.mobileMenu.closeBtn) DOM.mobileMenu.closeBtn.addEventListener('click', closemobileMenu);
     if (DOM.mobileMenu.overlay) {
         DOM.mobileMenu.overlay.addEventListener('click', (e) => {
-            if (e.target === DOM.mobileMenu.overlay) closeMobileMenu();
+            if (e.target === DOM.mobileMenu.overlay) closemobileMenu();
         });
     }
 
-    function closeMobileMenu() {
+    function closemobileMenu() {
         if (!DOM.mobileMenu.overlay) return;
         DOM.mobileMenu.overlay.classList.add('opacity-0');
         if (DOM.mobileMenu.drawer) DOM.mobileMenu.drawer.classList.add('translate-x-full');
@@ -425,7 +413,7 @@ async function initApp() {
         DOM.btnToggleFiltros.addEventListener('click', toggleFiltros);
     }
 
-    // Búsqueda automática al cambiar cualquier select
+    // Búsqueda automática al ¿¿Cambiar cualquier select
     DOM.filters.version.addEventListener('change', handleLocalSearch);
     DOM.filters.tipo.addEventListener('change', handleLocalSearch);
     DOM.filters.genero.addEventListener('change', handleLocalSearch);
@@ -438,12 +426,12 @@ async function initApp() {
     }
     
     // Eventos de Admin
-    if (DOM.actions.openCreate) DOM.actions.openCreate.forEach(btn => btn.addEventListener('click', () => { openCreateModal(); closeMobileMenu(); }));
+    if (DOM.actions.openCreate) DOM.actions.openCreate.forEach(btn => btn.addEventListener('click', () => { openCreateModal(); closemobileMenu(); }));
     if (DOM.admin.closeCreateModal) DOM.admin.closeCreateModal.addEventListener('click', closeCreateModal);
     if (DOM.admin.btnCancelCreate) DOM.admin.btnCancelCreate.addEventListener('click', closeCreateModal);
     if (DOM.admin.btnAddTalla) DOM.admin.btnAddTalla.addEventListener('click', addTallaField);
     if (DOM.admin.formCreate) DOM.admin.formCreate.addEventListener('submit', handleCreateProduct);
-    if (DOM.actions.openList) DOM.actions.openList.forEach(btn => btn.addEventListener('click', () => { openListModal(); closeMobileMenu(); }));
+    if (DOM.actions.openList) DOM.actions.openList.forEach(btn => btn.addEventListener('click', () => { openListModal(); closemobileMenu(); }));
     if (DOM.admin.closeListModal) DOM.admin.closeListModal.addEventListener('click', closeListModal);
     
     if (DOM.admin.closeInvModal) DOM.admin.closeInvModal.addEventListener('click', closeInventoryModal);
@@ -470,27 +458,27 @@ async function initApp() {
     }
 
     // Eventos de Perfil y Clientes
-    if (DOM.actions.openClients) DOM.actions.openClients.forEach(btn => btn.addEventListener('click', () => { openClientsModal(); closeMobileMenu(); }));
+    if (DOM.actions.openClients) DOM.actions.openClients.forEach(btn => btn.addEventListener('click', () => { openClientsModal(); closemobileMenu(); }));
     if (DOM.admin.closeClientsModal) DOM.admin.closeClientsModal.addEventListener('click', closeClientsModal);
     if (DOM.admin.btnOpenCreateClient) DOM.admin.btnOpenCreateClient.addEventListener('click', () => openClientFormModal());
     
-    // Eventos de Órdenes
-    if (DOM.actions.openOrders) DOM.actions.openOrders.forEach(btn => btn.addEventListener('click', () => { openOrdenesModal(); closeMobileMenu(); }));
-    if (DOM.admin.ordenes?.closeBtn) DOM.admin.ordenes.closeBtn.addEventListener('click', closeOrdenesModal);
-    if (DOM.admin.ordenes?.btnBuscar) DOM.admin.ordenes.btnBuscar.addEventListener('click', handleSearchOrdenes);
-    if (DOM.admin.ordenes?.filtros?.nombre) DOM.admin.ordenes.filtros.nombre.addEventListener('input', handleSearchOrdenes);
-    if (DOM.admin.ordenes?.filtros?.id) DOM.admin.ordenes.filtros.id.addEventListener('input', handleSearchOrdenes);
-    if (DOM.admin.ordenes?.filtros?.estatus) DOM.admin.ordenes.filtros.estatus.addEventListener('change', handleSearchOrdenes);
+    // Eventos de Óórdenes
+    if (DOM.actions.openOrders) DOM.actions.openOrders.forEach(btn => btn.addEventListener('click', () => { openOrdenesModal(); closemobileMenu(); }));
+    if (DOM.admin.Ordenes?.closeBtn) DOM.admin.Ordenes.closeBtn.addEventListener('click', closeOrdenesModal);
+    if (DOM.admin.Ordenes?.btnBuscar) DOM.admin.Ordenes.btnBuscar.addEventListener('click', handleSearchOrdenes);
+    if (DOM.admin.Ordenes?.filtros?.nombre) DOM.admin.Ordenes.filtros.nombre.addEventListener('input', handleSearchOrdenes);
+    if (DOM.admin.Ordenes?.filtros?.id) DOM.admin.Ordenes.filtros.id.addEventListener('input', handleSearchOrdenes);
+    if (DOM.admin.Ordenes?.filtros?.estatus) DOM.admin.Ordenes.filtros.estatus.addEventListener('change', handleSearchOrdenes);
     
-    const ordenesPagePrev = document.getElementById('admin-ordenes-page-prev');
-    const ordenesPageNext = document.getElementById('admin-ordenes-page-next');
-    const ordenesPerPageSelect = document.getElementById('admin-ordenes-per-page');
-    if (ordenesPagePrev) ordenesPagePrev.addEventListener('click', () => { if (ordenesCurrentPage > 1) { ordenesCurrentPage--; renderOrdenes(); } });
-    if (ordenesPageNext) ordenesPageNext.addEventListener('click', () => { if (ordenesCurrentPage * ordenesPerPage < currentOrdenes.length) { ordenesCurrentPage++; renderOrdenes(); } });
-    if (ordenesPerPageSelect) {
-        ordenesPerPageSelect.addEventListener('change', (e) => {
-            ordenesPerPage = parseInt(e.target.value) || 5;
-            ordenesCurrentPage = 1;
+    const OrdenesPagePrev = document.getElementById('admin-ordenes-page-prev');
+    const OrdenesPageNext = document.getElementById('admin-ordenes-page-next');
+    const OrdenesPerPageSelect = document.getElementById('admin-ordenes-per-page');
+    if (OrdenesPagePrev) OrdenesPagePrev.addEventListener('click', () => { if (OrdenesCurrentPage > 1) { OrdenesCurrentPage--; renderOrdenes(); } });
+    if (OrdenesPageNext) OrdenesPageNext.addEventListener('click', () => { if (OrdenesCurrentPage * OrdenesPerPage < currentOrdenes.length) { OrdenesCurrentPage++; renderOrdenes(); } });
+    if (OrdenesPerPageSelect) {
+        OrdenesPerPageSelect.addEventListener('change', (e) => {
+            OrdenesPerPage = parseInt(e.target.value) || 5;
+            OrdenesCurrentPage = 1;
             renderOrdenes();
         });
     }
@@ -603,10 +591,10 @@ async function loadCatalogs() {
         const categorias = candidate.categorias || [];
         const personalizaciones = candidate.personalizaciones || candidate.personalizacion || [];
         const reglas_mayoreo_super = candidate.reglas_mayoreo_super || null;
-        const estatus_ordenes = candidate.estatus_ordenes || candidate.estatus || null;
+        const estatus_Ordenes = candidate.estatus_Ordenes || candidate.estatus || null;
         
         if (Array.isArray(tipos) && Array.isArray(versiones) && Array.isArray(generos)) {
-            return { tipos, versiones, generos, perfiles, categorias, personalizaciones, reglas_mayoreo_super, estatus_ordenes };
+            return { tipos, versiones, generos, perfiles, categorias, personalizaciones, reglas_mayoreo_super, estatus_Ordenes };
         }
         return null;
     };
@@ -667,7 +655,7 @@ async function loadCatalogs() {
         allPersonalizaciones = pers.map(p => ({
             id: p.id_personalizacion || p.id,
             nombre: p.concepto || p.nombre || '',
-            precio_menudeo: parseFloat((p.precio_menudeo !== undefined && p.precio_menudeo !== "") ? p.precio_menudeo : (p.precio || 0)),
+            precio_Menudeo: parseFloat((p.precio_Menudeo !== undefined && p.precio_Menudeo !== "") ? p.precio_Menudeo : (p.precio || 0)),
             precio_mayoreo: parseFloat((p.precio_mayoreo !== undefined && p.precio_mayoreo !== "") ? p.precio_mayoreo : (p.precio || 0))
         }));
     } else {
@@ -702,8 +690,8 @@ function populateSelects(data) {
     const versiones = data.versiones || [];
     const generos = data.generos || [];
     const perfiles = (data.perfiles && data.perfiles.length > 0) ? data.perfiles : ["Menudeo", "Mayoreo", "Administrador"];
-    const estatusList = data.estatus_ordenes || ['Pendiente', 'Enviado', 'Entregado', 'Cancelado'];
-    window.ordenesEstatusList = estatusList;
+    const estatusList = data.estatus_Ordenes || ['Pendiente', 'Enviado', 'Entregado', 'Cancelado'];
+    window.OrdenesEstatusList = estatusList;
     
     // Poblar select de personalización en modal de pedidos
     updatePersonalizacionDropdown();
@@ -726,15 +714,15 @@ function populateSelects(data) {
     // Perfiles
     if(DOM.admin.selectPerfil) {
         populateDropdown(DOM.admin.selectPerfil, perfiles, "Selecciona perfil");
-        // Quitar la opción vacía por defecto
+        // quitará la opción vacía por defecto
         const defaultOpt = DOM.admin.selectPerfil.querySelector('option[value=""]');
         if (defaultOpt) defaultOpt.remove();
     }
     if(DOM.admin.clientInputs.perfil) populateDropdown(DOM.admin.clientInputs.perfil, ["Menudeo", "Mayoreo"], "Selecciona perfil");
     
-    // Estatus de Órdenes
-    if (DOM.admin.ordenes && DOM.admin.ordenes.filtros.estatus) {
-        populateDropdown(DOM.admin.ordenes.filtros.estatus, estatusList, "Todos los Estatus");
+    // Estatus de Óórdenes
+    if (DOM.admin.Ordenes && DOM.admin.Ordenes.filtros.estatus) {
+        populateDropdown(DOM.admin.Ordenes.filtros.estatus, estatusList, "Todos los Estatus");
     }
 }
 
@@ -792,7 +780,7 @@ async function handleLoginSubmit(e) {
             if (DOM.navUserBadge) DOM.navUserBadge.classList.remove('hidden');
             
             if (res.data.perfil === "Administrador") {
-                if (DOM.admin && DOM.admin.adminMenuWrapper) DOM.admin.adminMenuWrapper.classList.remove('hidden');
+                if (DOM.admin && DOM.admin.adminMenúuWrapper) DOM.admin.adminMenúuWrapper.classList.remove('hidden');
                 if (DOM.mobileMenu && DOM.mobileMenu.adminSection) DOM.mobileMenu.adminSection.classList.remove('hidden');
                 const savedSub = localStorage.getItem('current_subperfil') || 'Menudeo';
                 if (DOM.adminSubperfilSelect) {
@@ -803,7 +791,7 @@ async function handleLoginSubmit(e) {
                     DOM.mobileMenu.adminSubperfilSelect.value = savedSub;
                 }
             } else {
-                if (DOM.admin && DOM.admin.adminMenuWrapper) DOM.admin.adminMenuWrapper.classList.add('hidden');
+                if (DOM.admin && DOM.admin.adminMenúuWrapper) DOM.admin.adminMenúuWrapper.classList.add('hidden');
                 if (DOM.mobileMenu && DOM.mobileMenu.adminSection) DOM.mobileMenu.adminSection.classList.add('hidden');
                 if (DOM.adminSubperfilSelect) DOM.adminSubperfilSelect.classList.add('hidden');
             }
@@ -913,7 +901,9 @@ function openListModal() {
     if(DOM.admin.filterVersion) DOM.admin.filterVersion.value = '';
     if(DOM.admin.filterGenero) DOM.admin.filterGenero.value = '';
     
-    DOM.admin.listModal.classList.remove('hidden');
+    DOM.admin.listmodal.classList.remove('hidden');
+    if (document.getElementById('user-filter-id')) document.getElementById('user-filter-id').value = '';
+    if (document.getElementById('user-filter-status')) document.getElementById('user-filter-status').value = '';
     void DOM.admin.listModal.offsetWidth;
     DOM.admin.listModal.classList.remove('opacity-0');
     DOM.admin.listModal.querySelector('.transform').classList.remove('scale-95');
@@ -939,13 +929,13 @@ function renderAdminTable() {
     if (!adminFilteredProducts || adminFilteredProducts.length === 0) {
         DOM.admin.listEmpty.classList.remove('hidden');
         DOM.admin.tableBody.closest('div.overflow-x-auto').classList.add('hidden');
-        DOM.admin.pageInfo.parentElement.classList.add('hidden');
+        DOM.admin.pageInfo.parentEleMenút.classList.add('hidden');
         return;
     }
     
     DOM.admin.listEmpty.classList.add('hidden');
     DOM.admin.tableBody.closest('div.overflow-x-auto').classList.remove('hidden');
-    DOM.admin.pageInfo.parentElement.classList.remove('hidden');
+    DOM.admin.pageInfo.parentEleMenút.classList.remove('hidden');
     
     const totalItems = adminFilteredProducts.length;
     const totalPages = Math.ceil(totalItems / adminItemsPerPage);
@@ -999,7 +989,7 @@ function renderAdminTable() {
                     <button class="p-1.5 rounded-md bg-navy-500/10 hover:bg-navy-500 text-navy-400 hover:text-white transition-all duration-300 shadow hover:shadow-navy-500/30 btn-manage-inv" title="Gestionar Inventario" data-id="${producto.id}">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
                     </button>
-                    <button class="p-1.5 rounded-md bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white transition-all duration-300 shadow hover:shadow-red-500/30" title="Eliminar Jersey" onclick="Swal.fire({icon:'info', title:'Próximamente', text:'Función de eliminar en desarrollo', background:'#151515', color:'#fff', confirmButtonColor:'#1d4ed8', customClass: {popup: 'border border-white/10 rounded-2xl'}})">
+                    <button class="p-1.5 rounded-md bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white transition-all duration-300 shadow hover:shadow-red-500/30" title="¿¿¿Eliminar Jersey" onclick="Swal.fire({icon:'info', title:'Próximamente', text:'Función de ¿¿¿Eliminar en desarrollo', background:'#151515', color:'#fff', confirmButtonColor:'#1d4ed8', customClass: {popup: 'border border-white/10 rounded-2xl'}})">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                     </button>
                 </div>
@@ -1043,12 +1033,14 @@ function openInventoryModal(producto) {
     
     renderInventorySizes(producto);
 
-    if (DOM.admin.updatePrecioMenudeo) DOM.admin.updatePrecioMenudeo.value = producto.precio_menudeo || 0;
+    if (DOM.admin.updatePrecioMenudeo) DOM.admin.updatePrecioMenudeo.value = producto.precio_Menudeo || 0;
     if (DOM.admin.updatePrecioMayoreo) DOM.admin.updatePrecioMayoreo.value = producto.precio_mayoreo || 0;
     if (DOM.admin.updatePrecioMayoreoSuper) DOM.admin.updatePrecioMayoreoSuper.value = producto.precio_mayoreo_super || 0;
     if (DOM.admin.updateFotoUrl) DOM.admin.updateFotoUrl.value = producto.foto || producto.imagen || '';
     
-    DOM.admin.invModal.classList.remove('hidden');
+    DOM.admin.invmodal.classList.remove('hidden');
+    if (document.getElementById('user-filter-id')) document.getElementById('user-filter-id').value = '';
+    if (document.getElementById('user-filter-status')) document.getElementById('user-filter-status').value = '';
     void DOM.admin.invModal.offsetWidth;
     DOM.admin.invModal.classList.remove('opacity-0');
     DOM.admin.invModal.querySelector('.transform').classList.remove('scale-95');
@@ -1177,7 +1169,7 @@ async function handleAddNewTalla(e) {
         genero: currentJerseyToManage.genero,
         personalizacion: currentJerseyToManage.personalizacion,
         foto: currentJerseyToManage.foto || currentJerseyToManage.imagen,
-        precio_menudeo: parseFloat(currentJerseyToManage.precio_menudeo) || 0,
+        precio_Menudeo: parseFloat(currentJerseyToManage.precio_Menudeo) || 0,
         precio_mayoreo: parseFloat(currentJerseyToManage.precio_mayoreo) || 0,
         precio_mayoreo_super: parseFloat(currentJerseyToManage.precio_mayoreo_super) || 0,
         tallas: [
@@ -1245,7 +1237,7 @@ async function handleUpdatePrecios(e) {
     const payload = {
         action: "update",
         id: currentJerseyToManage.id,
-        precio_menudeo: pMenudeo,
+        precio_Menudeo: pMenudeo,
         precio_mayoreo: pMayoreo,
         precio_mayoreo_super: pMayoreoSuper,
         foto: DOM.admin.updateFotoUrl ? DOM.admin.updateFotoUrl.value.trim() : ''
@@ -1293,7 +1285,9 @@ async function handleUpdatePrecios(e) {
 }
 
 function openCreateModal() {
-    DOM.admin.createModal.classList.remove('hidden');
+    DOM.admin.createmodal.classList.remove('hidden');
+    if (document.getElementById('user-filter-id')) document.getElementById('user-filter-id').value = '';
+    if (document.getElementById('user-filter-status')) document.getElementById('user-filter-status').value = '';
     // Forzar redibujo
     void DOM.admin.createModal.offsetWidth;
     DOM.admin.createModal.classList.remove('opacity-0');
@@ -1332,7 +1326,7 @@ function addTallaField() {
                 <label class="block text-[10px] font-semibold text-gray-400 mb-1 uppercase tracking-wider">Stock</label>
                 <input type="number" required min="0" placeholder="0" class="stock-val w-full bg-dark-200/50 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-navy-400 focus:ring-1 focus:ring-navy-400 text-white">
             </div>
-            <button type="button" onclick="document.getElementById('talla-${id}').remove()" class="bg-red-500/10 text-red-500 hover:bg-red-500/20 p-2 rounded-lg transition-colors h-[38px] flex items-center justify-center" title="Eliminar talla">
+            <button type="button" onclick="document.getElementById('talla-${id}').remove()" class="bg-red-500/10 text-red-500 hover:bg-red-500/20 p-2 rounded-lg transition-colors h-[38px] flex items-center justify-center" title="¿¿¿Eliminar talla">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
             </button>
         </div>
@@ -1346,11 +1340,11 @@ async function handleCreateProduct(e) {
     const originalText = btnSubmit.innerHTML;
     
     // Obtener tallas
-    const tallasElements = DOM.admin.tallasContainer.querySelectorAll('.talla-item');
+    const tallasEleMenúts = DOM.admin.tallasContainer.querySelectorAll('.talla-item');
     const tallas = [];
     const generoSeleccionado = DOM.admin.createSelects.genero.value;
 
-    tallasElements.forEach(el => {
+    tallasEleMenúts.forEach(el => {
         tallas.push({
             talla: el.querySelector('.talla-val').value.trim(),
             categoria: generoSeleccionado,
@@ -1362,7 +1356,7 @@ async function handleCreateProduct(e) {
         Swal.fire({
             icon: 'warning',
             title: 'Datos incompletos',
-            text: 'Debes agregar al menos una talla al inventario.',
+            text: 'Debes agregar al Menúos una talla al inventario.',
             background: '#151515',
             color: '#ffffff',
             confirmButtonColor: '#3b82f6',
@@ -1379,7 +1373,7 @@ async function handleCreateProduct(e) {
         genero: DOM.admin.createSelects.genero.value,
         personalizacion: document.getElementById('create-personalizacion').value,
         foto: DOM.admin.fotoInput.value.trim(),
-        precio_menudeo: parseFloat(DOM.admin.precioMenudeo.value) || 0,
+        precio_Menudeo: parseFloat(DOM.admin.precioMenudeo.value) || 0,
         precio_mayoreo: parseFloat(DOM.admin.precioMayoreo.value) || 0,
         precio_mayoreo_super: parseFloat(DOM.admin.precioMayoreoSuper.value) || 0,
         tallas: tallas
@@ -1566,7 +1560,7 @@ function createProductCard(producto) {
         profileToUse = localStorage.getItem('current_subperfil') || 'Menudeo';
     }
     
-    const hasPrice = (parseFloat(producto.precio_menudeo) > 0) || (parseFloat(producto.precio_mayoreo) > 0) || (parseFloat(producto.precio_mayoreo_super) > 0) || producto.precio;
+    const hasPrice = (parseFloat(producto.precio_Menudeo) > 0) || (parseFloat(producto.precio_mayoreo) > 0) || (parseFloat(producto.precio_mayoreo_super) > 0) || producto.precio;
     let statusTextHtml = '';
     if (hasPrice) {
         const basePrice = getBasePriceForProfile(producto, profileToUse);
@@ -1713,7 +1707,9 @@ function applyClientFilters(keepPage = false) {
 }
 
 function openClientsModal() {
-    DOM.admin.clientsModal.classList.remove('hidden');
+    DOM.admin.clientsmodal.classList.remove('hidden');
+    if (document.getElementById('user-filter-id')) document.getElementById('user-filter-id').value = '';
+    if (document.getElementById('user-filter-status')) document.getElementById('user-filter-status').value = '';
     void DOM.admin.clientsModal.offsetWidth;
     DOM.admin.clientsModal.classList.remove('opacity-0');
     DOM.admin.clientsModal.querySelector('.transform').classList.remove('scale-95');
@@ -1764,7 +1760,9 @@ function openClientFormModal(client = null) {
         DOM.admin.clientInputs.perfil.value = "Menudeo";
     }
     
-    DOM.admin.clientFormModal.classList.remove('hidden');
+    DOM.admin.clientFormmodal.classList.remove('hidden');
+    if (document.getElementById('user-filter-id')) document.getElementById('user-filter-id').value = '';
+    if (document.getElementById('user-filter-status')) document.getElementById('user-filter-status').value = '';
     void DOM.admin.clientFormModal.offsetWidth;
     DOM.admin.clientFormModal.classList.remove('opacity-0');
     DOM.admin.clientFormModal.querySelector('.transform').classList.remove('scale-95');
@@ -1795,8 +1793,8 @@ function renderClientSkeletons(count = 5) {
     DOM.admin.clientTableBody.innerHTML = '';
     DOM.admin.clientListEmpty.classList.add('hidden');
     DOM.admin.clientTableBody.closest('div.overflow-x-auto').classList.remove('hidden');
-    if (DOM.admin.clientPageInfo && DOM.admin.clientPageInfo.parentElement) {
-        DOM.admin.clientPageInfo.parentElement.classList.add('hidden');
+    if (DOM.admin.clientPageInfo && DOM.admin.clientPageInfo.parentEleMenút) {
+        DOM.admin.clientPageInfo.parentEleMenút.classList.add('hidden');
     }
     
     for (let i = 0; i < count; i++) {
@@ -1835,13 +1833,13 @@ function renderClientsTable() {
     if (!clientsFiltered || clientsFiltered.length === 0) {
         DOM.admin.clientListEmpty.classList.remove('hidden');
         DOM.admin.clientTableBody.closest('div.overflow-x-auto').classList.add('hidden');
-        DOM.admin.clientPageInfo.parentElement.classList.add('hidden');
+        DOM.admin.clientPageInfo.parentEleMenút.classList.add('hidden');
         return;
     }
     
     DOM.admin.clientListEmpty.classList.add('hidden');
     DOM.admin.clientTableBody.closest('div.overflow-x-auto').classList.remove('hidden');
-    DOM.admin.clientPageInfo.parentElement.classList.remove('hidden');
+    DOM.admin.clientPageInfo.parentEleMenút.classList.remove('hidden');
     
     const totalItems = clientsFiltered.length;
     const totalPages = Math.ceil(totalItems / clientsPerPage);
@@ -1899,7 +1897,7 @@ function renderClientsTable() {
                     <button class="p-1.5 rounded-md bg-navy-500/10 hover:bg-navy-500 text-navy-400 hover:text-white transition-all duration-300 shadow hover:shadow-navy-500/30 btn-edit-client" title="Editar Cliente" data-id="${client.id_cliente}">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
                     </button>
-                    <button class="p-1.5 rounded-md bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white transition-all duration-300 shadow hover:shadow-red-500/30 btn-delete-client" title="Eliminar Cliente" data-id="${client.id_cliente}">
+                    <button class="p-1.5 rounded-md bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white transition-all duration-300 shadow hover:shadow-red-500/30 btn-delete-client" title="¿¿¿Eliminar Cliente" data-id="${client.id_cliente}">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                     </button>
                 </div>
@@ -1991,7 +1989,7 @@ async function handleSaveClient(e) {
     }
 }
 
-// --- SISTEMA DE CARRITO Y ORDENES (NUEVA VISTA) ---
+// --- SISTEMA DE CARRITO Y Ordenes (NUEVA VISTA) ---
 
 function switchView(view) {
     currentView = view;
@@ -2060,6 +2058,8 @@ function openPedidoModal(producto) {
     
     // Abrir modal con animación
     DOM.pedido.modal.classList.remove('hidden');
+    if (document.getElementById('user-filter-id')) document.getElementById('user-filter-id').value = '';
+    if (document.getElementById('user-filter-status')) document.getElementById('user-filter-status').value = '';
     void DOM.pedido.modal.offsetWidth;
     DOM.pedido.modal.classList.remove('opacity-0');
     DOM.pedido.modal.querySelector('.transform').classList.remove('scale-95');
@@ -2098,7 +2098,7 @@ function handlePedidoPersonalizacionChange() {
         const isMayoreo = profileToUse === 'Mayoreo';
         const persObj = allPersonalizaciones.find(x => String(x.id) === String(val)) || defaultPersonalizaciones.find(x => String(x.id) === String(val));
         if (persObj) {
-            price = isMayoreo ? parseFloat(persObj.precio_mayoreo || 0) : parseFloat(persObj.precio_menudeo || 0);
+            price = isMayoreo ? parseFloat(persObj.precio_mayoreo || 0) : parseFloat(persObj.precio_Menudeo || 0);
         }
     }
     
@@ -2164,7 +2164,7 @@ function updatePersonalizacionDropdown() {
     allPersonalizaciones.forEach(p => {
         const option = document.createElement('option');
         option.value = p.id;
-        const price = isMayoreo ? p.precio_mayoreo : p.precio_menudeo;
+        const price = isMayoreo ? p.precio_mayoreo : p.precio_Menudeo;
         option.textContent = `${p.nombre} (+$${price.toFixed(2)})`;
         DOM.pedido.personalizacion.appendChild(option);
     });
@@ -2311,6 +2311,8 @@ function updateCartBadge() {
 
 function openCartModal() {
     DOM.cart.modal.classList.remove('hidden');
+    if (document.getElementById('user-filter-id')) document.getElementById('user-filter-id').value = '';
+    if (document.getElementById('user-filter-status')) document.getElementById('user-filter-status').value = '';
     void DOM.cart.modal.offsetWidth;
     DOM.cart.modal.classList.remove('opacity-0');
     DOM.cart.modal.querySelector('.transform').classList.remove('scale-95');
@@ -2361,7 +2363,7 @@ function getBasePriceForProfile(producto, profile) {
     } else if (profile === 'Mayoreo' || profile === 'Súper Mayoreo' || profile === 'Mayoreo Súper') {
         basePrice = parseFloat(producto.precio_mayoreo || 0);
     } else {
-        basePrice = parseFloat(producto.precio_menudeo || 0);
+        basePrice = parseFloat(producto.precio_Menudeo || 0);
     }
     
     // Soporte para productos con esquema de precio tradicional / compatibilidad hacia atrás
@@ -2410,7 +2412,7 @@ function renderCartItems() {
         if (item.personalizacionId !== 'PERS-NONE') {
             const persObj = allPersonalizaciones.find(x => String(x.id) === String(item.personalizacionId)) || defaultPersonalizaciones.find(x => String(x.id) === String(item.personalizacionId));
             if (persObj) {
-                persPrice = isMayoreo ? parseFloat(persObj.precio_mayoreo || 0) : parseFloat(persObj.precio_menudeo || 0);
+                persPrice = isMayoreo ? parseFloat(persObj.precio_mayoreo || 0) : parseFloat(persObj.precio_Menudeo || 0);
                 persName = persObj.nombre;
             }
         }
@@ -2445,7 +2447,7 @@ function renderCartItems() {
                 <div class="font-bold text-white text-xs">$${itemTotal.toFixed(2)}</div>
                 <div class="text-[9px] text-gray-500 mt-0.5">$${finalUnitPrice.toFixed(2)} c/u</div>
             </div>
-            <button onclick="removeCartItem(${index})" class="p-1.5 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-colors" title="Eliminar artículo">
+            <button onclick="removeCartItem(${index})" class="p-1.5 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-colors" title="¿¿¿Eliminar artículo">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
             </button>
         `;
@@ -2484,7 +2486,7 @@ function emptyCart(confirm = true) {
     if (confirm === true) {
         Swal.fire({
             title: '¿Vaciar el pedido?',
-            text: 'Se eliminarán todos los jerseys de tu carrito.',
+            text: 'Se ¿¿¿Eliminarán todos los jerseys de tu carrito.',
             icon: 'warning',
             showCancelButton: true,
             confirmButtonColor: '#ef4444',
@@ -2536,7 +2538,7 @@ async function submitOrder() {
         if (item.personalizacionId !== 'PERS-NONE') {
             const persObj = allPersonalizaciones.find(x => String(x.id) === String(item.personalizacionId)) || defaultPersonalizaciones.find(x => String(x.id) === String(item.personalizacionId));
             if (persObj) {
-                persPrice = isMayoreo ? parseFloat(persObj.precio_mayoreo || 0) : parseFloat(persObj.precio_menudeo || 0);
+                persPrice = isMayoreo ? parseFloat(persObj.precio_mayoreo || 0) : parseFloat(persObj.precio_Menudeo || 0);
             }
         }
         
@@ -2593,7 +2595,7 @@ async function submitOrder() {
                 if (item.personalizacionId !== 'PERS-NONE') {
                     const persObj = allPersonalizaciones.find(x => String(x.id) === String(item.personalizacionId)) || defaultPersonalizaciones.find(x => String(x.id) === String(item.personalizacionId));
                     if (persObj) {
-                        persPrice = isMayoreo ? parseFloat(persObj.precio_mayoreo || 0) : parseFloat(persObj.precio_menudeo || 0);
+                        persPrice = isMayoreo ? parseFloat(persObj.precio_mayoreo || 0) : parseFloat(persObj.precio_Menudeo || 0);
                         persName = persObj.nombre;
                     }
                 }
@@ -2690,12 +2692,12 @@ async function submitOrder() {
     }
 }
 
-// --- ÓRDENES / PEDIDOS ---
+// --- Óórdenes / PEDIDOS ---
 
-let currentOrdenes = []; // Guarda las órdenes actuales cargadas
-let allFetchedOrdenes = []; // Guarda todas las órdenes originales
-let ordenesCurrentPage = 1;
-let ordenesPerPage = 5;
+let currentOrdenes = []; // Guarda las óórdenes actuales cargadas
+let allFetchedOrdenes = []; // Guarda todas las óórdenes originales
+let OrdenesCurrentPage = 1;
+let OrdenesPerPage = 5;
 
 function openOrdenesModal() {
     const loggedUserStr = localStorage.getItem('logged_user');
@@ -2703,33 +2705,35 @@ function openOrdenesModal() {
     const loggedUser = JSON.parse(loggedUserStr);
     if (loggedUser.perfil !== 'Administrador') return;
 
-    DOM.admin.ordenes.modal.classList.remove('hidden');
+    DOM.admin.Ordenes.modal.classList.remove('hidden');
+    if (document.getElementById('user-filter-id')) document.getElementById('user-filter-id').value = '';
+    if (document.getElementById('user-filter-status')) document.getElementById('user-filter-status').value = '';
     // Animar entrada
     setTimeout(() => {
-        DOM.admin.ordenes.modal.classList.remove('opacity-0');
-        DOM.admin.ordenes.modal.querySelector('.bg-dark-100').classList.remove('scale-95');
+        DOM.admin.Ordenes.modal.classList.remove('opacity-0');
+        DOM.admin.Ordenes.modal.querySelector('.bg-dark-100').classList.remove('scale-95');
     }, 10);
     // Limpiar filtros al abrir
-    DOM.admin.ordenes.filtros.nombre.value = '';
-    DOM.admin.ordenes.filtros.id.value = '';
-    DOM.admin.ordenes.filtros.estatus.value = '';
+    DOM.admin.Ordenes.filtros.nombre.value = '';
+    DOM.admin.Ordenes.filtros.id.value = '';
+    DOM.admin.Ordenes.filtros.estatus.value = '';
     
     // Buscar historial completo inicialmente
     fetchOrdenes();
 }
 
 function closeOrdenesModal() {
-    DOM.admin.ordenes.modal.classList.add('opacity-0');
-    DOM.admin.ordenes.modal.querySelector('.bg-dark-100').classList.add('scale-95');
+    DOM.admin.Ordenes.modal.classList.add('opacity-0');
+    DOM.admin.Ordenes.modal.querySelector('.bg-dark-100').classList.add('scale-95');
     setTimeout(() => {
-        DOM.admin.ordenes.modal.classList.add('hidden');
+        DOM.admin.Ordenes.modal.classList.add('hidden');
     }, 300);
 }
 
 function handleSearchOrdenes() {
-    const nombre = DOM.admin.ordenes.filtros.nombre.value.trim().toLowerCase();
-    const id = DOM.admin.ordenes.filtros.id.value.trim().toLowerCase();
-    const estatus = DOM.admin.ordenes.filtros.estatus.value;
+    const nombre = DOM.admin.Ordenes.filtros.nombre.value.trim().toLowerCase();
+    const id = DOM.admin.Ordenes.filtros.id.value.trim().toLowerCase();
+    const estatus = DOM.admin.Ordenes.filtros.estatus.value;
     
     currentOrdenes = allFetchedOrdenes.filter(orden => {
         const clientObj = window.allClients ? window.allClients.find(c => String(c.id_cliente) === String(orden.id_cliente)) : null;
@@ -2742,14 +2746,14 @@ function handleSearchOrdenes() {
         return matchNombre && matchId && matchEstatus;
     });
     
-    ordenesCurrentPage = 1;
+    OrdenesCurrentPage = 1;
     renderOrdenes();
 }
 
 async function fetchOrdenes() {
-    DOM.admin.ordenes.listContainer.innerHTML = '';
-    DOM.admin.ordenes.emptyState.classList.add('hidden');
-    DOM.admin.ordenes.loadingState.classList.remove('hidden');
+    DOM.admin.Ordenes.listContainer.innerHTML = '';
+    DOM.admin.Ordenes.emptyState.classList.add('hidden');
+    DOM.admin.Ordenes.loadingState.classList.remove('hidden');
     
     const payload = { action: 'search_orders' };
     
@@ -2760,7 +2764,7 @@ async function fetchOrdenes() {
         });
         const result = await response.json();
         
-        DOM.admin.ordenes.loadingState.classList.add('hidden');
+        DOM.admin.Ordenes.loadingState.classList.add('hidden');
         
         if (result.status === 'success' && result.data && result.data.length > 0) {
             allFetchedOrdenes = result.data;
@@ -2768,17 +2772,17 @@ async function fetchOrdenes() {
         } else {
             allFetchedOrdenes = [];
             currentOrdenes = [];
-            DOM.admin.ordenes.emptyState.classList.remove('hidden');
+            DOM.admin.Ordenes.emptyState.classList.remove('hidden');
         }
     } catch (error) {
-        console.error('Error fetching órdenes:', error);
-        DOM.admin.ordenes.loadingState.classList.add('hidden');
-        Swal.fire({ icon: 'error', title: 'Error de Red', text: 'No se pudieron cargar las órdenes.', background: '#151515', color: '#fff' });
+        console.error('Error fetching óórdenes:', error);
+        DOM.admin.Ordenes.loadingState.classList.add('hidden');
+        Swal.fire({ icon: 'error', title: 'Error de Red', text: 'No se pudieron cargar las óórdenes.', background: '#151515', color: '#fff' });
     }
 }
 
 function renderOrdenes() {
-    const container = DOM.admin.ordenes.listContainer;
+    const container = DOM.admin.Ordenes.listContainer;
     if (container) container.innerHTML = '';
     
     const paginationEl = document.getElementById('admin-ordenes-pagination');
@@ -2786,16 +2790,16 @@ function renderOrdenes() {
     
     let ordersToRender = currentOrdenes;
     
-    if (currentOrdenes.length > ordenesPerPage) {
+    if (currentOrdenes.length > OrdenesPerPage) {
         if (paginationEl) {
             paginationEl.classList.remove('hidden');
             paginationEl.classList.add('flex');
         }
-        const start = (ordenesCurrentPage - 1) * ordenesPerPage;
-        const end = Math.min(start + ordenesPerPage, currentOrdenes.length);
+        const start = (OrdenesCurrentPage - 1) * OrdenesPerPage;
+        const end = Math.min(start + OrdenesPerPage, currentOrdenes.length);
         if (pageInfoEl) pageInfoEl.textContent = `Mostrando ${start + 1} - ${end} de ${currentOrdenes.length}`;
         
-        ordersToRender = currentOrdenes.slice(start, start + ordenesPerPage);
+        ordersToRender = currentOrdenes.slice(start, start + OrdenesPerPage);
     } else {
         if (paginationEl) {
             paginationEl.classList.add('hidden');
@@ -2884,7 +2888,7 @@ function renderOrdenes() {
             case 'Cancelada': estatusColorClass = 'bg-red-500/20 text-red-400 border border-red-500/20'; break;
         }
         
-        const estatusOptionsHtml = (window.ordenesEstatusList || ['Pendiente', 'Enviado', 'Entregado', 'Cancelado'])
+        const estatusOptionsHtml = (window.OrdenesEstatusList || ['Pendiente', 'Enviado', 'Entregado', 'Cancelado'])
             .map(e => `<option value="${e}">${e}</option>`)
             .join('');
             
@@ -2972,7 +2976,7 @@ window.openOrderDetailsModal = function(id_orden) {
         </div>
         <div class="text-right flex-shrink-0 min-w-[70px] flex flex-col justify-between items-end self-stretch py-1">
             ${art.id_detalle ? `
-            <button onclick="deleteOrderItem('${orden.id_orden}', '${art.id_detalle}')" class="text-gray-500 hover:text-red-500 transition-colors p-1" title="Eliminar artículo">
+            <button onclick="deleteOrderItem('${orden.id_orden}', '${art.id_detalle}')" class="text-gray-500 hover:text-red-500 transition-colors p-1" title="¿¿¿Eliminar artículo">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
             </button>
             ` : '<div></div>'}
@@ -2991,7 +2995,7 @@ window.openOrderDetailsModal = function(id_orden) {
     document.getElementById('admin-order-details-container').innerHTML = articulosHtml;
     
     const phoneElement = document.getElementById('admin-order-details-phone');
-    const phoneTextElement = document.getElementById('admin-order-details-phone-text');
+    const phoneTextEleMenút = document.getElementById('admin-order-details-phone-text');
     
     // El telefono viene directamente en la orden como telefono_cliente
     let rawPhone = orden.telefono_cliente;
@@ -3005,13 +3009,13 @@ window.openOrderDetailsModal = function(id_orden) {
     let finalPhone = rawPhone ? String(rawPhone).replace(/\D/g, '') : null;
     
     if (finalPhone) {
-        phoneTextElement.textContent = finalPhone;
+        phoneTextEleMenút.textContent = finalPhone;
         if (phoneElement) {
             phoneElement.classList.remove('hidden');
             phoneElement.classList.remove('opacity-50');
         }
     } else {
-        phoneTextElement.textContent = 'Sin teléfono registrado';
+        phoneTextEleMenút.textContent = 'Sin teléfono registrado';
         if (phoneElement) {
             phoneElement.classList.remove('hidden');
             phoneElement.classList.add('opacity-50');
@@ -3021,15 +3025,17 @@ window.openOrderDetailsModal = function(id_orden) {
     // Set status options
     const statusSelect = document.getElementById('admin-order-details-status');
     if (statusSelect) {
-        const estatusOptionsHtml = (window.ordenesEstatusList || ['Pendiente', 'Enviado', 'Entregado', 'Cancelado'])
+        const estatusOptionsHtml = (window.OrdenesEstatusList || ['Pendiente', 'Enviado', 'Entregado', 'Cancelado'])
             .map(e => `<option value="${e}">${e}</option>`)
             .join('');
-        statusSelect.innerHTML = `<option value="">Cambiar Estatus...</option>${estatusOptionsHtml}`;
+        statusSelect.innerHTML = `<option value="">¿¿Cambiar Estatus...</option>${estatusOptionsHtml}`;
         statusSelect.value = orden.estatus;
     }
     
     const modal = document.getElementById('admin-order-details-modal');
     modal.classList.remove('hidden');
+    if (document.getElementById('user-filter-id')) document.getElementById('user-filter-id').value = '';
+    if (document.getElementById('user-filter-status')) document.getElementById('user-filter-status').value = '';
     void modal.offsetWidth;
     modal.classList.remove('opacity-0');
     modal.querySelector('.transform').classList.remove('scale-95');
@@ -3050,13 +3056,13 @@ window.openOrderDetailsModal = function(id_orden) {
 
 window.deleteOrderItem = async function(id_orden, id_detalle) {
     const result = await Swal.fire({
-        title: '¿Eliminar artículo?',
-        text: `¿Estás seguro de que deseas eliminar este artículo de la orden? Esta acción no se puede deshacer.`,
+        title: '¿¿¿¿Eliminar artículo?',
+        text: `¿Estás seguro de que deseas ¿¿¿Eliminar este artículo de la orden? Esta acción no se puede deshacer.`,
         icon: 'warning',
         showCancelButton: true,
         confirmButtonColor: '#ef4444',
         cancelButtonColor: '#3f3f46',
-        confirmButtonText: 'Sí, eliminar',
+        confirmButtonText: 'Sí, ¿¿¿Eliminar',
         cancelButtonText: 'Cancelar',
         background: '#151515', color: '#fff'
     });
@@ -3092,7 +3098,7 @@ window.deleteOrderItem = async function(id_orden, id_detalle) {
                 document.getElementById('close-order-details-modal')?.click();
             }
         } else {
-            Swal.fire({ icon: 'error', title: 'Error', text: data.message || 'No se pudo eliminar el artículo.', background: '#151515', color: '#fff' });
+            Swal.fire({ icon: 'error', title: 'Error', text: data.message || 'No se pudo ¿¿¿Eliminar el artículo.', background: '#151515', color: '#fff' });
         }
     } catch (error) {
         console.error('Error eliminando artículo:', error);
@@ -3106,13 +3112,13 @@ async function updateOrderStatus(id_orden, nuevo_estatus) {
     const selects = document.querySelectorAll(`select[onchange="updateOrderStatus('${id_orden}', this.value)"]`);
     
     const result = await Swal.fire({
-        title: '¿Cambiar estatus?',
+        title: '¿¿¿¿Cambiar estatus?',
         text: `¿Estás seguro que deseas marcar la orden ${id_orden} como ${nuevo_estatus}?`,
         icon: 'question',
         showCancelButton: true,
         confirmButtonColor: '#1d4ed8',
         cancelButtonColor: '#3f3f46',
-        confirmButtonText: 'Sí, cambiar',
+        confirmButtonText: 'Sí, ¿¿Cambiar',
         cancelButtonText: 'Cancelar',
         background: '#151515', color: '#fff'
     });
@@ -3143,7 +3149,7 @@ async function updateOrderStatus(id_orden, nuevo_estatus) {
         const data = await response.json();
         
         if (data.status === 'success') {
-            await Swal.fire({ icon: 'success', title: '¡Actualizado!', text: data.message, background: '#151515', color: '#fff', timer: 1500, showConfirmButton: false });
+            await Swal.fire({ icon: 'success', title: '¡¡Actualizado!', text: data.message, background: '#151515', color: '#fff', timer: 1500, showConfirmButton: false });
             
             const ordenOriginal = currentOrdenes.find(o => o.id_orden === id_orden) || allFetchedOrdenes.find(o => o.id_orden === id_orden);
             
@@ -3249,7 +3255,7 @@ async function fetchUserOrdenes(force = false) {
     const loggedUser = JSON.parse(loggedUserStr);
     
     // Reuse admin fetch if it exists, otherwise do our own
-    // Para simplificar, obtenemos todas las �rdenes de este cliente.
+    // Para simplificar, obtenemos todas las �órdenes de este cliente.
     if (allFetchedOrdenes && allFetchedOrdenes.length > 0 && !force) {
         return allFetchedOrdenes.filter(o => String(o.id_cliente).trim() === String(loggedUser.id_cliente).trim());
     }
@@ -3281,7 +3287,7 @@ async function openUserOrdenesModal() {
         return;
     }
     
-    // Cerrar men� m�vil si est� abierto
+    // Cerrar Menú� m�vil si est� abierto
     if (typeof DOM !== 'undefined' && DOM.mobileMenu) {
         if(DOM.mobileMenu.drawer) DOM.mobileMenu.drawer.classList.add('translate-x-full'); if(DOM.mobileMenu.overlay) { DOM.mobileMenu.overlay.classList.add('opacity-0'); setTimeout(() => DOM.mobileMenu.overlay.classList.add('hidden'), 300); }
     }
@@ -3292,6 +3298,8 @@ async function openUserOrdenesModal() {
     const list = document.getElementById('user-ordenes-list');
     
     modal.classList.remove('hidden');
+    if (document.getElementById('user-filter-id')) document.getElementById('user-filter-id').value = '';
+    if (document.getElementById('user-filter-status')) document.getElementById('user-filter-status').value = '';
     // pecar opacity in setTimeout para la transici�n
     setTimeout(() => { modal.classList.remove('opacity-0'); }, 10);
     
@@ -3311,7 +3319,22 @@ function renderUserOrdenesList() {
     
     if (list) list.innerHTML = '';
     
-    if (!allUserOrdenesFetched || allUserOrdenesFetched.length === 0) {
+    if (!allUserOrdenesFetched) return;
+    
+    const filterId = document.getElementById('user-filter-id') ? document.getElementById('user-filter-id').value.trim().toLowerCase() : '';
+    const filterStatus = document.getElementById('user-filter-status') ? document.getElementById('user-filter-status').value : '';
+    
+    let filteredOrders = allUserOrdenesFetched;
+    
+    if (filterId) {
+        filteredOrders = filteredOrders.filter(o => o.id_orden.toLowerCase().includes(filterId));
+    }
+    
+    if (filterStatus) {
+        filteredOrders = filteredOrders.filter(o => o.estatus === filterStatus);
+    }
+    
+    if (filteredOrders.length === 0) {
         empty.classList.remove('hidden');
         return;
     }
@@ -3319,7 +3342,7 @@ function renderUserOrdenesList() {
     empty.classList.add('hidden');
     
     // Sort orders by date desc
-    const sortedOrders = [...allUserOrdenesFetched].sort((a,b) => new Date(b.fecha) - new Date(a.fecha));
+    const sortedOrders = [...filteredOrders].sort((a,b) => new Date(b.fecha) - new Date(a.fecha));
     
     sortedOrders.forEach(orden => {
         const estatusInfo = getEstatusColor(orden.estatus);
@@ -3329,7 +3352,7 @@ function renderUserOrdenesList() {
         card.className = "bg-dark-200/50 border border-white/5 rounded-xl p-4 sm:p-5 hover:border-white/10 transition-colors flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center";
         
         const dateObj = new Date(orden.fecha);
-        const formattedDate = !isNaN(dateObj) ? dateObj.toLocaleDateString('es-MX', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Fecha Inv�lida';
+        const formattedDate = !isNaN(dateObj) ? dateObj.toLocaleDateString('es-MX', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Fecha Inválida';
         
         card.innerHTML = `
             <div class="flex flex-col gap-1">
@@ -3339,8 +3362,8 @@ function renderUserOrdenesList() {
                 </div>
                 <p class="text-xs text-gray-400 mt-1">${formattedDate}</p>
                 <div class="flex items-center gap-3 mt-2 text-xs font-semibold text-gray-300">
-                    <span class="flex items-center gap-1.5"><svg class="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path></svg>${numItems} art�cul${numItems !== 1 ? 'os' : 'o'}</span>
-                    <span class="text-gray-600">�</span>
+                    <span class="flex items-center gap-1.5"><svg class="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path></svg>${numItems} artícul${numItems !== 1 ? 'os' : 'o'}</span>
+                    <span class="text-gray-600">•</span>
                     <span class="text-emerald-400 font-bold">Total: $${(orden.gran_total || 0).toFixed(2)}</span>
                 </div>
             </div>
@@ -3385,6 +3408,8 @@ function openUserOrderDetailsModal(id_orden) {
     }
     
     modal.classList.remove('hidden');
+    if (document.getElementById('user-filter-id')) document.getElementById('user-filter-id').value = '';
+    if (document.getElementById('user-filter-status')) document.getElementById('user-filter-status').value = '';
     setTimeout(() => { modal.classList.remove('opacity-0'); }, 10);
     
     renderUserOrderDetailsUI();
@@ -3436,7 +3461,7 @@ function renderUserOrderDetailsUI() {
             }
             
             actionHtml = `
-                <button onclick="removeUserOrderItem(${index})" class="absolute top-2 right-2 sm:relative sm:top-auto sm:right-auto sm:ml-auto w-8 h-8 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 flex items-center justify-center transition-colors border border-red-500/20" title="Eliminar art�culo">
+                <button onclick="removeUserOrderItem(${index})" class="absolute top-2 right-2 sm:relative sm:top-auto sm:right-auto sm:ml-auto w-8 h-8 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 flex items-center justify-center transition-colors border border-red-500/20" title="¿¿¿Eliminar art�culo">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                 </button>
             `;
@@ -3494,13 +3519,13 @@ function removeUserOrderItem(index) {
     const item = currentUserOrderEditing.articulos_carrito[index];
     
     Swal.fire({
-        title: '�Eliminar art�culo?',
-        text: "Este art�culo se quitar� del pedido.",
+        title: '�¿¿¿Eliminar art�culo?',
+        text: "Este art�culo se quitará� del pedido.",
         icon: 'warning',
         showCancelButton: true,
         confirmButtonColor: '#ef4444',
         cancelButtonColor: '#374151',
-        confirmButtonText: 'S�, eliminar',
+        confirmButtonText: 'S�, ¿¿¿Eliminar',
         cancelButtonText: 'Cancelar',
         background: '#151515', color: '#fff'
     }).then((result) => {
@@ -3549,15 +3574,9 @@ function calculateUserOrderTotals() {
 
 async function saveUserOrderChanges() {
     if (currentUserOrderEdits.length === 0) {
-        Swal.fire({ icon: 'info', title: 'Sin cambios', text: 'No has realizado ninguna modificaci�n.', background: '#151515', color: '#fff', timer: 1500, showConfirmButton: false });
+        Swal.fire({ icon: 'info', title: 'Sin cambios', text: 'No has realizado ninguna modificación.', background: '#151515', color: '#fff', timer: 1500, showConfirmButton: false });
         return;
     }
-    
-    // Process deletes first, then updates
-    const deletes = currentUserOrderEdits.filter(e => e.actionType === 'delete');
-    const updates = currentUserOrderEdits.filter(e => e.actionType !== 'delete');
-    
-    // Assuming backend logic supports 'update_order_item' and 'delete_order_item'
     
     Swal.fire({
         title: 'Guardando...',
@@ -3568,32 +3587,46 @@ async function saveUserOrderChanges() {
     });
     
     try {
-        // Enviar deletes
-        for (const del of deletes) {
-            await fetch(API_URL, {
-                method: 'POST',
-                body: JSON.stringify({ action: 'delete_order_item', id_detalle: del.id_detalle })
-            });
-        }
+        const originalOrder = allUserOrdenesFetched.find(o => o.id_orden === currentUserOrderEditing.id_orden);
         
-        // Enviar updates
-        // ATENCI�N: Se asume que el backend tiene la acci�n 'update_order_item'
-        for (const upd of updates) {
-            const item = currentUserOrderEditing.articulos_carrito.find(a => a.id_detalle === upd.id_detalle);
-            if (item) {
-                await fetch(API_URL, {
+        for (const edit of currentUserOrderEdits) {
+            const originalItem = originalOrder ? originalOrder.articulos_carrito.find(a => a.id_detalle === edit.id_detalle) : null;
+            const currentItem = currentUserOrderEditing.articulos_carrito.find(a => a.id_detalle === edit.id_detalle);
+            const targetItem = currentItem || originalItem;
+            
+            if (targetItem) {
+                const nueva_cantidad = edit.actionType === 'delete' ? 0 : targetItem.cantidad;
+                const categoria = targetItem.id_playera && targetItem.id_playera.genero ? targetItem.id_playera.genero : 'Adulto';
+                let id_pers = 'PERS-NONE';
+                if (targetItem.id_personalizacion) {
+                    if (typeof targetItem.id_personalizacion === 'object' && targetItem.id_personalizacion.id_personalizacion) {
+                        id_pers = targetItem.id_personalizacion.id_personalizacion;
+                    } else if (typeof targetItem.id_personalizacion === 'string') {
+                        id_pers = targetItem.id_personalizacion;
+                    }
+                }
+                const texto_pers = targetItem.texto_personalizado || '';
+                
+                const response = await fetch(API_URL, {
                     method: 'POST',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                     body: JSON.stringify({ 
-                        action: 'update_order_item', 
-                        id_detalle: item.id_detalle,
-                        cantidad: item.cantidad,
-                        texto_personalizado: item.texto_personalizado || ''
+                        action: 'update_order_item_quantity', 
+                        id_detalle: edit.id_detalle,
+                        categoria: categoria,
+                        nueva_cantidad: nueva_cantidad,
+                        id_personalizacion: id_pers,
+                        texto_personalizado: texto_pers
                     })
                 });
+                const resData = await response.json();
+                if (resData.status !== 'success') {
+                    console.error('Error updating order item:', resData);
+                }
             }
         }
         
-        Swal.fire({ icon: 'success', title: '�Actualizado!', text: 'Tus cambios se han guardado exitosamente.', background: '#151515', color: '#fff', timer: 2000, showConfirmButton: false });
+        Swal.fire({ icon: 'success', title: '¡¡Actualizado!', text: 'Tus cambios se han guardado exitosamente.', background: '#151515', color: '#fff', timer: 2000, showConfirmButton: false });
         
         // Refresh data
         allUserOrdenesFetched = await fetchUserOrdenes(true);
@@ -3639,3 +3672,9 @@ function getEstatusColor(estatus) {
         default: return { color: 'gray', bg: 'bg-gray-500/20', text: 'text-gray-400', border: 'border-gray-500/20' };
     }
 }
+
+
+
+
+
+

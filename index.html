@@ -1029,6 +1029,41 @@
             </div>
             
             <div class="p-4 sm:p-6 flex-grow overflow-auto flex flex-col">
+                  
+                  <!-- Filtros -->
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6 bg-black/20 p-4 rounded-xl border border-white/5">
+                      <div class="space-y-2">
+                          <label class="text-xs font-bold text-gray-400 uppercase tracking-wider">Buscar por ID de Orden</label>
+                          <div class="relative">
+                              <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-500">
+                                  <i class="fa-solid fa-search"></i>
+                              </span>
+                              <input type="text" id="user-filter-id" oninput="renderUserOrdenesList()" placeholder="Ej. ORD-177..." class="w-full bg-dark-200 text-white rounded-xl pl-10 pr-4 py-2 border border-white/10 focus:border-navy-500 focus:ring-1 focus:ring-navy-500 outline-none transition-all placeholder-gray-600 text-sm">
+                          </div>
+                      </div>
+                      <div class="space-y-2">
+                          <label class="text-xs font-bold text-gray-400 uppercase tracking-wider">Filtrar por Estatus</label>
+                          <div class="relative">
+                              <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-500">
+                                  <i class="fa-solid fa-filter"></i>
+                              </span>
+                              <select id="user-filter-status" onchange="renderUserOrdenesList()" class="w-full bg-dark-200 text-white rounded-xl pl-10 pr-4 py-2 border border-white/10 focus:border-navy-500 focus:ring-1 focus:ring-navy-500 outline-none transition-all text-sm appearance-none cursor-pointer">
+                                  <option value="">Todos los Estatus</option>
+                                  <option value="Pendiente">Pendiente</option>
+                                  <option value="Revisando">Revisando</option>
+                                  <option value="Disponible - Para recoger">Disponible - Para recoger</option>
+                                  <option value="Disponible - Para enviar">Disponible - Para enviar</option>
+                                  <option value="Entregada - Paqueteria">Entregada - Paqueteria</option>
+                                  <option value="Finalizada">Finalizada</option>
+                                  <option value="Cancelada">Cancelada</option>
+                              </select>
+                              <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-400">
+                                  <i class="fa-solid fa-chevron-down text-xs"></i>
+                              </div>
+                          </div>
+                      </div>
+                  </div>
+
                 <div class="flex-grow min-h-[300px] flex flex-col">
                     <div id="user-ordenes-list" class="space-y-4">
                         <!-- User orders will be rendered here -->
@@ -1098,9 +1133,13 @@
     </div>
 
     <!-- Módulo Principal JS -->
-    <script src="./js/app.js?v=1.0.12"></script>
+    <script src="./js/app.js?v=1.0.16"></script>
 </body>
 </html>
+
+
+
+
 
 
 
