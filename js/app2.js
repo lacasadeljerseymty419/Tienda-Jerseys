@@ -89,10 +89,10 @@ const DOM = {
         openOrders: document.querySelectorAll('.action-open-orders')
     },
     mobileMenu: {
-        toggleBtn: document.getElementById('btn-mobile-Menúu-toggle'),
-        closeBtn: document.getElementById('btn-close-mobile-Menúu'),
-        overlay: document.getElementById('mobile-Menúu-overlay'),
-        drawer: document.getElementById('mobile-Menúu-drawer'),
+        toggleBtn: document.getElementById('btn-mobile-menu-toggle'),
+        closeBtn: document.getElementById('btn-close-mobile-menu'),
+        overlay: document.getElementById('mobile-menu-overlay'),
+        drawer: document.getElementById('mobile-menu-drawer'),
         userName: document.getElementById('mobile-nav-user-name'),
         adminSection: document.getElementById('mobile-admin-section'),
         adminSubperfilSelect: document.getElementById('mobile-admin-subperfil-select')
@@ -470,6 +470,8 @@ async function initApp() {
     if (DOM.actions.openOrders) DOM.actions.openOrders.forEach(btn => btn.addEventListener('click', () => { openOrdenesModal(); closemobileMenu(); }));
     if (DOM.admin.Ordenes?.closeBtn) DOM.admin.Ordenes.closeBtn.addEventListener('click', closeOrdenesModal);
     if (DOM.admin.Ordenes?.btnBuscar) DOM.admin.Ordenes.btnBuscar.addEventListener('click', handleSearchOrdenes);
+    
+
     if (DOM.admin.Ordenes?.filtros?.nombre) DOM.admin.Ordenes.filtros.nombre.addEventListener('input', handleSearchOrdenes);
     if (DOM.admin.Ordenes?.filtros?.id) DOM.admin.Ordenes.filtros.id.addEventListener('input', handleSearchOrdenes);
     if (DOM.admin.Ordenes?.filtros?.estatus) DOM.admin.Ordenes.filtros.estatus.addEventListener('change', handleSearchOrdenes);

@@ -75,17 +75,17 @@ async function initCatalogo() {
     if (DOM.btnAplicar) DOM.btnAplicar.addEventListener('click', handleFilterDesktop);
     if (DOM.btnAplicarMobile) DOM.btnAplicarMobile.addEventListener('click', handleFilterMobile);
     
-    if (DOM.filters.nombre) {
-        DOM.filters.nombre.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') handleFilterDesktop();
-        });
-    }
+    // Listeners para auto-aplicar filtros (Desktop)
+    if (DOM.filters.nombre) DOM.filters.nombre.addEventListener('input', handleFilterDesktop);
+    if (DOM.filters.tipo) DOM.filters.tipo.addEventListener('change', handleFilterDesktop);
+    if (DOM.filters.version) DOM.filters.version.addEventListener('change', handleFilterDesktop);
+    if (DOM.filters.genero) DOM.filters.genero.addEventListener('change', handleFilterDesktop);
     
-    if (DOM.mobileFilters.searchInput) {
-        DOM.mobileFilters.searchInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') handleFilterMobile();
-        });
-    }
+    // Listeners para auto-aplicar filtros (Mobile)
+    if (DOM.mobileFilters.searchInput) DOM.mobileFilters.searchInput.addEventListener('input', handleFilterMobile);
+    if (DOM.mobileFilters.tipo) DOM.mobileFilters.tipo.addEventListener('change', handleFilterMobile);
+    if (DOM.mobileFilters.version) DOM.mobileFilters.version.addEventListener('change', handleFilterMobile);
+    if (DOM.mobileFilters.genero) DOM.mobileFilters.genero.addEventListener('change', handleFilterMobile);
 
     if (DOM.mobileFilters.btnToggle) {
         DOM.mobileFilters.btnToggle.addEventListener('click', () => {
