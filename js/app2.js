@@ -919,7 +919,7 @@ function openListModal() {
     if(DOM.admin.filterVersion) DOM.admin.filterVersion.value = '';
     if(DOM.admin.filterGenero) DOM.admin.filterGenero.value = '';
     
-    DOM.admin.listmodal.classList.remove('hidden');
+    DOM.admin.listModal.classList.remove('hidden');
     if (document.getElementById('user-filter-id')) document.getElementById('user-filter-id').value = '';
     if (document.getElementById('user-filter-status')) document.getElementById('user-filter-status').value = '';
     void DOM.admin.listModal.offsetWidth;
@@ -1303,7 +1303,7 @@ async function handleUpdatePrecios(e) {
 }
 
 function openCreateModal() {
-    DOM.admin.createmodal.classList.remove('hidden');
+    DOM.admin.createModal.classList.remove('hidden');
     if (document.getElementById('user-filter-id')) document.getElementById('user-filter-id').value = '';
     if (document.getElementById('user-filter-status')) document.getElementById('user-filter-status').value = '';
     // Forzar redibujo
@@ -1843,7 +1843,7 @@ function applyClientFilters(keepPage = false) {
 }
 
 function openClientsModal() {
-    DOM.admin.clientsmodal.classList.remove('hidden');
+    DOM.admin.clientsModal.classList.remove('hidden');
     if (document.getElementById('user-filter-id')) document.getElementById('user-filter-id').value = '';
     if (document.getElementById('user-filter-status')) document.getElementById('user-filter-status').value = '';
     void DOM.admin.clientsModal.offsetWidth;
