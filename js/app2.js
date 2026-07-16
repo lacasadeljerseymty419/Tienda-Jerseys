@@ -1,4 +1,4 @@
-const API_URL = "https://script.google.com/macros/s/AKfycbxM1d2gYABMBmGLb-6cgcEaoFpAH1F67o4X1aJcdPEhz64Fx6ZXyo284UNX0sGLVC2Ejg/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbwXcegcYmKbKVdAmLTRH-bYa9ju_-MaXY3Ny4JAnxWEwefpbZ6acI5YEbVvoklaDpN4Jw/exec";
 
 async function get_configs() {
     try {
@@ -1459,7 +1459,30 @@ async function fetchInitialProducts() {
         }
     }
     
-    renderLocalProducts(allProducts);
+    // Aplicar filtros locales de búsqueda si existen
+    const hasActiveFilters = (DOM.filters.nombre && DOM.filters.nombre.value.trim() !== "") ||
+                             (DOM.filters.tipo && DOM.filters.tipo.value !== "") ||
+                             (DOM.filters.version && DOM.filters.version.value !== "") ||
+                             (DOM.filters.genero && DOM.filters.genero.value !== "");
+                             
+    if (hasActiveFilters) {
+        const nombreQ = DOM.filters.nombre.value.trim().toLowerCase();
+        const tipoQ = DOM.filters.tipo.value;
+        const versionQ = DOM.filters.version.value;
+        const generoQ = DOM.filters.genero.value;
+        
+        const filtrados = allProducts.filter(p => {
+            let match = true;
+            if (nombreQ && !(p.nombre || '').toLowerCase().includes(nombreQ)) match = false;
+            if (tipoQ && p.tipo !== tipoQ) match = false;
+            if (versionQ && p.version !== versionQ) match = false;
+            if (generoQ && p.genero !== generoQ) match = false;
+            return match;
+        });
+        renderLocalProducts(filtrados);
+    } else {
+        renderLocalProducts(allProducts);
+    }
     
     // Si el modal de administración de lista está abierto, actualizar sus filtros e interfaz conservando la página
     if (DOM.admin.listModal && !DOM.admin.listModal.classList.contains('hidden')) {
@@ -2309,7 +2332,8 @@ function handleAddToPedidoSubmit(e) {
             talla: selectedTalla,
             cantidad: selectedQty,
             personalizacionId: selectedPersId,
-            texto_personalizado: cleanCustomText
+            texto_personalizado: cleanCustomText,
+            id_inventario: tallaObj ? (tallaObj.id_inventario || tallaObj.IdInventario || '') : ''
         });
     }
     
@@ -2638,7 +2662,8 @@ async function submitOrder() {
             cantidad: item.cantidad,
             id_personalizacion: item.personalizacionId,
             texto_personalizado: item.texto_personalizado,
-            precio_unitario_final: finalPrice
+            precio_unitario_final: finalPrice,
+            id_inventario: item.id_inventario || ''
         };
     });
     
@@ -2657,7 +2682,7 @@ async function submitOrder() {
         id_cliente: selectedClientId,
         tipo_precio_aplicado: profile,
         articulos: articulos,
-        envio_domicilio: envio_domicilio,
+        envio: envio_domicilio,
         costo_envio: shippingCost
     };
     
@@ -2783,10 +2808,26 @@ async function submitOrder() {
             // Vaciar carrito
             cart = [];
             updateCartBadge();
+            
+            // Resetear checkbox de envío a domicilio y actualizar interfaz del carrito
+            const cartEnvioCheckbox = document.getElementById('cart-envio-domicilio');
+            if (cartEnvioCheckbox) cartEnvioCheckbox.checked = false;
+            renderCartItems();
+            
             closeCartModal();
             
             // Recargar productos en background para actualizar inventarios/stock
             fetchInitialProducts();
+            
+            // Recargar historial de órdenes del cliente para que aparezcan en su historial
+            fetchUserOrdenes(true).then(() => {
+                renderUserOrdenesList();
+            });
+            
+            // Si el administrador está logueado, actualizar caché global de órdenes
+            if (typeof fetchOrdenes === 'function') {
+                fetchOrdenes();
+            }
         } else {
             throw new Error(data.message || 'Error desconocido al registrar pedido.');
         }
@@ -3017,8 +3058,7 @@ function renderOrdenes() {
                             <strong>${finalNombreCliente}</strong> <span class="mx-1">|</span> ${dateStr} <span class="mx-1">|</span> <span class="text-white font-semibold">${totalPiezas} piezas</span>
                         </div>
                     </div>
-                    <div class="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full sm:w-auto" onclick="event.stopPropagation()">
-                        <div class="text-base text-emerald-400 font-black whitespace-nowrap">$${Number(orden.gran_total).toFixed(2)}</div>
+                        <div class="text-base text-emerald-400 font-black whitespace-nowrap">$${Number(orden.total_neto !== undefined ? orden.total_neto : (Number(orden.gran_total || 0) + (Number(orden.envio_costo) || 0))).toFixed(2)}</div>
                     </div>
                 </div>
             </div>
@@ -3053,12 +3093,12 @@ window.openOrderDetailsModal = function(id_orden) {
             const itemTotal = Number(art.subtotal_renglon);
             const unitPrice = Number(art.precio_unitario_final) || (itemTotal / Number(art.cantidad));
             
-            let persName = art.texto_personalizado ? 'Sí' : 'Ninguna';
+            let persName = art.texto_personalizado ? 'Sí' : '';
             if (art.id_personalizacion && typeof art.id_personalizacion === 'object') {
                 if (art.id_personalizacion.id_personalizacion !== 'PERS-NONE' && art.id_personalizacion.concepto) {
                     persName = art.id_personalizacion.concepto;
                 } else {
-                    persName = 'Ninguna';
+                    persName = '';
                 }
             } else if (art.id_personalizacion && art.id_personalizacion !== 'PERS-NONE') {
                 const pObj = (window.allPersonalizaciones && window.allPersonalizaciones.find(x => String(x.id) === String(art.id_personalizacion))) 
@@ -3078,10 +3118,14 @@ window.openOrderDetailsModal = function(id_orden) {
                 Talla: <span class="text-gray-200 font-semibold">${art.talla}</span> | 
                 Cant: <span class="text-gray-200 font-semibold">${art.cantidad}</span>
             </div>
-            <div class="text-xs text-gray-400 mt-0.5">
+            ${persName ? `
+            <div class="text-xs text-gray-400 mt-1">
                 Pers: <span class="text-navy-400 font-semibold">${persName}</span>
-                ${art.texto_personalizado ? ` | <span class="text-emerald-400 font-mono">"${art.texto_personalizado}"</span>` : ''}
             </div>
+            ${art.texto_personalizado ? `
+            <div class="text-xs text-gray-400 mt-0.5">
+                Texto Estampado: <span class="text-emerald-400 font-mono font-bold uppercase">"${art.texto_personalizado}"</span>
+            </div>` : ''}` : ''}
         </div>
         <div class="text-right flex-shrink-0 min-w-[70px] flex flex-col justify-between items-end self-stretch py-1">
             ${art.id_detalle ? `
@@ -3232,8 +3276,12 @@ async function updateOrderStatus(id_orden, nuevo_estatus) {
         background: '#151515', color: '#fff'
     });
     
+    const id = String(id_orden).trim();
+    const ordenOriginal = currentOrdenes.find(o => String(o.id_orden).trim() === id) 
+        || allFetchedOrdenes.find(o => String(o.id_orden).trim() === id)
+        || allUserOrdenesFetched.find(o => String(o.id_orden).trim() === id);
+
     if (!result.isConfirmed) {
-        const ordenOriginal = currentOrdenes.find(o => o.id_orden === id_orden) || allFetchedOrdenes.find(o => o.id_orden === id_orden);
         selects.forEach(sel => sel.value = ordenOriginal ? ordenOriginal.estatus : "");
         const modalSelect = document.getElementById('admin-order-details-status');
         if (modalSelect && document.getElementById('admin-order-details-id')?.textContent === id_orden) {
@@ -3242,10 +3290,57 @@ async function updateOrderStatus(id_orden, nuevo_estatus) {
         return;
     }
     
+    // Verificar si el pedido tiene envío de forma más tolerante
+    const envioSolicitado = ordenOriginal && ordenOriginal.envio_solicitado 
+        ? String(ordenOriginal.envio_solicitado).trim().toLowerCase() 
+        : "";
+        
+    const tieneEnvio = ordenOriginal && (
+        envioSolicitado.startsWith("s") || // Sí, si, S, Sí (con mala codificación)
+        Number(ordenOriginal.envio_costo) > 0 ||
+        Number(ordenOriginal.costo_envio) > 0
+    );
+    
+    // Normalizar estatus para evitar problemas de acentos y mayúsculas
+    const estatusNormalizado = String(nuevo_estatus).trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    
+    let trackingGuide = "";
+    if (estatusNormalizado === "entregada - paqueteria" && tieneEnvio) {
+        const { value: trackingNum } = await Swal.fire({
+            title: 'Número de Guía',
+            text: 'Por favor, ingresa el número de guía de la paquetería:',
+            input: 'text',
+            inputPlaceholder: 'Ej. DHL123456789',
+            showCancelButton: true,
+            confirmButtonColor: '#1d4ed8',
+            cancelButtonColor: '#3f3f46',
+            confirmButtonText: 'Guardar y Continuar',
+            cancelButtonText: 'Cancelar',
+            background: '#151515', color: '#fff',
+            inputValidator: (value) => {
+                if (!value) {
+                    return 'Debes ingresar un número de guía para continuar.';
+                }
+            }
+        });
+        
+        if (!trackingNum) {
+            // Cancelar el cambio de estatus y revertir selects
+            selects.forEach(sel => sel.value = ordenOriginal ? ordenOriginal.estatus : "");
+            const modalSelect = document.getElementById('admin-order-details-status');
+            if (modalSelect && document.getElementById('admin-order-details-id')?.textContent === id_orden) {
+                modalSelect.value = ordenOriginal ? ordenOriginal.estatus : "";
+            }
+            return;
+        }
+        trackingGuide = trackingNum;
+    }
+    
     const payload = {
         action: 'update_order_status',
         id_orden: id_orden,
-        nuevo_estatus: nuevo_estatus
+        nuevo_estatus: nuevo_estatus,
+        guia: trackingGuide
     };
     
     try {
@@ -3473,7 +3568,7 @@ function renderUserOrdenesList() {
                 <div class="flex items-center gap-3 mt-2 text-xs font-semibold text-gray-300">
                     <span class="flex items-center gap-1.5"><svg class="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path></svg>${numItems} artícul${numItems !== 1 ? 'os' : 'o'}</span>
                     <span class="text-gray-600">•</span>
-                    <span class="text-emerald-400 font-bold">Total: $${(orden.gran_total || 0).toFixed(2)}</span>
+                    <span class="text-emerald-400 font-bold">Total: $${Number(orden.total_neto !== undefined ? orden.total_neto : (Number(orden.gran_total || 0) + (Number(orden.envio_costo) || 0))).toFixed(2)}</span>
                 </div>
             </div>
             <div class="w-full sm:w-auto mt-2 sm:mt-0 flex gap-2 justify-end">
@@ -3509,10 +3604,14 @@ function openUserOrderDetailsModal(id_orden) {
     statusBadge.className = `px-2 py-1 rounded-lg text-xs font-bold uppercase tracking-wider ${sColor.bg} ${sColor.text} ${sColor.border}`;
     
     if (isEditable) {
-        document.getElementById('user-order-edit-warning').classList.remove('hidden');
+        const editWarning = document.getElementById('user-order-edit-warning');
+        if (editWarning) editWarning.classList.remove('hidden');
+        if (document.getElementById('user-order-locked-warning')) document.getElementById('user-order-locked-warning').classList.add('hidden');
         document.getElementById('btn-save-user-order-changes').classList.remove('hidden');
     } else {
-        document.getElementById('user-order-edit-warning').classList.add('hidden');
+        const editWarning = document.getElementById('user-order-edit-warning');
+        if (editWarning) editWarning.classList.add('hidden');
+        if (document.getElementById('user-order-locked-warning')) document.getElementById('user-order-locked-warning').classList.remove('hidden');
         document.getElementById('btn-save-user-order-changes').classList.add('hidden');
     }
     
@@ -3536,35 +3635,59 @@ function renderUserOrderDetailsUI() {
     
     const isEditable = (currentUserOrderEditing.estatus === 'Pendiente');
     
+    // Normalizar id_personalizacion si viene como String desde la API
+    const orderProfile = currentUserOrderEditing.tipo_precio_aplicado || 'Menudeo';
+    const isMayoreo = orderProfile === 'Mayoreo' || orderProfile === 'Súper Mayoreo' || orderProfile === 'Mayoreo Súper';
+    currentUserOrderEditing.articulos_carrito.forEach(item => {
+        if (item.id_personalizacion && typeof item.id_personalizacion !== 'object') {
+            const pId = item.id_personalizacion;
+            const pObj = allPersonalizaciones.find(x => String(x.id) === String(pId)) 
+                       || defaultPersonalizaciones.find(x => String(x.id) === String(pId));
+            if (pObj) {
+                item.id_personalizacion = {
+                    id_personalizacion: pObj.id,
+                    concepto: pObj.nombre,
+                    precio: isMayoreo ? parseFloat(pObj.precio_mayoreo || 0) : parseFloat(pObj.precio_Menudeo || 0)
+                };
+            } else {
+                item.id_personalizacion = {
+                    id_personalizacion: pId,
+                    concepto: pId === 'PERS-001' ? 'Nombre y Número' : 'Personalizado',
+                    precio: 0
+                };
+            }
+        }
+    });
+    
     currentUserOrderEditing.articulos_carrito.forEach((item, index) => {
         const art = document.createElement('div');
         art.className = "bg-dark-100 border border-white/5 rounded-xl p-3 sm:p-4 flex flex-col sm:flex-row gap-3 sm:gap-4 items-start sm:items-center mb-3 relative overflow-hidden group";
         
-        let persText = "Ninguna";
+        let persConcept = "";
+        let persText = "";
         if (item.id_personalizacion && item.id_personalizacion.id_personalizacion && item.id_personalizacion.id_personalizacion !== "PERS-NONE") {
-            persText = item.id_personalizacion.concepto;
-            if (item.texto_personalizado) persText += ` (${item.texto_personalizado})`;
+            persConcept = item.id_personalizacion.concepto;
+            persText = item.texto_personalizado || "";
         }
         
+        let isPersonalized = false;
+        if (item.id_personalizacion) {
+            let pId = (typeof item.id_personalizacion === 'object') ? item.id_personalizacion.id_personalizacion : item.id_personalizacion;
+            if (pId && pId !== "PERS-NONE" && pId !== "Ninguna" && pId !== "") {
+                isPersonalized = true;
+            }
+        }
+
         // Render view/edit modes
         let quantityHtml = `<span class="text-white font-bold">${item.cantidad}</span>`;
-        let persHtml = `<span class="text-blue-400 font-semibold">${persText}</span>`;
         let actionHtml = '';
         
         if (isEditable) {
-            quantityHtml = `
-                <div class="flex items-center gap-2 border border-white/10 rounded-lg p-0.5 bg-black/20">
-                    <button class="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/10 rounded" onclick="changeUserOrderItemQty(${index}, -1)">-</button>
-                    <span class="text-sm font-bold w-4 text-center text-white">${item.cantidad}</span>
-                    <button class="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/10 rounded" onclick="changeUserOrderItemQty(${index}, 1)">+</button>
-                </div>
-            `;
-            
-            if (item.id_personalizacion && item.id_personalizacion.id_personalizacion !== "PERS-NONE") {
-                persHtml = `
-                    <div class="mt-2 w-full">
-                        <label class="block text-[10px] text-gray-400 uppercase tracking-wider mb-1">Texto de Pers. (${item.id_personalizacion.concepto})</label>
-                        <input type="text" value="${item.texto_personalizado || ''}" onchange="changeUserOrderItemPersText(${index}, this.value)" class="w-full bg-dark-200/50 border border-white/10 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-navy-400 focus:ring-1 focus:ring-navy-400 text-white placeholder-gray-600 uppercase" placeholder="Escribe el nombre/número...">
+            if (isPersonalized) {
+                quantityHtml = `
+                    <div class="flex items-center gap-2">
+                        <span class="text-sm font-bold text-white">${item.cantidad}</span>
+                        <span class="text-[10px] text-yellow-500 bg-yellow-500/10 px-1.5 py-0.5 rounded border border-yellow-500/20 ml-2 text-center">(Personalizada)</span>
                     </div>
                 `;
             }
@@ -3589,7 +3712,8 @@ function renderUserOrderDetailsUI() {
                     <div class="flex items-center gap-1"><span class="text-gray-500">Talla:</span><span class="text-white font-bold bg-white/10 px-1.5 rounded">${item.talla}</span></div>
                     <div class="flex items-center gap-1"><span class="text-gray-500">Cant:</span>${quantityHtml}</div>
                 </div>
-                ${!isEditable ? `<div class="mt-1.5 text-xs text-gray-500 flex items-center gap-1">Pers: ${persHtml}</div>` : persHtml}
+                ${persConcept ? `<div class="mt-1.5 text-xs text-gray-500">Pers: <span class="text-blue-400 font-semibold">${persConcept}</span></div>` : ''}
+                ${persConcept && persText ? `<div class="mt-1 text-xs text-gray-500">Texto Estampado: <span class="text-emerald-400 font-mono font-bold uppercase">"${persText}"</span></div>` : ''}
             </div>
             <div class="flex flex-col items-end gap-1 mt-2 sm:mt-0 ml-auto pl-2 border-l border-white/5 sm:border-none">
                 <span class="text-white font-bold text-base sm:text-lg">$${item.subtotal_renglon.toFixed(2)}</span>
@@ -3666,19 +3790,84 @@ function trackUserOrderEdit(id_detalle, actionType, value) {
 
 function calculateUserOrderTotals() {
     let subJers = 0;
+    let totalPers = 0;
     
     if (currentUserOrderEditing.articulos_carrito) {
         currentUserOrderEditing.articulos_carrito.forEach(item => {
             subJers += item.subtotal_renglon;
+            
+            let itemPersPrice = 0;
+            if (item.id_personalizacion) {
+                let pId = (typeof item.id_personalizacion === 'object') ? item.id_personalizacion.id_personalizacion : item.id_personalizacion;
+                if (pId && pId !== "PERS-NONE" && pId !== "Ninguna" && pId !== "") {
+                    if (typeof item.id_personalizacion === 'object' && item.id_personalizacion.precio !== undefined) {
+                        itemPersPrice = parseFloat(item.id_personalizacion.precio || 0);
+                    } else {
+                        const pObj = allPersonalizaciones.find(x => String(x.id) === String(pId)) 
+                                   || defaultPersonalizaciones.find(x => String(x.id) === String(pId));
+                        if (pObj) {
+                            const orderProfile = currentUserOrderEditing.tipo_precio_aplicado || 'Menudeo';
+                            const isMayoreo = orderProfile === 'Mayoreo' || orderProfile === 'Súper Mayoreo' || orderProfile === 'Mayoreo Súper';
+                            itemPersPrice = isMayoreo ? parseFloat(pObj.precio_mayoreo || 0) : parseFloat(pObj.precio_Menudeo || 0);
+                        }
+                    }
+                }
+            }
+            totalPers += itemPersPrice * item.cantidad;
         });
     }
     
-    // We update the local object total so it reflects correctly
-    currentUserOrderEditing.gran_total = subJers;
+    const costoEnvio = Number(currentUserOrderEditing.envio_costo !== undefined ? currentUserOrderEditing.envio_costo : (currentUserOrderEditing.costo_envio || 0));
     
-    document.getElementById('user-order-subtotal').textContent = '$' + subJers.toFixed(2);
-    document.getElementById('user-order-pers-total').textContent = 'Incluido';
-    document.getElementById('user-order-total').textContent = '$' + subJers.toFixed(2);
+    // We update the local object total so it reflects correctly
+    currentUserOrderEditing.gran_total = subJers + costoEnvio;
+    
+    // Excluir la personalización del subtotal de jerseys que se muestra
+    const displaySubtotalJerseys = subJers - totalPers;
+    
+    document.getElementById('user-order-subtotal').textContent = '$' + displaySubtotalJerseys.toFixed(2);
+    document.getElementById('user-order-pers-total').textContent = '$' + totalPers.toFixed(2);
+    
+    const envioRow = document.getElementById('user-order-envio-row');
+    const envioVal = document.getElementById('user-order-envio-val');
+    if (envioRow && envioVal) {
+        if (costoEnvio > 0) {
+            envioRow.classList.remove('hidden');
+            envioVal.textContent = '$' + costoEnvio.toFixed(2);
+        } else {
+            envioRow.classList.add('hidden');
+        }
+    }
+    
+    document.getElementById('user-order-total').textContent = '$' + (subJers + costoEnvio).toFixed(2);
+    
+    // Mostrar u ocultar guía de rastreo
+    const guiaContainer = document.getElementById('user-order-guia-container');
+    const guiaVal = document.getElementById('user-order-guia-val');
+    const btnCopyGuia = document.getElementById('btn-copy-guia');
+    
+    if (guiaContainer && guiaVal) {
+        const trackingNum = currentUserOrderEditing.guia ? String(currentUserOrderEditing.guia).trim() : "";
+        if (trackingNum) {
+            guiaContainer.classList.remove('hidden');
+            guiaVal.textContent = trackingNum;
+            
+            if (btnCopyGuia) {
+                btnCopyGuia.onclick = () => {
+                    navigator.clipboard.writeText(trackingNum);
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Guía copiada',
+                        text: 'Número de guía copiado al portapapeles',
+                        background: '#151515', color: '#fff',
+                        timer: 1000, showConfirmButton: false
+                    });
+                };
+            }
+        } else {
+            guiaContainer.classList.add('hidden');
+        }
+    }
 }
 
 async function saveUserOrderChanges() {
@@ -3697,6 +3886,7 @@ async function saveUserOrderChanges() {
     
     try {
         const originalOrder = allUserOrdenesFetched.find(o => o.id_orden === currentUserOrderEditing.id_orden);
+        let orderEmptied = false;
         
         for (const edit of currentUserOrderEdits) {
             const originalItem = originalOrder ? originalOrder.articulos_carrito.find(a => a.id_detalle === edit.id_detalle) : null;
@@ -3716,11 +3906,16 @@ async function saveUserOrderChanges() {
                 }
                 const texto_pers = targetItem.texto_personalizado || '';
                 
+                let action = 'update_order_item_quantity';
+                if (edit.actionType === 'delete') {
+                    action = 'delete_order_item';
+                }
+                
                 const response = await fetch(API_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                     body: JSON.stringify({ 
-                        action: 'update_order_item_quantity', 
+                        action: action, 
                         id_detalle: edit.id_detalle,
                         categoria: categoria,
                         nueva_cantidad: nueva_cantidad,
@@ -3729,13 +3924,20 @@ async function saveUserOrderChanges() {
                     })
                 });
                 const resData = await response.json();
+                if (resData.status === 'error') {
+                    Swal.fire({ icon: 'error', title: 'Error', text: resData.message || 'Error al actualizar el artículo.', background: '#151515', color: '#fff' });
+                    return;
+                }
                 if (resData.status !== 'success') {
                     console.error('Error updating order item:', resData);
+                }
+                if (resData.orden_vaciada) {
+                    orderEmptied = true;
                 }
             }
         }
         
-        Swal.fire({ icon: 'success', title: '¡¡Actualizado!', text: 'Tus cambios se han guardado exitosamente.', background: '#151515', color: '#fff', timer: 2000, showConfirmButton: false });
+        Swal.fire({ icon: 'success', title: '¡Actualizado!', text: 'Tus cambios se han guardado exitosamente.', background: '#151515', color: '#fff', timer: 2000, showConfirmButton: false });
         
         // Refresh data
         allUserOrdenesFetched = await fetchUserOrdenes(true);
@@ -3744,8 +3946,12 @@ async function saveUserOrderChanges() {
             fetchOrdenes(); // Fire and forget update global cache
         }
         
-        // Re-open detail with updated data
-        openUserOrderDetailsModal(currentUserOrderEditing.id_orden);
+        if (orderEmptied) {
+            document.getElementById('user-order-details-modal').classList.add('hidden');
+        } else {
+            // Re-open detail with updated data
+            openUserOrderDetailsModal(currentUserOrderEditing.id_orden);
+        }
         // Refresh list
         renderUserOrdenesList();
         
