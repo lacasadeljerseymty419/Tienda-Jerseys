@@ -257,7 +257,11 @@ function renderLocalProducts(products) {
     products.forEach(p => {
         const id = p.id || p.id_producto;
         const nombre = p.nombre || 'Sin nombre';
-        const imgUrl = p.foto || p.imagen || 'https://images.unsplash.com/photo-1577212017184-807dd6acefd6?auto=format&fit=crop&q=80&w=400';
+        
+        const images = (p.foto || p.imagen || '').split(',').map(u => u.trim()).filter(Boolean);
+        let currentImgIdx = 0;
+        
+        const imgUrl = images[currentImgIdx] || 'https://images.unsplash.com/photo-1577212017184-807dd6acefd6?auto=format&fit=crop&q=80&w=400';
         const genero = p.genero || '-';
         const tipo = p.tipo || '-';
         const version = p.version || '-';
@@ -282,15 +286,31 @@ function renderLocalProducts(products) {
         const card = document.createElement('div');
         card.className = 'group bg-white rounded-2xl p-3 sm:p-4 border border-gray-200 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col h-full relative';
         
+        let carouselControlsHtml = '';
+        if (images.length > 1) {
+            carouselControlsHtml = `
+                <button type="button" class="carousel-prev-btn absolute left-1.5 sm:left-2 top-1/2 -translate-y-1/2 w-6 h-6 sm:w-8 sm:h-8 bg-black/60 hover:bg-black/80 backdrop-blur-sm rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-all text-white z-30 opacity-100 md:opacity-0 md:group-hover:opacity-100">
+                    <svg class="w-3 h-3 sm:w-4.5 sm:h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"></path></svg>
+                </button>
+                <button type="button" class="carousel-next-btn absolute right-1.5 sm:right-2 top-1/2 -translate-y-1/2 w-6 h-6 sm:w-8 sm:h-8 bg-black/60 hover:bg-black/80 backdrop-blur-sm rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-all text-white z-30 opacity-100 md:opacity-0 md:group-hover:opacity-100">
+                    <svg class="w-3 h-3 sm:w-4.5 sm:h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"></path></svg>
+                </button>
+                <div class="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1 z-30 bg-black/40 backdrop-blur-xs px-2 py-1 rounded-full opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                    ${images.map((_, i) => `<span class="carousel-dot w-1.5 h-1.5 rounded-full ${i === 0 ? 'bg-white' : 'bg-white/40'} transition-all duration-300" data-idx="${i}"></span>`).join('')}
+                </div>
+            `;
+        }
+        
         card.innerHTML = `
             ${agotado ? '<div class="absolute top-2 right-2 sm:top-4 sm:right-4 z-10 bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded-md uppercase tracking-wide">Agotado</div>' : ''}
-            <div class="relative w-full aspect-square rounded-xl overflow-hidden mb-4 bg-gray-50 cursor-pointer" onclick="openImageModal('${imgUrl}')">
-                <img src="${imgUrl}" alt="${nombre}" class="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-500">
-                <div class="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors flex items-center justify-center">
+            <div class="product-image-container relative w-full aspect-square rounded-xl overflow-hidden mb-4 bg-gray-50 cursor-pointer">
+                <img src="${imgUrl}" alt="${nombre}" class="product-card-img w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-500">
+                <div class="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors flex items-center justify-center pointer-events-none">
                     <div class="bg-white/90 backdrop-blur-sm rounded-full p-2 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm text-gray-700">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7"></path></svg>
                     </div>
                 </div>
+                ${carouselControlsHtml}
             </div>
             
             <div class="flex-grow flex flex-col">
@@ -309,6 +329,58 @@ function renderLocalProducts(products) {
                 </div>
             </div>
         `;
+        
+        const imgEl = card.querySelector('.product-card-img');
+        const dots = card.querySelectorAll('.carousel-dot');
+        
+        const updateImage = (newIdx) => {
+            currentImgIdx = newIdx;
+            imgEl.src = images[currentImgIdx];
+            dots.forEach((dot, idx) => {
+                if (idx === currentImgIdx) {
+                    dot.className = 'carousel-dot w-1.5 h-1.5 rounded-full bg-white transition-all duration-300';
+                } else {
+                    dot.className = 'carousel-dot w-1.5 h-1.5 rounded-full bg-white/40 transition-all duration-300';
+                }
+            });
+        };
+        
+        const prevBtn = card.querySelector('.carousel-prev-btn');
+        if (prevBtn) {
+            prevBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const newIdx = (currentImgIdx - 1 + images.length) % images.length;
+                updateImage(newIdx);
+            });
+        }
+        
+        const nextBtn = card.querySelector('.carousel-next-btn');
+        if (nextBtn) {
+            nextBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const newIdx = (currentImgIdx + 1) % images.length;
+                updateImage(newIdx);
+            });
+        }
+        
+        dots.forEach(dot => {
+            dot.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const idx = parseInt(dot.getAttribute('data-idx'));
+                updateImage(idx);
+            });
+        });
+        
+        const imgContainer = card.querySelector('.product-image-container');
+        if (imgContainer) {
+            imgContainer.addEventListener('click', (e) => {
+                if (e.target.closest('.carousel-prev-btn') || e.target.closest('.carousel-next-btn') || e.target.closest('.carousel-dot')) {
+                    return;
+                }
+                openImageModal(images[currentImgIdx]);
+            });
+        }
+        
         DOM.grid.appendChild(card);
     });
 }

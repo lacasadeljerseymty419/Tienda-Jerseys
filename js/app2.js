@@ -1,5 +1,11 @@
 const API_URL = "https://script.google.com/macros/s/AKfycbwXcegcYmKbKVdAmLTRH-bYa9ju_-MaXY3Ny4JAnxWEwefpbZ6acI5YEbVvoklaDpN4Jw/exec";
 
+function getFirstImage(fotoField) {
+    if (!fotoField) return '';
+    const parts = String(fotoField).split(',');
+    return parts[0].trim();
+}
+
 async function get_configs() {
     try {
         const response = await fetch(API_URL, {
@@ -968,7 +974,7 @@ function renderAdminTable() {
             });
         }
         
-        const imgUrl = producto.foto || producto.imagen || 'https://images.unsplash.com/photo-1577212017184-807dd6acefd6?auto=format&fit=crop&q=80&w=100';
+        const imgUrl = getFirstImage(producto.foto || producto.imagen) || 'https://images.unsplash.com/photo-1577212017184-807dd6acefd6?auto=format&fit=crop&q=80&w=100';
         
         const colorGenero = getGenderColorClass(producto.genero);
         
@@ -1024,7 +1030,7 @@ function openInventoryModal(producto) {
     currentJerseyToManage = producto;
     DOM.admin.invTitle.textContent = producto.nombre;
     DOM.admin.invId.textContent = `ID: ${producto.id}`;
-    DOM.admin.invImg.src = producto.foto || producto.imagen || '';
+    DOM.admin.invImg.src = getFirstImage(producto.foto || producto.imagen) || '';
     
     // Inyectar etiquetas del producto en el encabezado del modal
     const tagsContainer = document.getElementById('inv-modal-tags');
@@ -1543,7 +1549,10 @@ function createProductCard(producto) {
     const article = document.createElement('article');
     article.className = 'group bg-dark-100 rounded-xl sm:rounded-2xl p-2 sm:p-4 border border-white/5 hover:border-navy-400/40 transition-all duration-300 flex flex-col h-full hover:shadow-[0_0_30px_rgba(59,130,246,0.08)] relative overflow-hidden';
     
-    const imgUrl = producto.foto || producto.imagen || 'https://images.unsplash.com/photo-1577212017184-807dd6acefd6?auto=format&fit=crop&q=80&w=600';
+    const images = (producto.foto || producto.imagen || '').split(',').map(u => u.trim()).filter(Boolean);
+    let currentImgIdx = 0;
+    
+    const imgUrl = images[currentImgIdx] || 'https://images.unsplash.com/photo-1577212017184-807dd6acefd6?auto=format&fit=crop&q=80&w=600';
     
     let tagsHtml = '<div class="flex flex-wrap gap-1 sm:gap-2 mb-1.5 sm:mb-3 z-10 relative">';
     if (producto.version) tagsHtml += `<span class="px-1.5 py-0.5 sm:px-2.5 sm:py-1 text-[8px] sm:text-[10px] font-bold uppercase tracking-wider bg-white/5 text-gray-400 rounded-md border border-white/10 backdrop-blur-sm">${producto.version}</span>`;
@@ -1640,6 +1649,21 @@ function createProductCard(producto) {
         `;
     }
 
+    let carouselControlsHtml = '';
+    if (images.length > 1) {
+        carouselControlsHtml = `
+            <button type="button" class="carousel-prev-btn absolute left-1.5 sm:left-2 top-1/2 -translate-y-1/2 w-6 h-6 sm:w-8 sm:h-8 bg-black/60 hover:bg-black/80 backdrop-blur-sm rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-all text-white z-30 opacity-100 md:opacity-0 md:group-hover:opacity-100">
+                <svg class="w-3 h-3 sm:w-4.5 sm:h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"></path></svg>
+            </button>
+            <button type="button" class="carousel-next-btn absolute right-1.5 sm:right-2 top-1/2 -translate-y-1/2 w-6 h-6 sm:w-8 sm:h-8 bg-black/60 hover:bg-black/80 backdrop-blur-sm rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-all text-white z-30 opacity-100 md:opacity-0 md:group-hover:opacity-100">
+                <svg class="w-3 h-3 sm:w-4.5 sm:h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"></path></svg>
+            </button>
+            <div class="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1 z-30 bg-black/40 backdrop-blur-xs px-2 py-1 rounded-full opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                ${images.map((_, i) => `<span class="carousel-dot w-1.5 h-1.5 rounded-full ${i === 0 ? 'bg-white' : 'bg-white/40'} transition-all duration-300" data-idx="${i}"></span>`).join('')}
+            </div>
+        `;
+    }
+
     let bottomSectionHtml = statusTextHtml + tallasHtml;
     if (currentView === 'jerseys-pedido') {
         if (isProximamente || isAgotado) {
@@ -1651,9 +1675,10 @@ function createProductCard(producto) {
 
     article.innerHTML = `
         <div class="product-image-container relative w-full aspect-[4/5] rounded-lg sm:rounded-xl overflow-hidden mb-2 sm:mb-4 bg-dark z-10 cursor-pointer">
-            <img src="${imgUrl}" alt="${producto.nombre || 'Jersey'}" class="w-full h-full object-cover object-center group-hover:scale-110 transition-transform duration-700 ease-out ${(isAgotado || isProximamente) ? 'grayscale opacity-60' : ''}" loading="lazy">
+            <img src="${imgUrl}" alt="${producto.nombre || 'Jersey'}" class="product-card-img w-full h-full object-cover object-center group-hover:scale-110 transition-transform duration-700 ease-out ${(isAgotado || isProximamente) ? 'grayscale opacity-60' : ''}" loading="lazy">
             <div class="absolute inset-0 bg-gradient-to-t from-dark-100/90 via-dark-100/20 to-transparent opacity-60 group-hover:opacity-40 transition-opacity duration-500"></div>
             ${imageOverlayHtml}
+            ${carouselControlsHtml}
         </div>
         <div class="product-details-container flex flex-col flex-grow cursor-pointer z-10 relative">
             <h3 class="text-[13px] sm:text-lg font-semibold text-white leading-tight mb-1 sm:mb-2 group-hover:text-navy-400 transition-colors line-clamp-2">
@@ -1693,10 +1718,57 @@ function createProductCard(producto) {
         });
     });
 
+    const imgEl = article.querySelector('.product-card-img');
+    const dots = article.querySelectorAll('.carousel-dot');
+    
+    const updateImage = (newIdx) => {
+        currentImgIdx = newIdx;
+        imgEl.src = images[currentImgIdx];
+        dots.forEach((dot, idx) => {
+            if (idx === currentImgIdx) {
+                dot.className = 'carousel-dot w-1.5 h-1.5 rounded-full bg-white transition-all duration-300';
+            } else {
+                dot.className = 'carousel-dot w-1.5 h-1.5 rounded-full bg-white/40 transition-all duration-300';
+            }
+        });
+    };
+    
+    const prevBtn = article.querySelector('.carousel-prev-btn');
+    if (prevBtn) {
+        prevBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const newIdx = (currentImgIdx - 1 + images.length) % images.length;
+            updateImage(newIdx);
+        });
+    }
+    
+    const nextBtn = article.querySelector('.carousel-next-btn');
+    if (nextBtn) {
+        nextBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const newIdx = (currentImgIdx + 1) % images.length;
+            updateImage(newIdx);
+        });
+    }
+    
+    dots.forEach(dot => {
+        dot.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const idx = parseInt(dot.getAttribute('data-idx'));
+            updateImage(idx);
+        });
+    });
+
     const imgContainer = article.querySelector('.product-image-container');
     if (imgContainer) {
-        imgContainer.addEventListener('click', () => openModal(imgUrl));
+        imgContainer.addEventListener('click', (e) => {
+            if (e.target.closest('.carousel-prev-btn') || e.target.closest('.carousel-next-btn') || e.target.closest('.carousel-dot')) {
+                return;
+            }
+            openModal(images[currentImgIdx]);
+        });
     }
+    
     const detailsContainer = article.querySelector('.product-details-container');
     if (detailsContainer) {
         detailsContainer.addEventListener('click', (e) => {
@@ -2089,7 +2161,7 @@ function openPedidoModal(producto, preselectedTalla = null) {
     }
     const basePrice = getBasePriceForProfile(producto, profileToUse);
     DOM.pedido.desc.innerHTML = `${producto.genero || '-'} | ${producto.tipo || '-'} | ${producto.version || '-'} | <span class="text-navy-400 font-bold">$${basePrice.toFixed(2)}</span>`;
-    DOM.pedido.img.src = producto.foto || producto.imagen || '';
+    DOM.pedido.img.src = getFirstImage(producto.foto || producto.imagen) || '';
     
     // Limpiar y poblar select de tallas con stock disponible
     DOM.pedido.talla.innerHTML = '<option value="" disabled selected>Selecciona talla...</option>';
@@ -2500,7 +2572,7 @@ function renderCartItems() {
         subtotal += basePrice * item.cantidad;
         personalizacionesTotal += persPrice * item.cantidad;
         
-        const imgUrl = prod.foto || prod.imagen || 'https://images.unsplash.com/photo-1577212017184-807dd6acefd6?auto=format&fit=crop&q=80&w=100';
+        const imgUrl = getFirstImage(prod.foto || prod.imagen) || 'https://images.unsplash.com/photo-1577212017184-807dd6acefd6?auto=format&fit=crop&q=80&w=100';
         
         const itemDiv = document.createElement('div');
         itemDiv.className = 'flex items-center gap-3 bg-dark-200/20 p-2.5 rounded-xl border border-white/5 group';
@@ -2978,7 +3050,7 @@ function renderOrdenes() {
                         || {};
                 }
                 
-                const imgUrl = prod.foto || prod.imagen || 'https://images.unsplash.com/photo-1577212017184-807dd6acefd6?auto=format&fit=crop&q=80&w=100';
+                const imgUrl = getFirstImage(prod.foto || prod.imagen) || 'https://images.unsplash.com/photo-1577212017184-807dd6acefd6?auto=format&fit=crop&q=80&w=100';
                 const nombre = prod.nombre || `Producto ${art.id_producto || (art.id_playera && art.id_playera.id) || 'Desconocido'}`;
                 const genero = prod.genero || '-';
                 const tipo = prod.tipo || '-';
@@ -3085,7 +3157,7 @@ window.openOrderDetailsModal = function(id_orden) {
                     || {};
             }
             
-            const imgUrl = prod.foto || prod.imagen || 'https://images.unsplash.com/photo-1577212017184-807dd6acefd6?auto=format&fit=crop&q=80&w=100';
+            const imgUrl = getFirstImage(prod.foto || prod.imagen) || 'https://images.unsplash.com/photo-1577212017184-807dd6acefd6?auto=format&fit=crop&q=80&w=100';
             const nombre = prod.nombre || `Producto ${art.id_producto || (art.id_playera && art.id_playera.id) || 'Desconocido'}`;
             const genero = prod.genero || '-';
             const tipo = prod.tipo || '-';
@@ -3701,7 +3773,7 @@ function renderUserOrderDetailsUI() {
         
         art.innerHTML = `
             <div class="w-16 h-16 sm:w-20 sm:h-20 bg-dark-200 rounded-lg overflow-hidden flex-shrink-0 relative border border-white/5">
-                <img src="${item.id_playera.foto}" class="w-full h-full object-cover" alt="Jersey">
+                <img src="${getFirstImage(item.id_playera.foto)}" class="w-full h-full object-cover" alt="Jersey">
             </div>
             <div class="flex-grow min-w-0 pr-6 sm:pr-0">
                 <h4 class="text-white font-bold text-sm sm:text-base leading-tight truncate">${item.id_playera.nombre}</h4>
