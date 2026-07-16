@@ -3844,6 +3844,7 @@ function calculateUserOrderTotals() {
     // Mostrar u ocultar guía de rastreo
     const guiaContainer = document.getElementById('user-order-guia-container');
     const guiaVal = document.getElementById('user-order-guia-val');
+    const guiaLink = document.getElementById('user-order-guia-link');
     const btnCopyGuia = document.getElementById('btn-copy-guia');
     
     if (guiaContainer && guiaVal) {
@@ -3852,13 +3853,18 @@ function calculateUserOrderTotals() {
             guiaContainer.classList.remove('hidden');
             guiaVal.textContent = trackingNum;
             
+            if (guiaLink) {
+                guiaLink.href = `https://hawkportal.lamensajeria.mx/rastreo/${trackingNum}`;
+            }
+            
             if (btnCopyGuia) {
                 btnCopyGuia.onclick = () => {
-                    navigator.clipboard.writeText(trackingNum);
+                    const fullUrl = `https://hawkportal.lamensajeria.mx/rastreo/${trackingNum}`;
+                    navigator.clipboard.writeText(fullUrl);
                     Swal.fire({
                         icon: 'success',
-                        title: 'Guía copiada',
-                        text: 'Número de guía copiado al portapapeles',
+                        title: 'Enlace copiado',
+                        text: 'Enlace de rastreo copiado al portapapeles',
                         background: '#151515', color: '#fff',
                         timer: 1000, showConfirmButton: false
                     });
