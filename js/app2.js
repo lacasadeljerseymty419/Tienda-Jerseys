@@ -1,4 +1,4 @@
-const API_URL = "https://script.google.com/macros/s/AKfycbyHA7KcATJ4GcD4M9g2H54PI15lHTuPF2hOaBxJhJYZFYeb-9Tqpjr3rR72EubaA-jokA/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbxjIvqdY1z7ef11VMwWKwAposAjv9yitogvmWPrcW-bJjG8tnGS2PSjJs7A5kPObDYpDg/exec";
 
 function getFirstImage(fotoField) {
     if (!fotoField) return '';
@@ -802,7 +802,7 @@ function closeModal() {
 
 async function loadCatalogs() {
     let configs = null;
-    const CACHE_KEY = 'jerseys_configs_v16';
+    const CACHE_KEY = 'jerseys_configs_v17';
     const CACHE_TTL = 60 * 60 * 1000; // 1 hora en milisegundos
     
     // 1. Intentar cargar y parsear del localStorage de manera segura considerando la expiración (TTL)
@@ -2206,7 +2206,7 @@ function openClientFormModal(client = null) {
         DOM.admin.clientInputs.perfil.value = "Menudeo";
     }
     
-    DOM.admin.clientFormmodal.classList.remove('hidden');
+    DOM.admin.clientFormModal.classList.remove('hidden');
     if (document.getElementById('user-filter-id')) document.getElementById('user-filter-id').value = '';
     if (document.getElementById('user-filter-status')) document.getElementById('user-filter-status').value = '';
     void DOM.admin.clientFormModal.offsetWidth;
@@ -2432,6 +2432,56 @@ async function handleSaveClient(e) {
     } finally {
         btnSubmit.disabled = false;
         btnSubmit.innerHTML = originalText;
+    }
+}
+
+async function handleDeleteClient(id) {
+    const result = await Swal.fire({
+        title: '¿Eliminar Cliente?',
+        text: "Esta acción no se puede deshacer.",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        cancelButtonColor: '#3b82f6',
+        confirmButtonText: 'Sí, eliminar',
+        cancelButtonText: 'Cancelar',
+        background: '#151515',
+        color: '#fff',
+        customClass: { popup: 'border border-white/10 rounded-2xl' }
+    });
+    
+    if (result.isConfirmed) {
+        try {
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({ action: "delete_client", id_cliente: id })
+            });
+            const data = await response.json();
+            if (data.status === 'success') {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Eliminado',
+                    text: data.message || 'El cliente ha sido eliminado.',
+                    background: '#151515', color: '#fff',
+                    timer: 1500,
+                    showConfirmButton: false,
+                    customClass: { popup: 'border border-white/10 rounded-2xl' }
+                });
+                fetchClients();
+            } else {
+                throw new Error(data.message || 'Error al eliminar');
+            }
+        } catch (error) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: error.message,
+                background: '#151515',
+                color: '#fff',
+                customClass: { popup: 'border border-white/10 rounded-2xl' }
+            });
+        }
     }
 }
 

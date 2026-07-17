@@ -1,4 +1,4 @@
-const API_URL = "https://script.google.com/macros/s/AKfycbyHA7KcATJ4GcD4M9g2H54PI15lHTuPF2hOaBxJhJYZFYeb-9Tqpjr3rR72EubaA-jokA/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbxjIvqdY1z7ef11VMwWKwAposAjv9yitogvmWPrcW-bJjG8tnGS2PSjJs7A5kPObDYpDg/exec";
 
 // Elementos DOM
 const DOM = {

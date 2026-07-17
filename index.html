@@ -336,31 +336,31 @@
                     
                     <div>
                         <label for="create-nombre" class="block text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wider">Nombre del Jersey</label>
-                        <input type="text" id="create-nombre" required placeholder="Ej. Real Madrid Local 2026" class="w-full bg-dark-200/50 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-navy-400 focus:ring-1 focus:ring-navy-400 transition-all text-white placeholder-gray-600">
+                        <input type="text" id="create-nombre" required placeholder="Ej. Nombre Equipo Año Temporada" class="w-full bg-dark-200/50 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-navy-400 focus:ring-1 focus:ring-navy-400 transition-all text-white placeholder-gray-600">
                     </div>
 
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div class="grid grid-cols-2 gap-3 sm:gap-4">
                         <div>
-                            <label for="create-tipo" class="block text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wider">Tipo</label>
-                            <select id="create-tipo" required class="w-full bg-dark-200/50 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-navy-400 focus:ring-1 focus:ring-navy-400 transition-all appearance-none cursor-pointer">
+                            <label for="create-tipo" class="block text-[10px] sm:text-xs font-semibold text-gray-400 mb-1.5 sm:mb-2 uppercase tracking-wider">Tipo</label>
+                            <select id="create-tipo" required class="w-full bg-dark-200/50 border border-white/10 rounded-xl px-3 py-2.5 sm:px-4 sm:py-3 text-xs sm:text-sm focus:outline-none focus:border-navy-400 focus:ring-1 focus:ring-navy-400 transition-all appearance-none cursor-pointer">
                                 <option value="" disabled selected>Selecciona un tipo...</option>
                             </select>
                         </div>
                         <div>
-                            <label for="create-version" class="block text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wider">Versión</label>
-                            <select id="create-version" required class="w-full bg-dark-200/50 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-navy-400 focus:ring-1 focus:ring-navy-400 transition-all appearance-none cursor-pointer">
+                            <label for="create-version" class="block text-[10px] sm:text-xs font-semibold text-gray-400 mb-1.5 sm:mb-2 uppercase tracking-wider">Versión</label>
+                            <select id="create-version" required class="w-full bg-dark-200/50 border border-white/10 rounded-xl px-3 py-2.5 sm:px-4 sm:py-3 text-xs sm:text-sm focus:outline-none focus:border-navy-400 focus:ring-1 focus:ring-navy-400 transition-all appearance-none cursor-pointer">
                                 <option value="" disabled selected>Selecciona una versión...</option>
                             </select>
                         </div>
                         <div>
-                            <label for="create-genero" class="block text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wider">Género</label>
-                            <select id="create-genero" required class="w-full bg-dark-200/50 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-navy-400 focus:ring-1 focus:ring-navy-400 transition-all appearance-none cursor-pointer">
+                            <label for="create-genero" class="block text-[10px] sm:text-xs font-semibold text-gray-400 mb-1.5 sm:mb-2 uppercase tracking-wider">Género</label>
+                            <select id="create-genero" required class="w-full bg-dark-200/50 border border-white/10 rounded-xl px-3 py-2.5 sm:px-4 sm:py-3 text-xs sm:text-sm focus:outline-none focus:border-navy-400 focus:ring-1 focus:ring-navy-400 transition-all appearance-none cursor-pointer">
                                 <option value="" disabled selected>Selecciona un género...</option>
                             </select>
                         </div>
                         <div>
-                            <label for="create-personalizacion" class="block text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wider">Personalización</label>
-                            <select id="create-personalizacion" required class="w-full bg-dark-200/50 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-navy-400 focus:ring-1 focus:ring-navy-400 transition-all appearance-none cursor-pointer text-white">
+                            <label for="create-personalizacion" class="block text-[10px] sm:text-xs font-semibold text-gray-400 mb-1.5 sm:mb-2 uppercase tracking-wider">Personalización</label>
+                            <select id="create-personalizacion" required class="w-full bg-dark-200/50 border border-white/10 rounded-xl px-3 py-2.5 sm:px-4 sm:py-3 text-xs sm:text-sm focus:outline-none focus:border-navy-400 focus:ring-1 focus:ring-navy-400 transition-all appearance-none cursor-pointer text-white">
                                 <option value="No">No</option>
                                 <option value="Sí">Sí</option>
                                 <option value="Opcional">Opcional</option>
@@ -369,18 +369,18 @@
                     </div>
 
                     <!-- Precios -->
-                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div class="grid grid-cols-3 gap-2 sm:gap-4">
                         <div>
-                            <label for="create-precio-menudeo" class="block text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wider">Precio Menudeo</label>
-                            <input type="number" id="create-precio-menudeo" required min="0" placeholder="Ej. 850" class="w-full bg-dark-200/50 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-navy-400 focus:ring-1 focus:ring-navy-400 transition-all text-white placeholder-gray-600">
+                            <label for="create-precio-menudeo" class="block text-[9px] sm:text-xs font-semibold text-gray-400 mb-1.5 sm:mb-2 uppercase tracking-wider">Menudeo</label>
+                            <input type="number" id="create-precio-menudeo" required min="0" placeholder="Ej. 850" class="w-full bg-dark-200/50 border border-white/10 rounded-xl px-2.5 py-2.5 sm:px-4 sm:py-3 text-xs sm:text-sm focus:outline-none focus:border-navy-400 focus:ring-1 focus:ring-navy-400 transition-all text-white placeholder-gray-600">
                         </div>
                         <div>
-                            <label for="create-precio-mayoreo" class="block text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wider">Precio Mayoreo</label>
-                            <input type="number" id="create-precio-mayoreo" required min="0" placeholder="Ej. 650" class="w-full bg-dark-200/50 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-navy-400 focus:ring-1 focus:ring-navy-400 transition-all text-white placeholder-gray-600">
+                            <label for="create-precio-mayoreo" class="block text-[9px] sm:text-xs font-semibold text-gray-400 mb-1.5 sm:mb-2 uppercase tracking-wider">Mayoreo</label>
+                            <input type="number" id="create-precio-mayoreo" required min="0" placeholder="Ej. 650" class="w-full bg-dark-200/50 border border-white/10 rounded-xl px-2.5 py-2.5 sm:px-4 sm:py-3 text-xs sm:text-sm focus:outline-none focus:border-navy-400 focus:ring-1 focus:ring-navy-400 transition-all text-white placeholder-gray-600">
                         </div>
                         <div>
-                            <label for="create-precio-mayoreo-super" class="block text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wider">Precio Mayoreo Súper</label>
-                            <input type="number" id="create-precio-mayoreo-super" required min="0" placeholder="Ej. 550" class="w-full bg-dark-200/50 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-navy-400 focus:ring-1 focus:ring-navy-400 transition-all text-white placeholder-gray-600">
+                            <label for="create-precio-mayoreo-super" class="block text-[9px] sm:text-xs font-semibold text-gray-400 mb-1.5 sm:mb-2 uppercase tracking-wider">Súper Mayoreo</label>
+                            <input type="number" id="create-precio-mayoreo-super" required min="0" placeholder="Ej. 550" class="w-full bg-dark-200/50 border border-white/10 rounded-xl px-2.5 py-2.5 sm:px-4 sm:py-3 text-xs sm:text-sm focus:outline-none focus:border-navy-400 focus:ring-1 focus:ring-navy-400 transition-all text-white placeholder-gray-600">
                         </div>
                     </div>
 
