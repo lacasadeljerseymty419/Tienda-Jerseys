@@ -1,4 +1,4 @@
-const API_URL = "https://script.google.com/macros/s/AKfycbwXcegcYmKbKVdAmLTRH-bYa9ju_-MaXY3Ny4JAnxWEwefpbZ6acI5YEbVvoklaDpN4Jw/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbyHA7KcATJ4GcD4M9g2H54PI15lHTuPF2hOaBxJhJYZFYeb-9Tqpjr3rR72EubaA-jokA/exec";
 
 function getFirstImage(fotoField) {
     if (!fotoField) return '';
@@ -67,6 +67,63 @@ async function login_client(usuario, password) {
     } catch (error) {
         console.error("Error en login:", error);
         return { status: "error", message: "Error de conexión al servidor." };
+    }
+}
+async function uploadImageToDrive(base64Data, fileName) {
+    try {
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({ action: "upload_image", image_data: base64Data, file_name: fileName })
+        });
+        if (!response.ok) throw new Error(`Error HTTP: ${response.status}`);
+        return await response.json();
+    } catch (error) {
+        console.error("Error al subir imagen a Drive:", error);
+        return { status: "error", message: "Error al conectar para subir imagen." };
+    }
+}
+
+function readFileAsBase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = error => reject(error);
+        reader.readAsDataURL(file);
+    });
+}
+
+function renderImagePreviews(container, imagesArray) {
+    if (!container) return;
+    container.innerHTML = '';
+    const urls = (Array.isArray(imagesArray) ? imagesArray : [imagesArray]).map(u => String(u || '').trim()).filter(Boolean);
+    if (urls.length === 0) {
+        container.classList.add('hidden');
+        return;
+    }
+    
+    container.classList.remove('hidden');
+    
+    if (urls.length === 1) {
+        const img = document.createElement('img');
+        img.src = urls[0];
+        img.className = 'h-32 rounded-lg border border-white/10 object-contain bg-dark col-span-4 w-full';
+        img.id = 'preview-foto';
+        img.alt = 'Preview';
+        container.appendChild(img);
+    } else {
+        urls.forEach((url, i) => {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'relative aspect-square rounded-lg overflow-hidden border border-white/10 bg-dark group h-20 w-20 flex-shrink-0';
+            
+            const img = document.createElement('img');
+            img.src = url;
+            img.className = 'w-full h-full object-cover';
+            img.alt = `Preview ${i + 1}`;
+            
+            wrapper.appendChild(img);
+            container.appendChild(wrapper);
+        });
     }
 }
 // --- FIN DE api.js ---
@@ -155,6 +212,14 @@ const DOM = {
     admin: {
         createModal: document.getElementById('admin-create-modal'),
         closeCreateModal: document.getElementById('close-create-modal'),
+        listModal: document.getElementById('admin-list-modal'),
+        closeListModal: document.getElementById('close-list-modal'),
+        invModal: document.getElementById('admin-inventory-modal'),
+        closeInvModal: document.getElementById('close-inventory-modal'),
+        invImg: document.getElementById('inv-modal-img'),
+        invTitle: document.getElementById('inv-modal-title'),
+        invId: document.getElementById('inv-modal-id'),
+        invTallasList: document.getElementById('inv-tallas-list'),
         btnCancelCreate: document.getElementById('btn-cancel-create'),
         formCreate: document.getElementById('form-create-product'),
         tallasContainer: document.getElementById('tallas-container'),
@@ -165,15 +230,21 @@ const DOM = {
             genero: document.getElementById('create-genero')
         },
         fotoInput: document.getElementById('create-foto'),
+        fotoPreview: document.getElementById('preview-foto'),
+        createFotoFile: document.getElementById('create-foto-file'),
+        createFotoFileInfo: document.getElementById('create-foto-file-info'),
         fotoPreviewContainer: document.getElementById('preview-foto-container'),
         newTallaVal: document.getElementById('new-talla-val'),
         newStockVal: document.getElementById('new-stock-val'),
-        precioMenudeo: document.getElementById('create-precio-Menudeo'),
+        precioMenudeo: document.getElementById('create-precio-menudeo'),
         precioMayoreo: document.getElementById('create-precio-mayoreo'),
         precioMayoreoSuper: document.getElementById('create-precio-mayoreo-super'),
         formUpdatePrecios: document.getElementById('form-update-precios'),
         updateFotoUrl: document.getElementById('update-foto-url'),
-        updatePrecioMenudeo: document.getElementById('update-precio-Menudeo'),
+        updateFotoFile: document.getElementById('update-foto-file'),
+        updateFotoFileInfo: document.getElementById('update-foto-file-info'),
+        updateFotoPreviewContainer: document.getElementById('update-preview-foto-container'),
+        updatePrecioMenudeo: document.getElementById('update-precio-menudeo'),
         updatePrecioMayoreo: document.getElementById('update-precio-mayoreo'),
         updatePrecioMayoreoSuper: document.getElementById('update-precio-mayoreo-super'),
         filterSearch: document.getElementById('admin-filter-search'),
@@ -183,6 +254,8 @@ const DOM = {
         pagePrev: document.getElementById('admin-page-prev'),
         pageNext: document.getElementById('admin-page-next'),
         pageInfo: document.getElementById('admin-pagination-info'),
+        tableBody: document.getElementById('admin-table-body'),
+        listEmpty: document.getElementById('admin-list-empty'),
         adminMenúuWrapper: document.getElementById('admin-menu-wrapper'),
         clientsModal: document.getElementById('admin-clients-modal'),
         closeClientsModal: document.getElementById('close-clients-modal'),
@@ -239,6 +312,9 @@ let allClients = [];
 let clientsFiltered = [];
 let clientCurrentPage = 1;
 const clientsPerPage = 5;
+let configTallasHombre = [];
+let configTallasDama = [];
+let configTallasNino = [];
 let editingClientId = null;
 
 // Variables de estado del Carrito y Pedidos
@@ -441,6 +517,19 @@ async function initApp() {
     if (DOM.admin.btnCancelCreate) DOM.admin.btnCancelCreate.addEventListener('click', closeCreateModal);
     if (DOM.admin.btnAddTalla) DOM.admin.btnAddTalla.addEventListener('click', addTallaField);
     if (DOM.admin.formCreate) DOM.admin.formCreate.addEventListener('submit', handleCreateProduct);
+    if (DOM.admin.createSelects.genero) {
+        DOM.admin.createSelects.genero.addEventListener('change', () => {
+            const selects = DOM.admin.tallasContainer.querySelectorAll('.talla-val');
+            const optionsHtml = getTallasOptionsHtml();
+            selects.forEach(select => {
+                const prevValue = select.value;
+                select.innerHTML = optionsHtml;
+                if (Array.from(select.options).some(opt => opt.value === prevValue)) {
+                    select.value = prevValue;
+                }
+            });
+        });
+    }
     if (DOM.actions.openList) DOM.actions.openList.forEach(btn => btn.addEventListener('click', () => { openListModal(); closemobileMenu(); }));
     if (DOM.admin.closeListModal) DOM.admin.closeListModal.addEventListener('click', closeListModal);
     
@@ -457,12 +546,154 @@ async function initApp() {
 
     if (DOM.admin.fotoInput) {
         DOM.admin.fotoInput.addEventListener('input', (e) => {
-            const url = e.target.value.trim();
-            if (url) {
-                DOM.admin.fotoPreview.src = url;
-                DOM.admin.fotoPreviewContainer.classList.remove('hidden');
+            const val = e.target.value.trim();
+            const urls = val ? val.split(',') : [];
+            renderImagePreviews(DOM.admin.fotoPreviewContainer, urls);
+        });
+    }
+
+    if (DOM.admin.createFotoFile) {
+        DOM.admin.createFotoFile.addEventListener('change', async (e) => {
+            const files = Array.from(e.target.files);
+            if (files.length === 0) {
+                DOM.admin.createFotoFileInfo.textContent = 'Sin archivos seleccionados';
+                DOM.admin.createFotoFileInfo.className = 'text-xs text-gray-400';
+                DOM.admin.fotoInput.value = '';
+                renderImagePreviews(DOM.admin.fotoPreviewContainer, []);
+                return;
+            }
+            
+            DOM.admin.createFotoFileInfo.textContent = `Subiendo ${files.length} archivo(s)...`;
+            DOM.admin.createFotoFileInfo.className = 'text-xs text-amber-400 font-semibold animate-pulse';
+            
+            DOM.admin.fotoPreviewContainer.classList.remove('hidden');
+            DOM.admin.fotoPreviewContainer.innerHTML = `
+                <div class="col-span-4 flex flex-col items-center justify-center p-6 bg-dark-200/50 rounded-xl border border-white/5 w-full">
+                    <svg class="animate-spin h-8 w-8 text-navy-400 mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                    <span class="text-xs text-gray-400">Subiendo a Google Drive...</span>
+                </div>
+            `;
+            
+            const urls = [];
+            let uploadSuccess = true;
+            for (const file of files) {
+                try {
+                    const base64 = await readFileAsBase64(file);
+                    const uploadRes = await uploadImageToDrive(base64, file.name);
+                    if (uploadRes.status === 'success') {
+                        urls.push(uploadRes.url);
+                    } else {
+                        throw new Error(uploadRes.message || "Error de servidor");
+                    }
+                } catch (err) {
+                    uploadSuccess = false;
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error al subir imagen',
+                        text: `No se pudo subir "${file.name}". Detalle: ${err.message}`,
+                        background: '#151515', color: '#fff',
+                        confirmButtonColor: '#ef4444'
+                    });
+                    break;
+                }
+            }
+            
+            if (uploadSuccess && urls.length > 0) {
+                const fotoUrl = urls.join(',');
+                DOM.admin.fotoInput.value = fotoUrl;
+                DOM.admin.createFotoFileInfo.textContent = `${urls.length} archivo(s) subido(s) con éxito`;
+                DOM.admin.createFotoFileInfo.className = 'text-xs text-green-400 font-semibold';
+                renderImagePreviews(DOM.admin.fotoPreviewContainer, urls);
             } else {
+                DOM.admin.fotoInput.value = '';
+                DOM.admin.createFotoFileInfo.textContent = 'Error al subir';
+                DOM.admin.createFotoFileInfo.className = 'text-xs text-red-400 font-semibold';
                 DOM.admin.fotoPreviewContainer.classList.add('hidden');
+                DOM.admin.fotoPreviewContainer.innerHTML = '';
+            }
+        });
+    }
+
+    if (DOM.admin.updateFotoFile) {
+        DOM.admin.updateFotoFile.addEventListener('change', async (e) => {
+            const files = Array.from(e.target.files);
+            if (files.length === 0) {
+                DOM.admin.updateFotoFileInfo.textContent = 'Sin archivos';
+                DOM.admin.updateFotoFileInfo.className = 'text-[10px] text-gray-400';
+                DOM.admin.updateFotoUrl.value = '';
+                if (DOM.admin.invImg && currentJerseyToManage) {
+                    DOM.admin.invImg.src = getFirstImage(currentJerseyToManage.foto || currentJerseyToManage.imagen);
+                }
+                if (DOM.admin.updateFotoPreviewContainer && currentJerseyToManage) {
+                    const originalUrls = (currentJerseyToManage.foto || currentJerseyToManage.imagen) ? (currentJerseyToManage.foto || currentJerseyToManage.imagen).split(',') : [];
+                    renderImagePreviews(DOM.admin.updateFotoPreviewContainer, originalUrls);
+                }
+                return;
+            }
+            
+            if (DOM.admin.invImg) {
+                DOM.admin.invImg.classList.add('opacity-40');
+            }
+            if (DOM.admin.updateFotoPreviewContainer) {
+                DOM.admin.updateFotoPreviewContainer.classList.remove('hidden');
+                DOM.admin.updateFotoPreviewContainer.innerHTML = `
+                    <div class="col-span-4 flex items-center justify-center p-4 bg-dark-200/50 rounded-xl border border-white/5 w-full">
+                        <svg class="animate-spin h-5 w-5 text-navy-400 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                        <span class="text-xs text-gray-400">Subiendo a Google Drive...</span>
+                    </div>
+                `;
+            }
+            
+            const urls = [];
+            let uploadSuccess = true;
+            for (const file of files) {
+                try {
+                    const base64 = await readFileAsBase64(file);
+                    const uploadRes = await uploadImageToDrive(base64, file.name);
+                    if (uploadRes.status === 'success') {
+                        urls.push(uploadRes.url);
+                    } else {
+                        throw new Error(uploadRes.message || "Error al subir");
+                    }
+                } catch (err) {
+                    uploadSuccess = false;
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error al subir',
+                        text: `Error al subir "${file.name}": ${err.message}`,
+                        background: '#151515', color: '#fff',
+                        confirmButtonColor: '#ef4444'
+                    });
+                    break;
+                }
+            }
+            
+            if (DOM.admin.invImg) {
+                DOM.admin.invImg.classList.remove('opacity-40');
+            }
+            
+            if (uploadSuccess && urls.length > 0) {
+                const fotoUrl = urls.join(',');
+                DOM.admin.updateFotoUrl.value = fotoUrl;
+                DOM.admin.updateFotoFileInfo.textContent = `${urls.length} archivo(s) subido(s)`;
+                DOM.admin.updateFotoFileInfo.className = 'text-[10px] text-green-400 font-semibold';
+                if (DOM.admin.invImg) {
+                    DOM.admin.invImg.src = urls[0];
+                }
+                if (DOM.admin.updateFotoPreviewContainer) {
+                    renderImagePreviews(DOM.admin.updateFotoPreviewContainer, urls);
+                }
+            } else {
+                DOM.admin.updateFotoUrl.value = '';
+                DOM.admin.updateFotoFileInfo.textContent = 'Error al subir';
+                DOM.admin.updateFotoFileInfo.className = 'text-[10px] text-red-400 font-semibold';
+                if (DOM.admin.invImg && currentJerseyToManage) {
+                    DOM.admin.invImg.src = getFirstImage(currentJerseyToManage.foto || currentJerseyToManage.imagen);
+                }
+                if (DOM.admin.updateFotoPreviewContainer && currentJerseyToManage) {
+                    const originalUrls = (currentJerseyToManage.foto || currentJerseyToManage.imagen) ? (currentJerseyToManage.foto || currentJerseyToManage.imagen).split(',') : [];
+                    renderImagePreviews(DOM.admin.updateFotoPreviewContainer, originalUrls);
+                }
             }
         });
     }
@@ -571,7 +802,7 @@ function closeModal() {
 
 async function loadCatalogs() {
     let configs = null;
-    const CACHE_KEY = 'jerseys_configs_v11';
+    const CACHE_KEY = 'jerseys_configs_v16';
     const CACHE_TTL = 60 * 60 * 1000; // 1 hora en milisegundos
     
     // 1. Intentar cargar y parsear del localStorage de manera segura considerando la expiración (TTL)
@@ -604,10 +835,13 @@ async function loadCatalogs() {
         const personalizaciones = candidate.personalizaciones || candidate.personalizacion || [];
         const reglas_mayoreo_super = candidate.reglas_mayoreo_super || null;
         const estatus_ordenes = candidate.estatus_ordenes || candidate.estatus_Ordenes || candidate.estatus || null;
+        const tallas_hombre = candidate.tallas_hombre || [];
+        const tallas_dama = candidate.tallas_dama || [];
+        const tallas_nino = candidate.tallas_nino || [];
         const reglas_envio = candidate.reglas_envio || [];
         
         if (Array.isArray(tipos) && Array.isArray(versiones) && Array.isArray(generos)) {
-            return { tipos, versiones, generos, perfiles, categorias, personalizaciones, reglas_mayoreo_super, estatus_ordenes, reglas_envio };
+            return { tipos, versiones, generos, perfiles, categorias, personalizaciones, reglas_mayoreo_super, estatus_ordenes, reglas_envio, tallas_hombre, tallas_dama, tallas_nino };
         }
         return null;
     };
@@ -699,6 +933,10 @@ function populateDropdown(selectEl, items, defaultText) {
 
 function populateSelects(data) {
     if (!data) return;
+    
+    configTallasHombre = data.tallas_hombre || [];
+    configTallasDama = data.tallas_dama || [];
+    configTallasNino = data.tallas_nino || [];
     
     const tipos = data.tipos || [];
     const versiones = data.versiones || [];
@@ -947,13 +1185,13 @@ function renderAdminTable() {
     if (!adminFilteredProducts || adminFilteredProducts.length === 0) {
         DOM.admin.listEmpty.classList.remove('hidden');
         DOM.admin.tableBody.closest('div.overflow-x-auto').classList.add('hidden');
-        DOM.admin.pageInfo.parentEleMenút.classList.add('hidden');
+        DOM.admin.pageInfo.parentElement.classList.add('hidden');
         return;
     }
     
     DOM.admin.listEmpty.classList.add('hidden');
     DOM.admin.tableBody.closest('div.overflow-x-auto').classList.remove('hidden');
-    DOM.admin.pageInfo.parentEleMenút.classList.remove('hidden');
+    DOM.admin.pageInfo.parentElement.classList.remove('hidden');
     
     const totalItems = adminFilteredProducts.length;
     const totalPages = Math.ceil(totalItems / adminItemsPerPage);
@@ -1051,12 +1289,16 @@ function openInventoryModal(producto) {
     
     renderInventorySizes(producto);
 
-    if (DOM.admin.updatePrecioMenudeo) DOM.admin.updatePrecioMenudeo.value = producto.precio_Menudeo || 0;
+    if (DOM.admin.updatePrecioMenudeo) DOM.admin.updatePrecioMenudeo.value = producto.precio_menudeo || 0;
     if (DOM.admin.updatePrecioMayoreo) DOM.admin.updatePrecioMayoreo.value = producto.precio_mayoreo || 0;
     if (DOM.admin.updatePrecioMayoreoSuper) DOM.admin.updatePrecioMayoreoSuper.value = producto.precio_mayoreo_super || 0;
     if (DOM.admin.updateFotoUrl) DOM.admin.updateFotoUrl.value = producto.foto || producto.imagen || '';
+    if (DOM.admin.updateFotoPreviewContainer) {
+        const initialUrls = (producto.foto || producto.imagen) ? (producto.foto || producto.imagen).split(',') : [];
+        renderImagePreviews(DOM.admin.updateFotoPreviewContainer, initialUrls);
+    }
     
-    DOM.admin.invmodal.classList.remove('hidden');
+    DOM.admin.invModal.classList.remove('hidden');
     if (document.getElementById('user-filter-id')) document.getElementById('user-filter-id').value = '';
     if (document.getElementById('user-filter-status')) document.getElementById('user-filter-status').value = '';
     void DOM.admin.invModal.offsetWidth;
@@ -1073,6 +1315,9 @@ function closeInventoryModal() {
         DOM.admin.invModal.classList.add('hidden');
         DOM.admin.formAddTalla.reset();
         if (DOM.admin.formUpdatePrecios) DOM.admin.formUpdatePrecios.reset();
+        if (DOM.admin.updateFotoFileInfo) {
+            DOM.admin.updateFotoFileInfo.textContent = 'Sin archivos';
+        }
         currentJerseyToManage = null;
     }, 300);
 }
@@ -1252,17 +1497,19 @@ async function handleUpdatePrecios(e) {
     const pMayoreo = parseFloat(DOM.admin.updatePrecioMayoreo.value) || 0;
     const pMayoreoSuper = parseFloat(DOM.admin.updatePrecioMayoreoSuper.value) || 0;
     
+    const fotoUrl = DOM.admin.updateFotoUrl ? DOM.admin.updateFotoUrl.value.trim() : '';
+
     const payload = {
         action: "update",
         id: currentJerseyToManage.id,
         precio_Menudeo: pMenudeo,
         precio_mayoreo: pMayoreo,
         precio_mayoreo_super: pMayoreoSuper,
-        foto: DOM.admin.updateFotoUrl ? DOM.admin.updateFotoUrl.value.trim() : ''
+        foto: fotoUrl
     };
 
     btnSubmit.disabled = true;
-    btnSubmit.innerHTML = 'Actualizando...';
+    btnSubmit.innerHTML = `<svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Actualizando...`;
 
     try {
         const response = await fetch(API_URL, {
@@ -1282,6 +1529,13 @@ async function handleUpdatePrecios(e) {
                 timer: 2000,
                 showConfirmButton: false
             });
+            
+            if (DOM.admin.updateFotoFile) {
+                DOM.admin.updateFotoFile.value = '';
+            }
+            if (DOM.admin.updateFotoFileInfo) {
+                DOM.admin.updateFotoFileInfo.textContent = 'Sin archivos';
+            }
             
             // Refrescar data en segundo plano
             await fetchInitialProducts();
@@ -1327,24 +1581,47 @@ function closeCreateModal() {
         DOM.admin.createModal.classList.add('hidden');
         document.body.style.overflow = '';
         DOM.admin.formCreate.reset();
+        if (DOM.admin.createFotoFileInfo) {
+            DOM.admin.createFotoFileInfo.textContent = 'Sin archivos seleccionados';
+        }
         DOM.admin.fotoPreviewContainer.classList.add('hidden');
         DOM.admin.tallasContainer.innerHTML = '';
     }, 300);
 }
 
+function getTallasForSelectedGender() {
+    if (!DOM.admin.createSelects.genero) return [];
+    const gender = String(DOM.admin.createSelects.genero.value || '').trim().toLowerCase();
+    if (gender.includes('hombre')) return configTallasHombre;
+    if (gender.includes('mujer') || gender.includes('dama')) return configTallasDama;
+    if (gender.includes('niño') || gender.includes('nino') || gender.includes('unisex')) return configTallasNino;
+    return [];
+}
+
+function getTallasOptionsHtml() {
+    const tallas = getTallasForSelectedGender();
+    if (tallas.length === 0) {
+        return `<option value="" disabled selected>Elige género primero</option>`;
+    }
+    return tallas.map(t => `<option value="${t}">${t}</option>`).join('');
+}
+
 function addTallaField() {
     const id = Date.now();
+    const optionsHtml = getTallasOptionsHtml();
     const html = `
         <div class="flex gap-3 items-end bg-dark-200/30 p-3 rounded-xl border border-white/5 talla-item" id="talla-${id}">
             <div class="flex-1">
                 <label class="block text-[10px] font-semibold text-gray-400 mb-1 uppercase tracking-wider">Talla</label>
-                <input type="text" required placeholder="Ej. S, M, L..." class="talla-val w-full bg-dark-200/50 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-navy-400 focus:ring-1 focus:ring-navy-400 text-white">
+                <select required class="talla-val w-full bg-dark-200/50 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-navy-400 focus:ring-1 focus:ring-navy-400 text-white cursor-pointer pr-8">
+                    ${optionsHtml}
+                </select>
             </div>
             <div class="flex-1">
                 <label class="block text-[10px] font-semibold text-gray-400 mb-1 uppercase tracking-wider">Stock</label>
                 <input type="number" required min="0" placeholder="0" class="stock-val w-full bg-dark-200/50 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-navy-400 focus:ring-1 focus:ring-navy-400 text-white">
             </div>
-            <button type="button" onclick="document.getElementById('talla-${id}').remove()" class="bg-red-500/10 text-red-500 hover:bg-red-500/20 p-2 rounded-lg transition-colors h-[38px] flex items-center justify-center" title="¿¿¿Eliminar talla">
+            <button type="button" onclick="document.getElementById('talla-${id}').remove()" class="bg-red-500/10 text-red-500 hover:bg-red-500/20 p-2 rounded-lg transition-colors h-[38px] flex items-center justify-center" title="Eliminar talla">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
             </button>
         </div>
@@ -1358,11 +1635,11 @@ async function handleCreateProduct(e) {
     const originalText = btnSubmit.innerHTML;
     
     // Obtener tallas
-    const tallasEleMenúts = DOM.admin.tallasContainer.querySelectorAll('.talla-item');
+    const tallasElements = DOM.admin.tallasContainer.querySelectorAll('.talla-item');
     const tallas = [];
     const generoSeleccionado = DOM.admin.createSelects.genero.value;
 
-    tallasEleMenúts.forEach(el => {
+    tallasElements.forEach(el => {
         tallas.push({
             talla: el.querySelector('.talla-val').value.trim(),
             categoria: generoSeleccionado,
@@ -1374,7 +1651,21 @@ async function handleCreateProduct(e) {
         Swal.fire({
             icon: 'warning',
             title: 'Datos incompletos',
-            text: 'Debes agregar al Menúos una talla al inventario.',
+            text: 'Debes agregar al menos una talla al inventario.',
+            background: '#151515',
+            color: '#ffffff',
+            confirmButtonColor: '#3b82f6',
+            customClass: { popup: 'border border-white/10 rounded-2xl' }
+        });
+        return;
+    }
+
+    const fotoUrl = DOM.admin.fotoInput.value.trim();
+    if (!fotoUrl) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Imagen requerida',
+            text: 'Debes seleccionar al menos una imagen para el jersey.',
             background: '#151515',
             color: '#ffffff',
             confirmButtonColor: '#3b82f6',
@@ -1390,7 +1681,7 @@ async function handleCreateProduct(e) {
         version: DOM.admin.createSelects.version.value,
         genero: DOM.admin.createSelects.genero.value,
         personalizacion: document.getElementById('create-personalizacion').value,
-        foto: DOM.admin.fotoInput.value.trim(),
+        foto: fotoUrl,
         precio_Menudeo: parseFloat(DOM.admin.precioMenudeo.value) || 0,
         precio_mayoreo: parseFloat(DOM.admin.precioMayoreo.value) || 0,
         precio_mayoreo_super: parseFloat(DOM.admin.precioMayoreoSuper.value) || 0,
@@ -1411,18 +1702,37 @@ async function handleCreateProduct(e) {
         const data = await response.json();
         
         if (data.status === 'success') {
-            Swal.fire({
+            const result = await Swal.fire({
                 icon: 'success',
                 title: '¡Playera Creada!',
-                html: `<span class="text-gray-300">${data.message}</span><br><br><span class="text-xs bg-navy-500/20 text-navy-400 px-3 py-1 rounded-lg border border-navy-500/30 font-mono tracking-wider">ID: ${data.id}</span>`,
+                html: `<span class="text-gray-300">${data.message || 'La playera se ha agregado correctamente al catálogo.'}</span><br><br><span class="text-xs bg-navy-500/20 text-navy-400 px-3 py-1 rounded-lg border border-navy-500/30 font-mono tracking-wider">ID: ${data.id}</span>`,
                 background: '#151515',
                 color: '#ffffff',
+                showCancelButton: true,
                 confirmButtonColor: '#1d4ed8',
                 confirmButtonText: 'Excelente',
+                cancelButtonColor: '#334155',
+                cancelButtonText: 'Agregar otra playera',
                 customClass: { popup: 'border border-white/10 rounded-2xl shadow-2xl shadow-navy-500/20' }
             });
-            closeCreateModal();
+            
+            if (DOM.admin.createFotoFile) {
+                DOM.admin.createFotoFile.value = '';
+            }
+            if (DOM.admin.createFotoFileInfo) {
+                DOM.admin.createFotoFileInfo.textContent = 'Sin archivos seleccionados';
+            }
+            
             fetchInitialProducts(); // Recargar productos para incluir el nuevo
+            
+            if (result.isConfirmed) {
+                closeCreateModal();
+            } else {
+                DOM.admin.formCreate.reset();
+                DOM.admin.fotoPreviewContainer.classList.add('hidden');
+                DOM.admin.tallasContainer.innerHTML = '';
+                addTallaField();
+            }
         } else {
             Swal.fire({
                 icon: 'error',
@@ -1929,8 +2239,8 @@ function renderClientSkeletons(count = 5) {
     DOM.admin.clientTableBody.innerHTML = '';
     DOM.admin.clientListEmpty.classList.add('hidden');
     DOM.admin.clientTableBody.closest('div.overflow-x-auto').classList.remove('hidden');
-    if (DOM.admin.clientPageInfo && DOM.admin.clientPageInfo.parentEleMenút) {
-        DOM.admin.clientPageInfo.parentEleMenút.classList.add('hidden');
+    if (DOM.admin.clientPageInfo && DOM.admin.clientPageInfo.parentElement) {
+        DOM.admin.clientPageInfo.parentElement.classList.add('hidden');
     }
     
     for (let i = 0; i < count; i++) {
@@ -1969,13 +2279,13 @@ function renderClientsTable() {
     if (!clientsFiltered || clientsFiltered.length === 0) {
         DOM.admin.clientListEmpty.classList.remove('hidden');
         DOM.admin.clientTableBody.closest('div.overflow-x-auto').classList.add('hidden');
-        DOM.admin.clientPageInfo.parentEleMenút.classList.add('hidden');
+        DOM.admin.clientPageInfo.parentElement.classList.add('hidden');
         return;
     }
     
     DOM.admin.clientListEmpty.classList.add('hidden');
     DOM.admin.clientTableBody.closest('div.overflow-x-auto').classList.remove('hidden');
-    DOM.admin.clientPageInfo.parentEleMenút.classList.remove('hidden');
+    DOM.admin.clientPageInfo.parentElement.classList.remove('hidden');
     
     const totalItems = clientsFiltered.length;
     const totalPages = Math.ceil(totalItems / clientsPerPage);
@@ -3220,7 +3530,7 @@ window.openOrderDetailsModal = function(id_orden) {
     document.getElementById('admin-order-details-container').innerHTML = articulosHtml;
     
     const phoneElement = document.getElementById('admin-order-details-phone');
-    const phoneTextEleMenút = document.getElementById('admin-order-details-phone-text');
+    const phoneTextElement = document.getElementById('admin-order-details-phone-text');
     
     // El telefono viene directamente en la orden como telefono_cliente
     let rawPhone = orden.telefono_cliente;
@@ -3234,13 +3544,13 @@ window.openOrderDetailsModal = function(id_orden) {
     let finalPhone = rawPhone ? String(rawPhone).replace(/\D/g, '') : null;
     
     if (finalPhone) {
-        phoneTextEleMenút.textContent = finalPhone;
+        phoneTextElement.textContent = finalPhone;
         if (phoneElement) {
             phoneElement.classList.remove('hidden');
             phoneElement.classList.remove('opacity-50');
         }
     } else {
-        phoneTextEleMenút.textContent = 'Sin teléfono registrado';
+        phoneTextElement.textContent = 'Sin teléfono registrado';
         if (phoneElement) {
             phoneElement.classList.remove('hidden');
             phoneElement.classList.add('opacity-50');
