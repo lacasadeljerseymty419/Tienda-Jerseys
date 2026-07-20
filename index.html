@@ -581,7 +581,9 @@
                     <form id="form-add-talla" class="flex gap-3 items-end bg-dark-200/30 p-4 rounded-xl border border-white/5">
                         <div class="flex-1">
                             <label class="block text-[10px] font-semibold text-gray-400 mb-1 uppercase tracking-wider">Talla</label>
-                            <input type="text" id="new-talla-val" required placeholder="Ej. XL" class="w-full bg-dark-200/50 border border-white/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-navy-400 focus:ring-1 focus:ring-navy-400 text-white">
+                            <select id="new-talla-val" required class="w-full bg-dark-200/50 border border-white/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-navy-400 focus:ring-1 focus:ring-navy-400 text-white cursor-pointer pr-8">
+                                <option value="" disabled selected>Elige talla...</option>
+                            </select>
                         </div>
                         <div class="flex-1">
                             <label class="block text-[10px] font-semibold text-gray-400 mb-1 uppercase tracking-wider">Stock Inicial</label>

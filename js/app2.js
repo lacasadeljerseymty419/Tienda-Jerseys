@@ -1,4 +1,4 @@
-const API_URL = "https://script.google.com/macros/s/AKfycbxjIvqdY1z7ef11VMwWKwAposAjv9yitogvmWPrcW-bJjG8tnGS2PSjJs7A5kPObDYpDg/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbzhFTUWw0-u9g1tbPowVjfHssIu5WLmBNJQyu6oBh329PsletwnEdIZjhiSC3iqHC36QA/exec";
 
 function getFirstImage(fotoField) {
     if (!fotoField) return '';
@@ -236,6 +236,7 @@ const DOM = {
         fotoPreviewContainer: document.getElementById('preview-foto-container'),
         newTallaVal: document.getElementById('new-talla-val'),
         newStockVal: document.getElementById('new-stock-val'),
+        formAddTalla: document.getElementById('form-add-talla'),
         precioMenudeo: document.getElementById('create-precio-menudeo'),
         precioMayoreo: document.getElementById('create-precio-mayoreo'),
         precioMayoreoSuper: document.getElementById('create-precio-mayoreo-super'),
@@ -942,7 +943,7 @@ function populateSelects(data) {
     const versiones = data.versiones || [];
     const generos = data.generos || [];
     const perfiles = (data.perfiles && data.perfiles.length > 0) ? data.perfiles : ["Menudeo", "Mayoreo", "Administrador"];
-    const estatusList = data.estatus_ordenes || ['Pendiente', 'Enviado', 'Entregado', 'Cancelado'];
+    const estatusList = data.estatus_ordenes || ['Pendiente', 'Enviado', 'Entregado', 'Cancelada'];
     window.OrdenesEstatusList = estatusList;
     
     // Poblar select de personalización en modal de pedidos
@@ -1264,6 +1265,21 @@ function renderAdminTable() {
     });
 }
 
+function updateNewTallaSelect(producto) {
+    if (DOM.admin.newTallaVal) {
+        const tallas = getTallasForGender(producto.genero);
+        const existentes = (producto.tallas || []).map(t => String(t.talla).trim().toUpperCase());
+        const disponibles = tallas.filter(t => !existentes.includes(t.trim().toUpperCase()));
+        
+        if (disponibles.length === 0) {
+            DOM.admin.newTallaVal.innerHTML = '<option value="" disabled selected>Sin tallas disponibles</option>';
+        } else {
+            DOM.admin.newTallaVal.innerHTML = '<option value="" disabled selected>Elige talla...</option>' + 
+                disponibles.map(t => `<option value="${t}">${t}</option>`).join('');
+        }
+    }
+}
+
 function openInventoryModal(producto) {
     currentJerseyToManage = producto;
     DOM.admin.invTitle.textContent = producto.nombre;
@@ -1297,6 +1313,8 @@ function openInventoryModal(producto) {
         const initialUrls = (producto.foto || producto.imagen) ? (producto.foto || producto.imagen).split(',') : [];
         renderImagePreviews(DOM.admin.updateFotoPreviewContainer, initialUrls);
     }
+
+    updateNewTallaSelect(producto);
     
     DOM.admin.invModal.classList.remove('hidden');
     if (document.getElementById('user-filter-id')) document.getElementById('user-filter-id').value = '';
@@ -1421,6 +1439,21 @@ async function handleAddNewTalla(e) {
     
     const tallaVal = DOM.admin.newTallaVal.value.trim();
     const stockVal = parseInt(DOM.admin.newStockVal.value) || 0;
+
+    // Validar duplicados (máximo de 2 veces la misma talla)
+    const existingCount = (currentJerseyToManage.tallas || []).filter(t => t.talla.trim().toUpperCase() === tallaVal.toUpperCase()).length;
+    if (existingCount >= 2) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Talla repetida',
+            text: `No puedes agregar la misma talla más de 2 veces en este jersey (Talla: ${tallaVal}).`,
+            background: '#151515',
+            color: '#ffffff',
+            confirmButtonColor: '#ef4444',
+            customClass: { popup: 'border border-white/10 rounded-2xl' }
+        });
+        return;
+    }
     
     const payload = {
         action: "create",
@@ -1432,7 +1465,8 @@ async function handleAddNewTalla(e) {
         genero: currentJerseyToManage.genero,
         personalizacion: currentJerseyToManage.personalizacion,
         foto: currentJerseyToManage.foto || currentJerseyToManage.imagen,
-        precio_Menudeo: parseFloat(currentJerseyToManage.precio_Menudeo) || 0,
+        precio_Menudeo: parseFloat(currentJerseyToManage.precio_Menudeo || currentJerseyToManage.precio_menudeo) || 0,
+        precio_menudeo: parseFloat(currentJerseyToManage.precio_Menudeo || currentJerseyToManage.precio_menudeo) || 0,
         precio_mayoreo: parseFloat(currentJerseyToManage.precio_mayoreo) || 0,
         precio_mayoreo_super: parseFloat(currentJerseyToManage.precio_mayoreo_super) || 0,
         tallas: [
@@ -1474,6 +1508,7 @@ async function handleAddNewTalla(e) {
             if (updatedProduct) {
                 currentJerseyToManage = updatedProduct;
                 renderInventorySizes(updatedProduct);
+                updateNewTallaSelect(updatedProduct);
             }
         } else {
             throw new Error(data.message || 'Error desconocido');
@@ -1589,13 +1624,17 @@ function closeCreateModal() {
     }, 300);
 }
 
+function getTallasForGender(gender) {
+    const gen = String(gender || '').trim().toLowerCase();
+    if (gen.includes('hombre')) return configTallasHombre;
+    if (gen.includes('mujer') || gen.includes('dama')) return configTallasDama;
+    if (gen.includes('niño') || gen.includes('nino') || gen.includes('unisex')) return configTallasNino;
+    return [];
+}
+
 function getTallasForSelectedGender() {
     if (!DOM.admin.createSelects.genero) return [];
-    const gender = String(DOM.admin.createSelects.genero.value || '').trim().toLowerCase();
-    if (gender.includes('hombre')) return configTallasHombre;
-    if (gender.includes('mujer') || gender.includes('dama')) return configTallasDama;
-    if (gender.includes('niño') || gender.includes('nino') || gender.includes('unisex')) return configTallasNino;
-    return [];
+    return getTallasForGender(DOM.admin.createSelects.genero.value);
 }
 
 function getTallasOptionsHtml() {
@@ -1646,6 +1685,30 @@ async function handleCreateProduct(e) {
             stock: parseInt(el.querySelector('.stock-val').value) || 0
         });
     });
+
+    // Validar duplicados (máximo de 2 veces la misma talla)
+    const counts = {};
+    let duplicateTalla = null;
+    for (const t of tallas) {
+        counts[t.talla] = (counts[t.talla] || 0) + 1;
+        if (counts[t.talla] > 2) {
+            duplicateTalla = t.talla;
+            break;
+        }
+    }
+
+    if (duplicateTalla) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Talla repetida',
+            text: `No puedes agregar la misma talla más de 2 veces en el jersey (Talla: ${duplicateTalla}).`,
+            background: '#151515',
+            color: '#ffffff',
+            confirmButtonColor: '#ef4444',
+            customClass: { popup: 'border border-white/10 rounded-2xl' }
+        });
+        return;
+    }
 
     if (tallas.length === 0) {
         Swal.fire({
@@ -3470,7 +3533,7 @@ function renderOrdenes() {
             case 'Cancelada': estatusColorClass = 'bg-red-500/20 text-red-400 border border-red-500/20'; break;
         }
         
-        const estatusOptionsHtml = (window.OrdenesEstatusList || ['Pendiente', 'Enviado', 'Entregado', 'Cancelado'])
+        const estatusOptionsHtml = (window.OrdenesEstatusList || ['Pendiente', 'Enviado', 'Entregado', 'Cancelada'])
             .map(e => `<option value="${e}">${e}</option>`)
             .join('');
             
@@ -3503,6 +3566,35 @@ function renderOrdenes() {
 window.openOrderDetailsModal = function(id_orden) {
     const orden = currentOrdenes.find(o => o.id_orden === id_orden);
     if (!orden) return;
+
+    // Auto-cancelar si no tiene artículos en el detalle
+    if ((!orden.articulos_carrito || orden.articulos_carrito.length === 0) && orden.estatus !== 'Cancelada') {
+        Swal.fire({
+            title: 'Pedido sin detalles',
+            text: 'Este pedido no contiene artículos registrados. Se marcará automáticamente como Cancelada.',
+            icon: 'info',
+            background: '#151515',
+            color: '#fff',
+            confirmButtonColor: '#1d4ed8',
+            customClass: { popup: 'border border-white/10 rounded-2xl' }
+        });
+        
+        fetch(API_URL, {
+            method: 'POST',
+            body: JSON.stringify({
+                action: 'update_order_status',
+                id_orden: id_orden,
+                nuevo_estatus: 'Cancelada',
+                guia: ''
+            })
+        }).then(res => res.json()).then(data => {
+            if (data.status === 'success') {
+                fetchOrdenes().then(() => {
+                    openOrderDetailsModal(id_orden);
+                });
+            }
+        }).catch(err => console.error('Error al auto-cancelar pedido sin detalles:', err));
+    }
     
     let articulosHtml = '';
     if (orden.articulos_carrito && orden.articulos_carrito.length > 0) {
@@ -3610,7 +3702,7 @@ window.openOrderDetailsModal = function(id_orden) {
     // Set status options
     const statusSelect = document.getElementById('admin-order-details-status');
     if (statusSelect) {
-        const estatusOptionsHtml = (window.OrdenesEstatusList || ['Pendiente', 'Enviado', 'Entregado', 'Cancelado'])
+        const estatusOptionsHtml = (window.OrdenesEstatusList || ['Pendiente', 'Enviado', 'Entregado', 'Cancelada'])
             .map(e => `<option value="${e}">${e}</option>`)
             .join('');
         statusSelect.innerHTML = `<option value="">Cambiar Estatus...</option>${estatusOptionsHtml}`;
@@ -3640,14 +3732,19 @@ window.openOrderDetailsModal = function(id_orden) {
 }
 
 window.deleteOrderItem = async function(id_orden, id_detalle) {
+    const orden = currentOrdenes.find(o => o.id_orden === id_orden) || allFetchedOrdenes.find(o => o.id_orden === id_orden);
+    const isLastItem = orden && orden.articulos_carrito && orden.articulos_carrito.length === 1;
+
     const result = await Swal.fire({
-        title: '¿Eliminar artículo?',
-        text: `¿Estás seguro de que deseas eliminar este artículo de la orden? Esta acción no se puede deshacer.`,
+        title: isLastItem ? '¿Cancelar orden?' : '¿Eliminar artículo?',
+        text: isLastItem 
+            ? `Este es el último artículo del pedido. Al eliminarlo, el pedido se marcará como Cancelada pero se conservará en el historial. ¿Deseas continuar?` 
+            : `¿Estás seguro de que deseas eliminar este artículo de la orden? Esta acción no se puede deshacer.`,
         icon: 'warning',
         showCancelButton: true,
         confirmButtonColor: '#ef4444',
         cancelButtonColor: '#3f3f46',
-        confirmButtonText: 'Sí, eliminar',
+        confirmButtonText: isLastItem ? 'Sí, cancelar orden' : 'Sí, eliminar',
         cancelButtonText: 'Cancelar',
         background: '#151515', color: '#fff'
     });
@@ -3660,7 +3757,7 @@ window.deleteOrderItem = async function(id_orden, id_detalle) {
     };
     
     try {
-        Swal.fire({ title: 'Eliminando...', allowOutsideClick: false, background: '#151515', color: '#fff', didOpen: () => { Swal.showLoading(); }});
+        Swal.fire({ title: 'Actualizando...', allowOutsideClick: false, background: '#151515', color: '#fff', didOpen: () => { Swal.showLoading(); }});
         
         const response = await fetch(API_URL, {
             method: 'POST',
@@ -3669,7 +3766,7 @@ window.deleteOrderItem = async function(id_orden, id_detalle) {
         const data = await response.json();
         
         if (data.status === 'success') {
-            Swal.fire({ icon: 'success', title: '¡Eliminado!', text: data.message || 'Artículo removido del pedido con éxito.', background: '#151515', color: '#fff', timer: 2000, showConfirmButton: false });
+            Swal.fire({ icon: 'success', title: isLastItem ? '¡Orden Cancelada!' : '¡Eliminado!', text: data.message || (isLastItem ? 'La orden ha sido marcada como Cancelada.' : 'Artículo removido del pedido con éxito.'), background: '#151515', color: '#fff', timer: 2000, showConfirmButton: false });
             
             // Re-fetch orders to get the updated totals and items
             await fetchOrdenes();
@@ -3679,14 +3776,14 @@ window.deleteOrderItem = async function(id_orden, id_detalle) {
             if (updatedOrden && updatedOrden.articulos_carrito && updatedOrden.articulos_carrito.length > 0) {
                 openOrderDetailsModal(id_orden);
             } else {
-                // All items were deleted, close modal
+                // All items were deleted (or soft-deleted), close modal
                 document.getElementById('close-order-details-modal')?.click();
             }
         } else {
             Swal.fire({ icon: 'error', title: 'Error', text: data.message || 'No se pudo eliminar el artículo.', background: '#151515', color: '#fff' });
         }
     } catch (error) {
-        console.error('Error eliminando artículo:', error);
+        console.error('Error al eliminar artículo:', error);
         Swal.fire({ icon: 'error', title: 'Error', text: error.message, background: '#151515', color: '#fff' });
     }
 };
