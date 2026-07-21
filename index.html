@@ -301,10 +301,16 @@
         </div>
     </template>
     
-    <!-- Modal de Imagen -->
-    <div id="image-modal" class="fixed inset-0 z-[60] flex items-center justify-center hidden bg-dark/95 backdrop-blur-md transition-opacity duration-300 opacity-0">
+    <div id="image-modal" class="fixed inset-0 z-[60] flex items-center justify-center hidden bg-dark/95 backdrop-blur-md transition-opacity duration-300 opacity-0 select-none">
         <button id="close-modal" class="absolute top-4 right-4 sm:top-6 sm:right-6 text-white/50 hover:text-white transition-colors p-2 bg-white/5 rounded-full hover:bg-white/10 z-50">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+        <!-- Botones de Navegación del Modal -->
+        <button id="modal-prev-btn" class="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 sm:w-12 sm:h-12 bg-white/5 hover:bg-white/10 border border-white/10 backdrop-blur-md rounded-full flex items-center justify-center text-white/70 hover:text-white transition-all z-50 hidden">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"></path></svg>
+        </button>
+        <button id="modal-next-btn" class="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 sm:w-12 sm:h-12 bg-white/5 hover:bg-white/10 border border-white/10 backdrop-blur-md rounded-full flex items-center justify-center text-white/70 hover:text-white transition-all z-50 hidden">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"></path></svg>
         </button>
         <div class="relative w-full max-w-4xl max-h-[90vh] p-4 flex items-center justify-center">
             <img id="modal-image" src="" alt="Vista previa del jersey" class="max-w-full max-h-[85vh] object-contain rounded-xl shadow-2xl shadow-navy-500/20 transform scale-95 transition-transform duration-300">

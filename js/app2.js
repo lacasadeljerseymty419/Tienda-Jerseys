@@ -517,6 +517,39 @@ async function initApp() {
         DOM.modal.overlay.addEventListener('click', (e) => {
             if (e.target === DOM.modal.overlay) closeModal();
         });
+        
+        const modalPrevBtn = document.getElementById('modal-prev-btn');
+        const modalNextBtn = document.getElementById('modal-next-btn');
+        if (modalPrevBtn) {
+            modalPrevBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (modalImages.length <= 1) return;
+                modalCurrentIndex = (modalCurrentIndex - 1 + modalImages.length) % modalImages.length;
+                DOM.modal.img.src = modalImages[modalCurrentIndex];
+            });
+        }
+        if (modalNextBtn) {
+            modalNextBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (modalImages.length <= 1) return;
+                modalCurrentIndex = (modalCurrentIndex + 1) % modalImages.length;
+                DOM.modal.img.src = modalImages[modalCurrentIndex];
+            });
+        }
+        
+        // Navegación por teclado
+        window.addEventListener('keydown', (e) => {
+            if (!DOM.modal.overlay || DOM.modal.overlay.classList.contains('hidden')) return;
+            if (e.key === 'ArrowLeft') {
+                if (modalImages.length <= 1) return;
+                modalCurrentIndex = (modalCurrentIndex - 1 + modalImages.length) % modalImages.length;
+                DOM.modal.img.src = modalImages[modalCurrentIndex];
+            } else if (e.key === 'ArrowRight') {
+                if (modalImages.length <= 1) return;
+                modalCurrentIndex = (modalCurrentIndex + 1) % modalImages.length;
+                DOM.modal.img.src = modalImages[modalCurrentIndex];
+            }
+        });
     }
     
     // Eventos de Admin
@@ -784,7 +817,10 @@ function toggleFiltros() {
     }
 }
 
-function openModal(imgUrl) {
+let modalImages = [];
+let modalCurrentIndex = 0;
+
+function openModal(imgUrl, imagesArray = [], currentIndex = 0) {
     if (!DOM.modal.overlay) return;
     DOM.modal.img.src = imgUrl;
     DOM.modal.overlay.classList.remove('hidden');
@@ -794,6 +830,21 @@ function openModal(imgUrl) {
         DOM.modal.img.classList.add('scale-100');
     });
     document.body.style.overflow = 'hidden';
+
+    modalImages = imagesArray;
+    modalCurrentIndex = currentIndex;
+
+    const prevBtn = document.getElementById('modal-prev-btn');
+    const nextBtn = document.getElementById('modal-next-btn');
+    if (prevBtn && nextBtn) {
+        if (modalImages.length > 1) {
+            prevBtn.classList.remove('hidden');
+            nextBtn.classList.remove('hidden');
+        } else {
+            prevBtn.classList.add('hidden');
+            nextBtn.classList.add('hidden');
+        }
+    }
 }
 
 function closeModal() {
@@ -805,6 +856,10 @@ function closeModal() {
         DOM.modal.overlay.classList.add('hidden');
         DOM.modal.img.src = '';
         document.body.style.overflow = '';
+        
+        // Limpiar variables del carrusel del modal
+        modalImages = [];
+        modalCurrentIndex = 0;
     }, 300);
 }
 
@@ -2187,7 +2242,7 @@ function createProductCard(producto) {
             if (e.target.closest('.carousel-prev-btn') || e.target.closest('.carousel-next-btn') || e.target.closest('.carousel-dot')) {
                 return;
             }
-            openModal(images[currentImgIdx]);
+            openModal(images[currentImgIdx], images, currentImgIdx);
         });
     }
     
