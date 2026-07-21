@@ -528,18 +528,45 @@
             </div>
             
             <div class="p-4 sm:p-6 space-y-6 overflow-y-visible sm:overflow-y-auto flex-grow custom-scrollbar">
-                <!-- Listado de Tallas Existentes -->
-                <div>
-                    <h3 class="text-sm font-semibold text-gray-300 mb-3 uppercase tracking-wider">Tallas Actuales</h3>
-                    <div id="inv-tallas-list" class="space-y-2">
-                        <!-- Tallas se inyectan aquí -->
-                    </div>
-                </div>
-
                 <!-- Formulario para Actualizar Detalles -->
-                <div class="pt-6 border-t border-white/5">
+                <div>
                     <h3 class="text-sm font-semibold text-gray-300 mb-3 uppercase tracking-wider">Actualizar Datos del Jersey</h3>
                     <form id="form-update-precios" class="space-y-4 bg-dark-200/30 p-4 rounded-xl border border-white/5">
+                        <!-- Datos básicos del Jersey -->
+                        <div>
+                            <label class="block text-[10px] font-semibold text-gray-400 mb-1 uppercase tracking-wider">Nombre del Jersey</label>
+                            <input type="text" id="update-nombre" required placeholder="Ej. Mexico Mundial 2026" class="w-full bg-dark-200/50 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-navy-400 text-white">
+                        </div>
+                        
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                            <div>
+                                <label class="block text-[10px] font-semibold text-gray-400 mb-1 uppercase tracking-wider">Tipo</label>
+                                <select id="update-tipo" required class="w-full bg-dark-200/50 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-navy-400 text-white cursor-pointer">
+                                    <option value="" disabled selected>Elige tipo...</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-semibold text-gray-400 mb-1 uppercase tracking-wider">Versión</label>
+                                <select id="update-version" required class="w-full bg-dark-200/50 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-navy-400 text-white cursor-pointer">
+                                    <option value="" disabled selected>Elige versión...</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-semibold text-gray-400 mb-1 uppercase tracking-wider">Género</label>
+                                <select id="update-genero" required class="w-full bg-dark-200/50 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-navy-400 text-white cursor-pointer">
+                                    <option value="" disabled selected>Elige género...</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-semibold text-gray-400 mb-1 uppercase tracking-wider">Personalización</label>
+                                <select id="update-personalizacion" required class="w-full bg-dark-200/50 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-navy-400 text-white cursor-pointer">
+                                    <option value="No">No</option>
+                                    <option value="Sí">Sí</option>
+                                    <option value="Opcional">Opcional</option>
+                                </select>
+                            </div>
+                        </div>
+
                         <div>
                             <label class="block text-[10px] font-semibold text-gray-400 mb-1 uppercase tracking-wider">Fotografía del Jersey</label>
                             <input type="hidden" id="update-foto-url">
@@ -594,6 +621,14 @@
                             Añadir
                         </button>
                     </form>
+                </div>
+
+                <!-- Listado de Tallas Existentes -->
+                <div class="pt-6 border-t border-white/5">
+                    <h3 class="text-sm font-semibold text-gray-300 mb-3 uppercase tracking-wider">Tallas Actuales</h3>
+                    <div id="inv-tallas-list" class="space-y-2">
+                        <!-- Tallas se inyectan aquí -->
+                    </div>
                 </div>
             </div>
         </div>

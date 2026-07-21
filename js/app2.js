@@ -1,4 +1,4 @@
-const API_URL = "https://script.google.com/macros/s/AKfycbzhFTUWw0-u9g1tbPowVjfHssIu5WLmBNJQyu6oBh329PsletwnEdIZjhiSC3iqHC36QA/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbz6QWcTWqXFOVqVr7iLoa8hXkWMjOPGsgkuL3U0agp1UBf85-G-v4QXQZR6xgSmJMp76g/exec";
 
 function getFirstImage(fotoField) {
     if (!fotoField) return '';
@@ -241,6 +241,13 @@ const DOM = {
         precioMayoreo: document.getElementById('create-precio-mayoreo'),
         precioMayoreoSuper: document.getElementById('create-precio-mayoreo-super'),
         formUpdatePrecios: document.getElementById('form-update-precios'),
+        updateNombre: document.getElementById('update-nombre'),
+        updateSelects: {
+            tipo: document.getElementById('update-tipo'),
+            version: document.getElementById('update-version'),
+            genero: document.getElementById('update-genero'),
+            personalizacion: document.getElementById('update-personalizacion')
+        },
         updateFotoUrl: document.getElementById('update-foto-url'),
         updateFotoFile: document.getElementById('update-foto-file'),
         updateFotoFileInfo: document.getElementById('update-foto-file-info'),
@@ -959,6 +966,11 @@ function populateSelects(data) {
     if(DOM.admin.createSelects.version) populateDropdown(DOM.admin.createSelects.version, versiones, "Selecciona versión");
     if(DOM.admin.createSelects.genero) populateDropdown(DOM.admin.createSelects.genero, generos, "Selecciona género");
     
+    // Selects del Modal de Edición (Actualización)
+    if(DOM.admin.updateSelects && DOM.admin.updateSelects.tipo) populateDropdown(DOM.admin.updateSelects.tipo, tipos, "Selecciona tipo");
+    if(DOM.admin.updateSelects && DOM.admin.updateSelects.version) populateDropdown(DOM.admin.updateSelects.version, versiones, "Selecciona versión");
+    if(DOM.admin.updateSelects && DOM.admin.updateSelects.genero) populateDropdown(DOM.admin.updateSelects.genero, generos, "Selecciona género");
+    
     // Selects de los filtros de Administración
     if(DOM.admin.filterTipo) populateDropdown(DOM.admin.filterTipo, tipos, "Tipo (Todos)");
     if(DOM.admin.filterVersion) populateDropdown(DOM.admin.filterVersion, versiones, "Versión (Todas)");
@@ -1305,6 +1317,14 @@ function openInventoryModal(producto) {
     
     renderInventorySizes(producto);
 
+    if (DOM.admin.updateNombre) DOM.admin.updateNombre.value = producto.nombre || '';
+    if (DOM.admin.updateSelects) {
+        if (DOM.admin.updateSelects.tipo) DOM.admin.updateSelects.tipo.value = producto.tipo || '';
+        if (DOM.admin.updateSelects.version) DOM.admin.updateSelects.version.value = producto.version || '';
+        if (DOM.admin.updateSelects.genero) DOM.admin.updateSelects.genero.value = producto.genero || '';
+        if (DOM.admin.updateSelects.personalizacion) DOM.admin.updateSelects.personalizacion.value = producto.personalizacion || 'No';
+    }
+
     if (DOM.admin.updatePrecioMenudeo) DOM.admin.updatePrecioMenudeo.value = producto.precio_menudeo || 0;
     if (DOM.admin.updatePrecioMayoreo) DOM.admin.updatePrecioMayoreo.value = producto.precio_mayoreo || 0;
     if (DOM.admin.updatePrecioMayoreoSuper) DOM.admin.updatePrecioMayoreoSuper.value = producto.precio_mayoreo_super || 0;
@@ -1532,11 +1552,22 @@ async function handleUpdatePrecios(e) {
     const pMayoreo = parseFloat(DOM.admin.updatePrecioMayoreo.value) || 0;
     const pMayoreoSuper = parseFloat(DOM.admin.updatePrecioMayoreoSuper.value) || 0;
     
+    const nombreVal = DOM.admin.updateNombre ? DOM.admin.updateNombre.value.trim() : '';
+    const tipoVal = DOM.admin.updateSelects && DOM.admin.updateSelects.tipo ? DOM.admin.updateSelects.tipo.value : '';
+    const versionVal = DOM.admin.updateSelects && DOM.admin.updateSelects.version ? DOM.admin.updateSelects.version.value : '';
+    const generoVal = DOM.admin.updateSelects && DOM.admin.updateSelects.genero ? DOM.admin.updateSelects.genero.value : '';
+    const personalizacionVal = DOM.admin.updateSelects && DOM.admin.updateSelects.personalizacion ? DOM.admin.updateSelects.personalizacion.value : '';
+    
     const fotoUrl = DOM.admin.updateFotoUrl ? DOM.admin.updateFotoUrl.value.trim() : '';
 
     const payload = {
         action: "update",
         id: currentJerseyToManage.id,
+        nombre: nombreVal,
+        tipo: tipoVal,
+        version: versionVal,
+        genero: generoVal,
+        personalizacion: personalizacionVal,
         precio_Menudeo: pMenudeo,
         precio_mayoreo: pMayoreo,
         precio_mayoreo_super: pMayoreoSuper,
@@ -1579,6 +1610,24 @@ async function handleUpdatePrecios(e) {
             const updatedProduct = allProducts.find(p => p.id === currentJerseyToManage.id);
             if (updatedProduct) {
                 currentJerseyToManage = updatedProduct;
+                DOM.admin.invTitle.textContent = updatedProduct.nombre;
+                
+                // Inyectar etiquetas actualizadas
+                const tagsContainer = document.getElementById('inv-modal-tags');
+                if (tagsContainer) {
+                    let tagsHtml = '';
+                    if (updatedProduct.version) {
+                        tagsHtml += `<span class="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-white/5 text-gray-400 rounded-md border border-white/10 backdrop-blur-sm">${updatedProduct.version}</span>`;
+                    }
+                    if (updatedProduct.tipo) {
+                        tagsHtml += `<span class="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-white/5 text-gray-300 rounded-md border border-white/10 backdrop-blur-sm">${updatedProduct.tipo}</span>`;
+                    }
+                    if (updatedProduct.genero) {
+                        const colorGen = getGenderColorClass(updatedProduct.genero);
+                        tagsHtml += `<span class="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider ${colorGen} rounded-md border backdrop-blur-sm">${updatedProduct.genero}</span>`;
+                    }
+                    tagsContainer.innerHTML = tagsHtml;
+                }
             }
         } else {
             throw new Error(data.message || 'Error al actualizar precios');
