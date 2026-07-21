@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registro de Cliente | Jerseys Premium</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        dark: {
+                            DEFAULT: '#0b0b0b', // Base muy profunda
+                            100: '#151515',     // Contraste para tarjetas
+                            200: '#222222',     // Bordes
+                        },
+                        navy: {
+                            400: '#3b82f6', // Azul brillante para textos/glows en fondo oscuro
+                            500: '#1d4ed8', // Azul marino profundo para fondos de botones
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background-color: #0b0b0b; color: #ffffff; }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #0b0b0b; }
+        ::-webkit-scrollbar-thumb { background: #222222; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #3b82f6; }
+    </style>
+</head>
+<body class="font-sans antialiased min-h-screen flex flex-col justify-between selection:bg-navy-400/30 selection:text-navy-400">
+    
+    <!-- Header simple -->
+    <header class="bg-dark/80 backdrop-blur-xl border-b border-white/5 py-4 flex-shrink-0">
+        <div class="max-w-7xl mx-auto px-4 flex items-center gap-3">
+            <a href="index.html" class="flex items-center gap-1.5 sm:gap-3">
+                <div class="w-8 h-8 bg-navy-500 rounded-lg flex items-center justify-center text-white font-black text-base shadow-[0_0_15px_rgba(59,130,246,0.4)]">J</div>
+                <span class="text-sm sm:text-base font-bold tracking-[0.15em] uppercase text-white"><span class="text-navy-400 font-light">Jerseys</span></span>
+            </a>
+        </div>
+    </header>
+
+    <!-- Contenedor del Formulario -->
+    <main class="flex-grow flex items-center justify-center py-10 px-4 sm:px-6 lg:px-8">
+        <div class="bg-dark-100 border border-white/10 rounded-2xl w-full max-w-2xl shadow-2xl shadow-navy-500/10 flex flex-col relative">
+            <div class="p-6 border-b border-white/5 flex justify-between items-center bg-dark-100/90 backdrop-blur-md rounded-t-2xl z-10 flex-shrink-0">
+                <div>
+                    <h2 class="text-xl sm:text-2xl font-bold text-white leading-tight flex items-center gap-3">
+                        <span class="bg-navy-500/20 text-navy-400 p-2 rounded-lg">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path></svg>
+                        </span>
+                        Registrar Nuevo Cliente
+                    </h2>
+                    <p class="text-xs sm:text-sm text-gray-400 mt-1">Crea tu cuenta de acceso y dirección de envío.</p>
+                </div>
+            </div>
+            
+            <form id="form-registro" class="p-6 space-y-6">
+                <!-- Información de Acceso y Nombre -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label for="client-nombre" class="block text-[10px] sm:text-xs font-semibold text-gray-400 mb-1.5 uppercase tracking-wider">Nombre Completo</label>
+                        <input type="text" id="client-nombre" required placeholder="Ej. Juan Pérez" class="w-full bg-dark-200/50 border border-white/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-navy-400 text-white placeholder-gray-600 transition-colors">
+                    </div>
+                    <div>
+                        <label for="client-telefono" class="block text-[10px] sm:text-xs font-semibold text-gray-400 mb-1.5 uppercase tracking-wider">Teléfono</label>
+                        <input type="text" id="client-telefono" required placeholder="Ej. 5512345678" class="w-full bg-dark-200/50 border border-white/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-navy-400 text-white placeholder-gray-600 transition-colors">
+                    </div>
+                    <div>
+                        <label for="client-usuario" class="block text-[10px] sm:text-xs font-semibold text-gray-400 mb-1.5 uppercase tracking-wider">Usuario (Login)</label>
+                        <input type="text" id="client-usuario" required placeholder="Ej. juanperez" class="w-full bg-dark-200/50 border border-white/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-navy-400 text-white placeholder-gray-600 transition-colors">
+                    </div>
+                    <div>
+                        <label for="client-password" class="block text-[10px] sm:text-xs font-semibold text-gray-400 mb-1.5 uppercase tracking-wider">Contraseña</label>
+                        <div class="relative">
+                            <input type="password" id="client-password" required placeholder="••••••••" class="w-full bg-dark-200/50 border border-white/10 rounded-lg pl-3 pr-10 py-2.5 text-sm focus:outline-none focus:border-navy-400 text-white placeholder-gray-600 transition-colors">
+                            <button type="button" id="btn-toggle-pass" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors focus:outline-none" title="Mostrar/Ocultar Contraseña">
+                                <svg class="w-4 h-4 eye-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Dirección de Envío -->
+                <div class="pt-4 border-t border-white/5 space-y-4">
+                    <h3 class="text-xs sm:text-sm font-semibold text-gray-300 uppercase tracking-wider">Dirección de Envío</h3>
+                    
+                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                        <div class="col-span-2">
+                            <label for="client-calle" class="block text-[10px] sm:text-xs font-semibold text-gray-400 mb-1.5 uppercase tracking-wider">Calle</label>
+                            <input type="text" id="client-calle" required placeholder="Ej. Av. Reforma" class="w-full bg-dark-200/50 border border-white/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-navy-400 text-white placeholder-gray-600 transition-colors">
+                        </div>
+                        <div>
+                            <label for="client-numero" class="block text-[10px] sm:text-xs font-semibold text-gray-400 mb-1.5 uppercase tracking-wider">Número</label>
+                            <input type="text" id="client-numero" required placeholder="Ej. 123" class="w-full bg-dark-200/50 border border-white/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-navy-400 text-white placeholder-gray-600 transition-colors">
+                        </div>
+                        <div>
+                            <label for="client-colonia" class="block text-[10px] sm:text-xs font-semibold text-gray-400 mb-1.5 uppercase tracking-wider">Colonia</label>
+                            <input type="text" id="client-colonia" required placeholder="Ej. Centro" class="w-full bg-dark-200/50 border border-white/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-navy-400 text-white placeholder-gray-600 transition-colors">
+                        </div>
+                        <div>
+                            <label for="client-municipio" class="block text-[10px] sm:text-xs font-semibold text-gray-400 mb-1.5 uppercase tracking-wider">Municipio/Alcaldía</label>
+                            <input type="text" id="client-municipio" required placeholder="Ej. Cuauhtémoc" class="w-full bg-dark-200/50 border border-white/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-navy-400 text-white placeholder-gray-600 transition-colors">
+                        </div>
+                        <div>
+                            <label for="client-cp" class="block text-[10px] sm:text-xs font-semibold text-gray-400 mb-1.5 uppercase tracking-wider">Código Postal</label>
+                            <input type="text" id="client-cp" required placeholder="Ej. 06000" class="w-full bg-dark-200/50 border border-white/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-navy-400 text-white placeholder-gray-600 transition-colors">
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label for="client-referencias" class="block text-[10px] sm:text-xs font-semibold text-gray-400 mb-1.5 uppercase tracking-wider">Referencias del Domicilio</label>
+                        <textarea id="client-referencias" required rows="2" placeholder="Ej. Entre calle A y B, portón color verde..." class="w-full bg-dark-200/50 border border-white/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-navy-400 text-white resize-none placeholder-gray-600 transition-colors"></textarea>
+                    </div>
+                </div>
+
+                <!-- Botones -->
+                <div class="pt-6 border-t border-white/5 flex justify-end gap-3">
+                    <a href="index.html" class="px-5 py-2.5 rounded-lg border border-white/10 text-white hover:bg-white/5 transition-all text-sm font-medium flex items-center justify-center">
+                        Cancelar
+                    </a>
+                    <button type="submit" id="btn-submit" class="px-6 py-2.5 rounded-lg bg-navy-500 hover:bg-navy-400 text-white font-bold transition-all duration-300 shadow-[0_0_20px_rgba(59,130,246,0.3)] hover:shadow-[0_0_30px_rgba(59,130,246,0.5)] text-sm flex items-center justify-center gap-2">
+                        Guardar Cliente
+                    </button>
+                </div>
+            </form>
+        </div>
+    </main>
+
+    <!-- Footer simple -->
+    <footer class="border-t border-white/5 bg-dark-100 py-6 flex-shrink-0">
+        <div class="max-w-7xl mx-auto text-center px-4">
+            <p class="text-gray-500 text-xs">&copy; 2026. Todos los derechos reservados.</p>
+        </div>
+    </footer>
+
+    <script>
+        const API_URL = "https://script.google.com/macros/s/AKfycby3s2ikpC4ULAD5j4IN5B1oHdsHQ-V4T9XCibnVbwTKjvFbcasps55NbROGMPYyJw-RVg/exec";
+
+        // Toggle visibilidad contraseña
+        const btnTogglePass = document.getElementById('btn-toggle-pass');
+        const passInput = document.getElementById('client-password');
+        if (btnTogglePass && passInput) {
+            btnTogglePass.addEventListener('click', () => {
+                const isPassword = passInput.type === 'password';
+                passInput.type = isPassword ? 'text' : 'password';
+                btnTogglePass.innerHTML = isPassword 
+                    ? `<svg class="w-4 h-4 eye-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.542-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.542 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"></path></svg>`
+                    : `<svg class="w-4 h-4 eye-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>`;
+            });
+        }
+
+        // Manejar el submit del formulario
+        const form = document.getElementById('form-registro');
+        const btnSubmit = document.getElementById('btn-submit');
+        
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const originalText = btnSubmit.innerHTML;
+            
+            const payload = {
+                action: "create_client",
+                nombre_completo: document.getElementById('client-nombre').value.trim(),
+                telefono: document.getElementById('client-telefono').value.trim(),
+                usuario: document.getElementById('client-usuario').value.trim(),
+                password: passInput.value,
+                perfil: "Mayoreo",
+                activo: 0,
+                calle: document.getElementById('client-calle').value.trim(),
+                numero: document.getElementById('client-numero').value.trim(),
+                colonia: document.getElementById('client-colonia').value.trim(),
+                municipio: document.getElementById('client-municipio').value.trim(),
+                cp: document.getElementById('client-cp').value.trim(),
+                referencias: document.getElementById('client-referencias').value.trim()
+            };
+
+            btnSubmit.disabled = true;
+            btnSubmit.innerHTML = `<svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Registrando...`;
+
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) throw new Error("Error de conexión al servidor.");
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    form.reset();
+                    await Swal.fire({
+                        icon: 'success',
+                        title: '¡Registro Exitoso!',
+                        html: '<span class="text-gray-300">Tu cuenta ha sido registrada con éxito. <br><b class="text-amber-400">Por favor, espera a que un administrador active tu cuenta para poder ingresar.</b></span>',
+                        background: '#151515',
+                        color: '#ffffff',
+                        confirmButtonColor: '#1d4ed8',
+                        confirmButtonText: 'Aceptar',
+                        customClass: { popup: 'border border-white/10 rounded-2xl shadow-2xl shadow-navy-500/20' }
+                    });
+                } else {
+                    throw new Error(data.message || 'Ocurrió un error al registrar.');
+                }
+            } catch (error) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error de Registro',
+                    text: error.message,
+                    background: '#151515',
+                    color: '#ffffff',
+                    confirmButtonColor: '#ef4444',
+                    customClass: { popup: 'border border-white/10 rounded-2xl' }
+                });
+            } finally {
+                btnSubmit.disabled = false;
+                btnSubmit.innerHTML = originalText;
+            }
+        });
+    </script>
+</body>
+</html>

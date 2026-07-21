@@ -1,4 +1,4 @@
-const API_URL = "https://script.google.com/macros/s/AKfycbz6QWcTWqXFOVqVr7iLoa8hXkWMjOPGsgkuL3U0agp1UBf85-G-v4QXQZR6xgSmJMp76g/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycby3s2ikpC4ULAD5j4IN5B1oHdsHQ-V4T9XCibnVbwTKjvFbcasps55NbROGMPYyJw-RVg/exec";
 
 function getFirstImage(fotoField) {
     if (!fotoField) return '';
@@ -409,7 +409,7 @@ async function initApp() {
         if (loggedUser.perfil === "Administrador") {
             if (DOM.admin.adminMenúuWrapper) DOM.admin.adminMenúuWrapper.classList.remove('hidden');
             if (DOM.mobileMenu.adminSection) DOM.mobileMenu.adminSection.classList.remove('hidden');
-            const savedSub = localStorage.getItem('current_subperfil') || 'Menudeo';
+            const savedSub = localStorage.getItem('current_subperfil') || 'Mayoreo';
             if (DOM.adminSubperfilSelect) {
                 DOM.adminSubperfilSelect.classList.remove('hidden');
                 DOM.adminSubperfilSelect.value = savedSub;
@@ -1087,6 +1087,18 @@ async function handleLoginSubmit(e) {
         const res = await login_client(usuario, password);
         
         if (res.status === 'success' && res.data) {
+            if (res.data.activo !== undefined && Number(res.data.activo) === 0) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Cuenta Inactiva',
+                    text: 'Tu cuenta de cliente está inactiva. Por favor, contacta al administrador para activarla.',
+                    background: '#151515', color: '#fff',
+                    confirmButtonColor: '#ef4444'
+                });
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+                return;
+            }
             localStorage.setItem('logged_user', JSON.stringify(res.data));
             localStorage.setItem('current_perfil', res.data.perfil || 'Menudeo');
             
@@ -1106,7 +1118,7 @@ async function handleLoginSubmit(e) {
             if (res.data.perfil === "Administrador") {
                 if (DOM.admin && DOM.admin.adminMenúuWrapper) DOM.admin.adminMenúuWrapper.classList.remove('hidden');
                 if (DOM.mobileMenu && DOM.mobileMenu.adminSection) DOM.mobileMenu.adminSection.classList.remove('hidden');
-                const savedSub = localStorage.getItem('current_subperfil') || 'Menudeo';
+                const savedSub = localStorage.getItem('current_subperfil') || 'Mayoreo';
                 if (DOM.adminSubperfilSelect) {
                     DOM.adminSubperfilSelect.classList.remove('hidden');
                     DOM.adminSubperfilSelect.value = savedSub;
@@ -2079,7 +2091,7 @@ function createProductCard(producto) {
     const activeProfile = localStorage.getItem('current_perfil') || 'Menudeo';
     let profileToUse = activeProfile;
     if (activeProfile === "Administrador") {
-        profileToUse = localStorage.getItem('current_subperfil') || 'Menudeo';
+        profileToUse = localStorage.getItem('current_subperfil') || 'Mayoreo';
     }
     
     const hasPrice = (parseFloat(producto.precio_Menudeo) > 0) || (parseFloat(producto.precio_mayoreo) > 0) || (parseFloat(producto.precio_mayoreo_super) > 0) || producto.precio;
@@ -2089,7 +2101,7 @@ function createProductCard(producto) {
         statusTextHtml = `
             <div class="mt-1 mb-2 bg-dark-200/40 border border-white/5 rounded-xl p-1.5 sm:p-2.5 space-y-0.5 sm:space-y-1 text-[9px] sm:text-xs z-10 relative backdrop-blur-sm">
                 <div class="flex justify-between items-center text-gray-400">
-                    <span class="font-medium">Precio (${profileToUse}):</span>
+                    <span class="font-medium">Precio:</span>
                     <span class="font-bold text-navy-400">$${basePrice.toFixed(2)}</span>
                 </div>
             </div>
@@ -2487,6 +2499,15 @@ function renderClientsTable() {
             ? `${client.calle} #${client.numero || ''}, Col. ${client.colonia || ''}` 
             : 'Sin dirección';
             
+        const isActivo = (client.activo !== 0 && client.activo !== "0");
+        const statusBtnClass = isActivo 
+            ? 'bg-emerald-500/10 hover:bg-emerald-500 text-emerald-500 hover:text-white' 
+            : 'bg-gray-500/10 hover:bg-gray-500 text-gray-500 hover:text-white';
+        const statusBtnTitle = isActivo ? 'Desactivar Cliente' : 'Activar Cliente';
+        const statusIcon = isActivo 
+            ? `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h8a5 5 0 010 10H8a5 5 0 010-10z"></path><circle cx="16" cy="12" r="3" fill="currentColor"></circle></svg>` 
+            : `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h8a5 5 0 010 10H8a5 5 0 010-10z"></path><circle cx="8" cy="12" r="3" fill="currentColor"></circle></svg>`;
+
         tr.innerHTML = `
             <td class="px-3 py-2">
                 <div>
@@ -2507,6 +2528,9 @@ function renderClientsTable() {
             </td>
             <td class="px-3 py-2 text-right">
                 <div class="flex items-center justify-end gap-1.5 opacity-50 group-hover:opacity-100 transition-opacity">
+                    <button class="p-1.5 rounded-md ${statusBtnClass} transition-all duration-300 shadow btn-toggle-client-status" title="${statusBtnTitle}" data-id="${client.id_cliente}">
+                        ${statusIcon}
+                    </button>
                     <button class="p-1.5 rounded-md bg-navy-500/10 hover:bg-navy-500 text-navy-400 hover:text-white transition-all duration-300 shadow hover:shadow-navy-500/30 btn-edit-client" title="Editar Cliente" data-id="${client.id_cliente}">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
                     </button>
@@ -2521,6 +2545,13 @@ function renderClientsTable() {
     });
 
     // Eventos de botones en la tabla
+    document.querySelectorAll('.btn-toggle-client-status').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const id = e.currentTarget.getAttribute('data-id');
+            handleToggleClientStatus(id);
+        });
+    });
+
     document.querySelectorAll('.btn-edit-client').forEach(btn => {
         btn.addEventListener('click', (e) => {
             const id = e.currentTarget.getAttribute('data-id');
@@ -2652,6 +2683,84 @@ async function handleDeleteClient(id) {
     }
 }
 
+async function handleToggleClientStatus(id) {
+    const client = allClients.find(c => c.id_cliente === id);
+    if (!client) return;
+    
+    const isActivo = (client.activo !== 0 && client.activo !== "0");
+    const nuevoEstado = isActivo ? 0 : 1;
+    const accionTexto = isActivo ? "desactivar" : "activar";
+    
+    const result = await Swal.fire({
+        title: `¿${isActivo ? 'Desactivar' : 'Activar'} Cliente?`,
+        text: `¿Estás seguro que deseas ${accionTexto} a ${client.nombre_completo || 'este cliente'}?`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: isActivo ? '#ef4444' : '#10b981',
+        cancelButtonColor: '#3f3f46',
+        confirmButtonText: `Sí, ${accionTexto}`,
+        cancelButtonText: 'Cancelar',
+        background: '#151515',
+        color: '#ffffff',
+        customClass: { popup: 'border border-white/10 rounded-2xl shadow-2xl' }
+    });
+    
+    if (result.isConfirmed) {
+        Swal.fire({
+            title: 'Procesando...',
+            text: 'Actualizando estado del cliente.',
+            allowOutsideClick: false,
+            showConfirmButton: false,
+            background: '#151515',
+            color: '#ffffff',
+            didOpen: () => {
+                Swal.showLoading();
+            }
+        });
+        
+        try {
+            const payload = {
+                ...client,
+                action: "update_client",
+                activo: nuevoEstado
+            };
+            
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify(payload)
+            });
+            
+            const data = await response.json();
+            
+            if (data.status === 'success') {
+                Swal.fire({
+                    icon: 'success',
+                    title: `Cliente ${isActivo ? 'Desactivado' : 'Activado'}`,
+                    text: `El cliente ha sido ${accionTexto}do con éxito.`,
+                    background: '#151515',
+                    color: '#ffffff',
+                    timer: 1500,
+                    showConfirmButton: false,
+                    customClass: { popup: 'border border-white/10 rounded-2xl' }
+                });
+                fetchClients(true); // Recargar manteniendo la página
+            } else {
+                throw new Error(data.message || 'Error al actualizar el estado.');
+            }
+        } catch (error) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: error.message,
+                background: '#151515',
+                color: '#ffffff',
+                customClass: { popup: 'border border-white/10 rounded-2xl' }
+            });
+        }
+    }
+}
+
 // --- SISTEMA DE CARRITO Y Ordenes (NUEVA VISTA) ---
 
 function switchView(view) {
@@ -2681,7 +2790,7 @@ function openPedidoModal(producto, preselectedTalla = null) {
     DOM.pedido.name.textContent = producto.nombre || 'Jersey Deportivo';
     let profileToUse = localStorage.getItem('current_perfil') || 'Menudeo';
     if (profileToUse === "Administrador") {
-        profileToUse = localStorage.getItem('current_subperfil') || 'Menudeo';
+        profileToUse = localStorage.getItem('current_subperfil') || 'Mayoreo';
     }
     if (profileToUse === 'Súper Mayoreo' || profileToUse === 'Mayoreo Súper') {
         profileToUse = 'Mayoreo';
@@ -2758,7 +2867,7 @@ function handlePedidoPersonalizacionChange() {
     if (isCustomized) {
         let profileToUse = localStorage.getItem('current_perfil') || 'Menudeo';
         if (profileToUse === "Administrador") {
-            profileToUse = localStorage.getItem('current_subperfil') || 'Menudeo';
+            profileToUse = localStorage.getItem('current_subperfil') || 'Mayoreo';
         }
         if (profileToUse === 'Súper Mayoreo' || profileToUse === 'Mayoreo Súper') {
             profileToUse = 'Mayoreo';
@@ -2822,7 +2931,7 @@ function updatePersonalizacionDropdown() {
     
     let profileToUse = localStorage.getItem('current_perfil') || 'Menudeo';
     if (profileToUse === "Administrador") {
-        profileToUse = localStorage.getItem('current_subperfil') || 'Menudeo';
+        profileToUse = localStorage.getItem('current_subperfil') || 'Mayoreo';
     }
     if (profileToUse === 'Súper Mayoreo' || profileToUse === 'Mayoreo Súper') {
         profileToUse = 'Mayoreo';
@@ -3068,7 +3177,7 @@ function renderCartItems() {
     const activeProfile = localStorage.getItem('current_perfil') || 'Menudeo';
     let clientProfile = activeProfile;
     if (activeProfile === "Administrador") {
-        clientProfile = localStorage.getItem('current_subperfil') || 'Menudeo';
+        clientProfile = localStorage.getItem('current_subperfil') || 'Mayoreo';
     }
     if (clientProfile === 'Súper Mayoreo' || clientProfile === 'Mayoreo Súper') {
         clientProfile = 'Mayoreo';
@@ -3233,7 +3342,7 @@ async function submitOrder() {
     const activeProfile = localStorage.getItem('current_perfil') || 'Menudeo';
     let profile = activeProfile;
     if (activeProfile === "Administrador") {
-        profile = localStorage.getItem('current_subperfil') || 'Menudeo';
+        profile = localStorage.getItem('current_subperfil') || 'Mayoreo';
     }
     if (profile === 'Súper Mayoreo' || profile === 'Mayoreo Súper') {
         profile = 'Mayoreo';
