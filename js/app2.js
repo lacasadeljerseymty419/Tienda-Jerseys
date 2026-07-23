@@ -1,4 +1,55 @@
-const API_URL = "https://script.google.com/macros/s/AKfycby3s2ikpC4ULAD5j4IN5B1oHdsHQ-V4T9XCibnVbwTKjvFbcasps55NbROGMPYyJw-RVg/exec";
+const API_URL = window.API_URL || "https://script.google.com/macros/s/AKfycbwULvs_KrTTGdq0s1J5OOgRKF3r8iGqgqKDoGZYcVNlEIGO7UOABejoBY67qVJhEVU0oQ/exec";
+
+// --- MONKEY PATCH FETCH PARA INYECCIÓN Y VALIDACIÓN DE TOKENS ---
+(function() {
+    const originalFetch = window.fetch;
+    window.fetch = async function(url, options) {
+        if (typeof url === 'string' && url.includes('script.google.com') && options && options.body && typeof options.body === 'string') {
+            try {
+                const data = JSON.parse(options.body);
+                if (data && typeof data === 'object' && !data.token) {
+                    data.token = localStorage.getItem('session_token') || '';
+                    options.body = JSON.stringify(data);
+                }
+            } catch (e) {
+                console.error("Error al interceptar petición de API:", e);
+            }
+        }
+        
+        const response = await originalFetch(url, options);
+        
+        if (typeof url === 'string' && url.includes('script.google.com') && response.ok) {
+            try {
+                const clone = response.clone();
+                const json = await clone.json();
+                if (json && json.session_invalid) {
+                    localStorage.removeItem('logged_user');
+                    localStorage.removeItem('current_perfil');
+                    localStorage.removeItem('session_token');
+                    
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Sesión Expirada',
+                        text: json.message || 'Tu sesión ha expirado o no es válida. Por favor, inicia sesión de nuevo.',
+                        background: '#151515', color: '#fff',
+                        confirmButtonColor: '#1d4ed8'
+                    }).then(() => {
+                        window.location.reload();
+                    });
+                    
+                    return new Response(JSON.stringify({ status: "error", message: "Sesión inválida" }), {
+                        status: 401,
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+                }
+            } catch (e) {
+                // Ignorar si no es JSON válido o no clonable
+            }
+        }
+        
+        return response;
+    };
+})();
 
 function getFirstImage(fotoField) {
     if (!fotoField) return '';
@@ -139,6 +190,8 @@ const DOM = {
     },
     navUserBadge: document.getElementById('nav-user-badge'),
     navUserName: document.getElementById('nav-user-name'),
+    headerLogoBadge: document.getElementById('header-logo-badge'),
+    mobileHeaderLogoBadge: document.getElementById('mobile-header-logo-badge'),
     adminSubperfilSelect: document.getElementById('admin-subperfil-select'),
     btnOpenCart: document.getElementById('btn-open-cart'),
     cartCount: document.getElementById('cart-count'),
@@ -305,6 +358,28 @@ const DOM = {
             emptyState: document.getElementById('admin-ordenes-empty'),
             loadingState: document.getElementById('admin-ordenes-loading')
         }
+    },
+    perfil: {
+        modal: document.getElementById('user-perfil-modal'),
+        closeBtn: document.getElementById('close-user-perfil-modal'),
+        btnCancel: document.getElementById('btn-cancel-perfil'),
+        btnMiPerfilDesktop: document.getElementById('btn-mi-perfil-desktop'),
+        btnMiPerfilMobile: document.getElementById('btn-mi-perfil-mobile'),
+        form: document.getElementById('form-user-perfil'),
+        avatarPreview: document.getElementById('perfil-avatar-preview'),
+        inputFile: document.getElementById('perfil-input-file'),
+        inputs: {
+            nombre: document.getElementById('perfil-nombre'),
+            telefono: document.getElementById('perfil-telefono'),
+            usuario: document.getElementById('perfil-usuario'),
+            password: document.getElementById('perfil-password'),
+            calle: document.getElementById('perfil-calle'),
+            numero: document.getElementById('perfil-numero'),
+            colonia: document.getElementById('perfil-colonia'),
+            municipio: document.getElementById('perfil-municipio'),
+            cp: document.getElementById('perfil-cp'),
+            referencias: document.getElementById('perfil-referencias')
+        }
     }
 };
 
@@ -352,6 +427,84 @@ function getGenderColorClass(genero) {
     return 'bg-white/5 text-gray-400 border-white/10';
 }
 
+function updateUserLogoInitial(username, imgUrl) {
+    const headerBadge = DOM.headerLogoBadge;
+    const mobileBadge = DOM.mobileHeaderLogoBadge;
+    
+    if (imgUrl && String(imgUrl).trim().startsWith('http')) {
+        const urlClean = String(imgUrl).trim();
+        if (headerBadge) {
+            headerBadge.classList.remove('bg-navy-500');
+            headerBadge.innerHTML = `<img src="${urlClean}" class="w-full h-full object-cover shadow-inner z-10" alt="Avatar">`;
+        }
+        if (mobileBadge) {
+            mobileBadge.classList.remove('bg-navy-500');
+            mobileBadge.innerHTML = `<img src="${urlClean}" class="w-full h-full object-cover shadow-inner z-10" alt="Avatar">`;
+        }
+    } else {
+        const letter = (username && username.trim().length > 0) 
+            ? username.trim().charAt(0).toUpperCase() 
+            : 'J';
+        if (headerBadge) {
+            headerBadge.classList.add('bg-navy-500');
+            headerBadge.innerHTML = '';
+            headerBadge.textContent = letter;
+        }
+        if (mobileBadge) {
+            mobileBadge.classList.add('bg-navy-500');
+            mobileBadge.innerHTML = '';
+            mobileBadge.textContent = letter;
+        }
+    }
+}
+
+function esPerfilSuperMayoreo(profile) {
+    if (!profile) return false;
+    const norm = String(profile).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+    return norm === 'super mayoreo' || norm === 'mayoreo super';
+}
+
+function esPerfilMayoreoOMas(profile) {
+    if (!profile) return false;
+    const norm = String(profile).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+    return norm === 'mayoreo' || norm === 'super mayoreo' || norm === 'mayoreo super';
+}
+
+function updateBrandTextColor() {
+    const brandSpan = document.getElementById('brand-text-span');
+    if (!brandSpan) return;
+    
+    const isSuperMayoreoActivo = (reglasMayoreoSuper.activo !== undefined) ? Number(reglasMayoreoSuper.activo) === 1 : true;
+    
+    const activeProfile = localStorage.getItem('current_perfil') || 'Menudeo';
+    let profile = activeProfile;
+    if (activeProfile === "Administrador") {
+        profile = localStorage.getItem('current_subperfil') || 'Mayoreo';
+    }
+    
+    if (isSuperMayoreoActivo && esPerfilSuperMayoreo(profile)) {
+        brandSpan.classList.remove('text-navy-400');
+        brandSpan.classList.add('text-amber-400', 'font-semibold');
+        
+        // Agregar glow dorado al badge del header
+        const headerBadge = document.getElementById('header-logo-badge');
+        if (headerBadge) {
+            headerBadge.classList.add('shadow-[0_0_15px_rgba(245,158,11,0.4)]');
+            headerBadge.classList.remove('shadow-[0_0_15px_rgba(59,130,246,0.4)]');
+        }
+    } else {
+        brandSpan.classList.add('text-navy-400');
+        brandSpan.classList.remove('text-amber-400', 'font-semibold');
+        
+        // Restaurar glow azul original
+        const headerBadge = document.getElementById('header-logo-badge');
+        if (headerBadge) {
+            headerBadge.classList.remove('shadow-[0_0_15px_rgba(245,158,11,0.4)]');
+            headerBadge.classList.add('shadow-[0_0_15px_rgba(59,130,246,0.4)]');
+        }
+    }
+}
+
 // --- Control de Sesión por Inactividad ---
 let inactivityTimer = null;
 const INACTIVITY_LIMIT_MS = 30 * 60 * 1000; // 30 minutos
@@ -366,6 +519,7 @@ function resetInactivityTimer() {
             localStorage.removeItem('logged_user');
             localStorage.removeItem('current_perfil');
             localStorage.removeItem('current_subperfil');
+            localStorage.removeItem('session_token');
             
             Swal.fire({
                 icon: 'warning',
@@ -403,10 +557,19 @@ async function initApp() {
     } else {
         DOM.login.overlay.classList.add('hidden');
         const loggedUser = JSON.parse(loggedUserStr);
-        DOM.navUserName.textContent = loggedUser.nombre_completo || loggedUser.usuario || 'Usuario';
-        if (DOM.mobileMenu.userName) DOM.mobileMenu.userName.textContent = loggedUser.nombre_completo || loggedUser.usuario || 'Usuario';
+        const userNameText = loggedUser.nombre_completo || loggedUser.usuario || 'Usuario';
+        DOM.navUserName.textContent = userNameText;
+        if (DOM.mobileMenu.userName) DOM.mobileMenu.userName.textContent = userNameText;
+        updateUserLogoInitial(userNameText, loggedUser.foto);
         DOM.navUserBadge.classList.remove('hidden');
+        const navLogoutBtn = document.getElementById('nav-logout-btn');
+        if (navLogoutBtn) {
+            navLogoutBtn.classList.remove('hidden');
+            navLogoutBtn.classList.add('sm:flex');
+        }
         if (loggedUser.perfil === "Administrador") {
+            if (DOM.perfil.btnMiPerfilDesktop) DOM.perfil.btnMiPerfilDesktop.classList.add('hidden');
+            if (DOM.perfil.btnMiPerfilMobile) DOM.perfil.btnMiPerfilMobile.classList.add('hidden');
             if (DOM.admin.adminMenúuWrapper) DOM.admin.adminMenúuWrapper.classList.remove('hidden');
             if (DOM.mobileMenu.adminSection) DOM.mobileMenu.adminSection.classList.remove('hidden');
             const savedSub = localStorage.getItem('current_subperfil') || 'Mayoreo';
@@ -418,15 +581,38 @@ async function initApp() {
                 DOM.mobileMenu.adminSubperfilSelect.value = savedSub;
             }
         } else {
+            if (DOM.perfil.btnMiPerfilDesktop) DOM.perfil.btnMiPerfilDesktop.classList.remove('hidden');
+            if (DOM.perfil.btnMiPerfilMobile) DOM.perfil.btnMiPerfilMobile.classList.remove('hidden');
             if (DOM.admin.adminMenúuWrapper) DOM.admin.adminMenúuWrapper.classList.add('hidden');
             if (DOM.mobileMenu.adminSection) DOM.mobileMenu.adminSection.classList.add('hidden');
             if (DOM.adminSubperfilSelect) DOM.adminSubperfilSelect.classList.add('hidden');
+            
+            // Refrescar perfil del usuario en segundo plano
+            fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({ action: "get_client_profile", token: localStorage.getItem('session_token') || '' })
+            }).then(r => r.json()).then(resData => {
+                if (resData && resData.status === 'success' && resData.data) {
+                    const user = resData.data;
+                    localStorage.setItem('logged_user', JSON.stringify(user));
+                    localStorage.setItem('current_perfil', user.perfil || 'Menudeo');
+                    
+                    const userNameText = user.nombre_completo || user.usuario || 'Usuario';
+                    DOM.navUserName.textContent = userNameText;
+                    if (DOM.mobileMenu.userName) DOM.mobileMenu.userName.textContent = userNameText;
+                    updateUserLogoInitial(userNameText, user.foto);
+                    updateBrandTextColor();
+                    applyProfileView();
+                }
+            }).catch(err => console.warn("Error al refrescar perfil en segundo plano:", err));
         }
     }
 
     renderSkeletons(6);
     await loadCatalogs();
     await fetchInitialProducts(); // Cargar todos y renderizar
+    updateBrandTextColor();
     
     // Cargar la lista de clientes en segundo plano al iniciar la app
     ensureClientsLoaded();
@@ -445,6 +631,7 @@ async function initApp() {
         if (DOM.mobileMenu.adminSubperfilSelect) DOM.mobileMenu.adminSubperfilSelect.value = val;
         localStorage.setItem('current_subperfil', val);
         applyProfileView();
+        updateBrandTextColor();
     }
     if (DOM.adminSubperfilSelect) DOM.adminSubperfilSelect.addEventListener('change', handleSubperfilChange);
     if (DOM.mobileMenu.adminSubperfilSelect) DOM.mobileMenu.adminSubperfilSelect.addEventListener('change', handleSubperfilChange);
@@ -865,7 +1052,7 @@ function closeModal() {
 
 async function loadCatalogs() {
     let configs = null;
-    const CACHE_KEY = 'jerseys_configs_v17';
+    const CACHE_KEY = 'jerseys_configs_v18';
     const CACHE_TTL = 60 * 60 * 1000; // 1 hora en milisegundos
     
     // 1. Intentar cargar y parsear del localStorage de manera segura considerando la expiración (TTL)
@@ -1066,6 +1253,7 @@ function handleLogout() {
         if (result.isConfirmed) {
             localStorage.removeItem('logged_user');
             localStorage.removeItem('current_perfil');
+            localStorage.removeItem('session_token');
             window.location.reload();
         }
     });
@@ -1101,9 +1289,11 @@ async function handleLoginSubmit(e) {
             }
             localStorage.setItem('logged_user', JSON.stringify(res.data));
             localStorage.setItem('current_perfil', res.data.perfil || 'Menudeo');
+            localStorage.setItem('session_token', res.data.token || '');
             
             // Al hacer login exitoso, reiniciamos el contador de inactividad
             resetInactivityTimer();
+            updateBrandTextColor();
             
             DOM.login.overlay.classList.add('opacity-0', 'pointer-events-none');
             setTimeout(() => {
@@ -1111,11 +1301,67 @@ async function handleLoginSubmit(e) {
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             }, 300);
             
-            DOM.navUserName.textContent = res.data.nombre_completo || res.data.usuario || 'Usuario';
-            if (DOM.mobileMenu && DOM.mobileMenu.userName) DOM.mobileMenu.userName.textContent = res.data.nombre_completo || res.data.usuario || 'Usuario';
+            const userNameText = res.data.nombre_completo || res.data.usuario || 'Usuario';
+            DOM.navUserName.textContent = userNameText;
+            if (DOM.mobileMenu && DOM.mobileMenu.userName) DOM.mobileMenu.userName.textContent = userNameText;
+            updateUserLogoInitial(userNameText, res.data.foto);
             if (DOM.navUserBadge) DOM.navUserBadge.classList.remove('hidden');
+            const navLogoutBtn = document.getElementById('nav-logout-btn');
+            if (navLogoutBtn) {
+                navLogoutBtn.classList.remove('hidden');
+                navLogoutBtn.classList.add('sm:flex');
+            }
+            
+            // 🌟 Alerta premium de Súper Mayoreo
+            if (esPerfilSuperMayoreo(res.data.perfil)) {
+                let fechaVigencia = 'Vencimiento no configurado';
+                if (res.data.super_mayoreo_exp) {
+                    try {
+                        const d = new Date(res.data.super_mayoreo_exp);
+                        fechaVigencia = d.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                    } catch (e) {}
+                }
+                
+                const acum = Number(res.data.super_mayoreo_acum || 0);
+                const faltan = Math.max(0, 10 - acum);
+                
+                let requirementHtml = '';
+                if (faltan > 0) {
+                    requirementHtml = `🔁 <strong>Para conservar tu precio:</strong> Llevas acumuladas <strong class="text-emerald-400">${acum}</strong> playeras en tu ciclo actual. Te faltan <strong class="text-amber-400 font-mono">${faltan}</strong> playeras más antes de la fecha de vencimiento para renovar tus beneficios por otros 6 días.`;
+                } else {
+                    requirementHtml = `✨ <strong>¡Meta de renovación cumplida!</strong> Llevas acumuladas <strong class="text-emerald-400">${acum}</strong> playeras. Ya tienes asegurado tu beneficio de Súper Mayoreo para el siguiente ciclo.`;
+                }
+                
+                Swal.fire({
+                    icon: 'info',
+                    title: `🌟 ¡Bienvenido, ${userNameText}!`,
+                    html: `
+                        <div class="text-left space-y-2.5 text-xs text-gray-300">
+                            <p>Tienes activo el perfil de <strong class="text-amber-400">Súper Mayoreo</strong> con precios preferenciales exclusivos.</p>
+                            <p>📅 <strong>Vigencia:</strong> hasta el <span class="text-white font-mono underline">${fechaVigencia}</span>.</p>
+                            <p>${requirementHtml}</p>
+                        </div>
+                    `,
+                    background: '#151515',
+                    color: '#ffffff',
+                    confirmButtonColor: '#d97706',
+                    confirmButtonText: '¡Excelente!'
+                });
+            } else if (res.data.perfil !== "Administrador") {
+                Swal.fire({
+                    title: '¡Acceso Correcto!',
+                    text: `Bienvenido de nuevo, ${userNameText}.`,
+                    icon: 'success',
+                    background: '#151515',
+                    color: '#ffffff',
+                    timer: 2000,
+                    showConfirmButton: false
+                });
+            }
             
             if (res.data.perfil === "Administrador") {
+                if (DOM.perfil.btnMiPerfilDesktop) DOM.perfil.btnMiPerfilDesktop.classList.add('hidden');
+                if (DOM.perfil.btnMiPerfilMobile) DOM.perfil.btnMiPerfilMobile.classList.add('hidden');
                 if (DOM.admin && DOM.admin.adminMenúuWrapper) DOM.admin.adminMenúuWrapper.classList.remove('hidden');
                 if (DOM.mobileMenu && DOM.mobileMenu.adminSection) DOM.mobileMenu.adminSection.classList.remove('hidden');
                 const savedSub = localStorage.getItem('current_subperfil') || 'Mayoreo';
@@ -1127,6 +1373,8 @@ async function handleLoginSubmit(e) {
                     DOM.mobileMenu.adminSubperfilSelect.value = savedSub;
                 }
             } else {
+                if (DOM.perfil.btnMiPerfilDesktop) DOM.perfil.btnMiPerfilDesktop.classList.remove('hidden');
+                if (DOM.perfil.btnMiPerfilMobile) DOM.perfil.btnMiPerfilMobile.classList.remove('hidden');
                 if (DOM.admin && DOM.admin.adminMenúuWrapper) DOM.admin.adminMenúuWrapper.classList.add('hidden');
                 if (DOM.mobileMenu && DOM.mobileMenu.adminSection) DOM.mobileMenu.adminSection.classList.add('hidden');
                 if (DOM.adminSubperfilSelect) DOM.adminSubperfilSelect.classList.add('hidden');
@@ -2059,7 +2307,7 @@ function createProductCard(producto) {
     const isAdmin = (localStorage.getItem('current_perfil') === "Administrador" && currentView === "mis-jerseys");
 
     if (hasSizes) {
-        tallasHtml = '<div class="flex flex-wrap gap-1 sm:gap-2 mt-auto pt-2 sm:pt-4 z-10 relative">';
+        tallasHtml = '<div class="flex flex-wrap gap-1 sm:gap-2 mt-2 pt-2 z-10 relative">';
         producto.tallas.forEach(t => {
             const stockVal = t.stock !== undefined ? t.stock : t.inventario;
             if (stockVal > 0) totalStock += stockVal;
@@ -2094,7 +2342,7 @@ function createProductCard(producto) {
         profileToUse = localStorage.getItem('current_subperfil') || 'Mayoreo';
     }
     
-    const hasPrice = (parseFloat(producto.precio_Menudeo) > 0) || (parseFloat(producto.precio_mayoreo) > 0) || (parseFloat(producto.precio_mayoreo_super) > 0) || producto.precio;
+    const hasPrice = (parseFloat(producto.precio_Menudeo || producto.precio_menudeo) > 0) || (parseFloat(producto.precio_mayoreo) > 0) || (parseFloat(producto.precio_mayoreo_super) > 0) || producto.precio;
     let statusTextHtml = '';
     if (hasPrice) {
         const basePrice = getBasePriceForProfile(producto, profileToUse);
@@ -2156,9 +2404,9 @@ function createProductCard(producto) {
     let bottomSectionHtml = statusTextHtml + tallasHtml;
     if (currentView === 'jerseys-pedido') {
         if (isProximamente || isAgotado) {
-            bottomSectionHtml += `<button class="w-full mt-3 py-2 rounded-lg bg-dark-200 text-gray-600 font-bold text-[11px] uppercase cursor-not-allowed border border-white/5" disabled>No disponible</button>`;
+            bottomSectionHtml += `<button class="w-full mt-auto mt-3 py-2 rounded-lg bg-dark-200 text-gray-600 font-bold text-[11px] uppercase cursor-not-allowed border border-white/5" disabled>No disponible</button>`;
         } else {
-            bottomSectionHtml += `<button class="w-full mt-3 py-2 rounded-lg bg-navy-500 hover:bg-navy-400 text-white font-bold text-[11px] uppercase tracking-wider transition-all duration-300 shadow hover:shadow-navy-500/20 active:scale-[0.97] btn-agregar-pedido">Agregar a mi pedido</button>`;
+            bottomSectionHtml += `<button class="w-full mt-auto mt-3 py-2 rounded-lg bg-navy-500 hover:bg-navy-400 text-white font-bold text-[11px] uppercase tracking-wider transition-all duration-300 shadow hover:shadow-navy-500/20 active:scale-[0.97] btn-agregar-pedido">Agregar a mi pedido</button>`;
         }
     }
 
@@ -2170,7 +2418,7 @@ function createProductCard(producto) {
             ${carouselControlsHtml}
         </div>
         <div class="product-details-container flex flex-col flex-grow cursor-pointer z-10 relative">
-            <h3 class="text-[13px] sm:text-lg font-semibold text-white leading-tight mb-1 sm:mb-2 group-hover:text-navy-400 transition-colors line-clamp-2">
+            <h3 class="text-[13px] sm:text-lg font-semibold text-white leading-tight mb-1 sm:mb-2 group-hover:text-navy-400 transition-colors line-clamp-2 h-9 sm:h-12">
                 ${producto.nombre || 'Jersey Deportivo'}
             </h3>
             ${tagsHtml}
@@ -2792,9 +3040,6 @@ function openPedidoModal(producto, preselectedTalla = null) {
     if (profileToUse === "Administrador") {
         profileToUse = localStorage.getItem('current_subperfil') || 'Mayoreo';
     }
-    if (profileToUse === 'Súper Mayoreo' || profileToUse === 'Mayoreo Súper') {
-        profileToUse = 'Mayoreo';
-    }
     const basePrice = getBasePriceForProfile(producto, profileToUse);
     DOM.pedido.desc.innerHTML = `${producto.genero || '-'} | ${producto.tipo || '-'} | ${producto.version || '-'} | <span class="text-navy-400 font-bold">$${basePrice.toFixed(2)}</span>`;
     DOM.pedido.img.src = getFirstImage(producto.foto || producto.imagen) || '';
@@ -2869,10 +3114,7 @@ function handlePedidoPersonalizacionChange() {
         if (profileToUse === "Administrador") {
             profileToUse = localStorage.getItem('current_subperfil') || 'Mayoreo';
         }
-        if (profileToUse === 'Súper Mayoreo' || profileToUse === 'Mayoreo Súper') {
-            profileToUse = 'Mayoreo';
-        }
-        const isMayoreo = profileToUse === 'Mayoreo';
+        const isMayoreo = esPerfilMayoreoOMas(profileToUse);
         const persObj = allPersonalizaciones.find(x => String(x.id) === String(val)) || defaultPersonalizaciones.find(x => String(x.id) === String(val));
         if (persObj) {
             price = isMayoreo ? parseFloat(persObj.precio_mayoreo || 0) : parseFloat(persObj.precio_Menudeo || 0);
@@ -2933,10 +3175,7 @@ function updatePersonalizacionDropdown() {
     if (profileToUse === "Administrador") {
         profileToUse = localStorage.getItem('current_subperfil') || 'Mayoreo';
     }
-    if (profileToUse === 'Súper Mayoreo' || profileToUse === 'Mayoreo Súper') {
-        profileToUse = 'Mayoreo';
-    }
-    const isMayoreo = profileToUse === 'Mayoreo';
+    const isMayoreo = esPerfilMayoreoOMas(profileToUse);
     
     allPersonalizaciones.forEach(p => {
         const option = document.createElement('option');
@@ -3132,21 +3371,32 @@ async function ensureClientsLoaded() {
 function getBasePriceForProfile(producto, profile) {
     let basePrice = 0;
     
+    const isSuperMayoreoActivo = (reglasMayoreoSuper.activo !== undefined) ? Number(reglasMayoreoSuper.activo) === 1 : true;
+    
     let applySuper = false;
-    if (profile === 'Mayoreo' || profile === 'Súper Mayoreo' || profile === 'Mayoreo Súper') {
-        const totalJugador = cart.filter(i => i.producto.version === 'Jugador').reduce((sum, i) => sum + i.cantidad, 0);
-        const totalFan = cart.filter(i => i.producto.version === 'Aficionado' || i.producto.version === 'Fan').reduce((sum, i) => sum + i.cantidad, 0);
-        
-        if (producto.version === 'Jugador' && totalJugador >= (reglasMayoreoSuper.piezas_jugador || 10)) applySuper = true;
-        if ((producto.version === 'Aficionado' || producto.version === 'Fan') && totalFan >= (reglasMayoreoSuper.piezas_fan || 15)) applySuper = true;
+    if (isSuperMayoreoActivo) {
+        if (esPerfilSuperMayoreo(profile)) {
+            applySuper = true;
+        } else {
+            const totalPiezas = cart.reduce((sum, i) => sum + i.cantidad, 0);
+            if (totalPiezas >= 10) {
+                applySuper = true;
+            } else if (String(profile).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim() === 'mayoreo') {
+                const totalJugador = cart.filter(i => i.producto.version === 'Jugador').reduce((sum, i) => sum + i.cantidad, 0);
+                const totalFan = cart.filter(i => i.producto.version === 'Aficionado' || i.producto.version === 'Fan').reduce((sum, i) => sum + i.cantidad, 0);
+                
+                if (producto.version === 'Jugador' && totalJugador >= (reglasMayoreoSuper.piezas_jugador || 10)) applySuper = true;
+                if ((producto.version === 'Aficionado' || producto.version === 'Fan') && totalFan >= (reglasMayoreoSuper.piezas_fan || 15)) applySuper = true;
+            }
+        }
     }
     
     if (applySuper && producto.precio_mayoreo_super) {
         basePrice = parseFloat(producto.precio_mayoreo_super);
-    } else if (profile === 'Mayoreo' || profile === 'Súper Mayoreo' || profile === 'Mayoreo Súper') {
+    } else if (esPerfilMayoreoOMas(profile)) {
         basePrice = parseFloat(producto.precio_mayoreo || 0);
     } else {
-        basePrice = parseFloat(producto.precio_Menudeo || 0);
+        basePrice = parseFloat(producto.precio_Menudeo || producto.precio_menudeo || 0);
     }
     
     // Soporte para productos con esquema de precio tradicional / compatibilidad hacia atrás
@@ -3179,9 +3429,6 @@ function renderCartItems() {
     if (activeProfile === "Administrador") {
         clientProfile = localStorage.getItem('current_subperfil') || 'Mayoreo';
     }
-    if (clientProfile === 'Súper Mayoreo' || clientProfile === 'Mayoreo Súper') {
-        clientProfile = 'Mayoreo';
-    }
     
     let subtotal = 0;
     let personalizacionesTotal = 0;
@@ -3193,7 +3440,7 @@ function renderCartItems() {
         // Obtener coste de personalización
         let persPrice = 0;
         let persName = "Ninguna";
-        const isMayoreo = clientProfile === 'Mayoreo' || clientProfile === 'Súper Mayoreo' || clientProfile === 'Mayoreo Súper';
+        const isMayoreo = esPerfilMayoreoOMas(clientProfile);
         if (item.personalizacionId !== 'PERS-NONE') {
             const persObj = allPersonalizaciones.find(x => String(x.id) === String(item.personalizacionId)) || defaultPersonalizaciones.find(x => String(x.id) === String(item.personalizacionId));
             if (persObj) {
@@ -3344,10 +3591,7 @@ async function submitOrder() {
     if (activeProfile === "Administrador") {
         profile = localStorage.getItem('current_subperfil') || 'Mayoreo';
     }
-    if (profile === 'Súper Mayoreo' || profile === 'Mayoreo Súper') {
-        profile = 'Mayoreo';
-    }
-    const isMayoreo = profile === 'Mayoreo';
+    const isMayoreo = esPerfilMayoreoOMas(profile);
     
     // Construir lista de artículos con precios calculados para el payload
     const articulos = cart.map(item => {
@@ -3387,6 +3631,7 @@ async function submitOrder() {
 
     const payload = {
         action: "create_order",
+        token: localStorage.getItem('session_token') || '',
         id_cliente: selectedClientId,
         tipo_precio_aplicado: profile,
         articulos: articulos,
@@ -3414,6 +3659,16 @@ async function submitOrder() {
         const data = await response.json();
         
         if (data.status === 'success') {
+            if (data.actualizacion_perfil) {
+                const user = JSON.parse(localStorage.getItem('logged_user'));
+                user.perfil = data.actualizacion_perfil.perfil;
+                user.super_mayoreo_exp = data.actualizacion_perfil.super_mayoreo_exp;
+                user.super_mayoreo_acum = data.actualizacion_perfil.super_mayoreo_acum;
+                localStorage.setItem('logged_user', JSON.stringify(user));
+                localStorage.setItem('current_perfil', user.perfil);
+                updateBrandTextColor();
+            }
+            
             // Generar HTML de recibo de compra
             let subtotal = 0;
             let totalQty = 0;
@@ -3536,6 +3791,75 @@ async function submitOrder() {
             if (typeof fetchOrdenes === 'function') {
                 fetchOrdenes();
             }
+        } else if (data.status === 'stock_conflict') {
+            let listHtml = '<div class="space-y-2 border-y border-white/10 py-3 my-3 text-xs">';
+            data.conflictos.forEach(c => {
+                const dispText = c.disponible > 0 ? `Quedan ${c.disponible} pzas` : 'Agotado';
+                listHtml += `
+                    <div class="flex justify-between items-center text-gray-300">
+                        <div class="truncate pr-4 flex-1 text-left">
+                            <strong>${c.nombre}</strong> (${c.talla})
+                            <div class="text-[10px] text-gray-500">Solicitado: ${c.solicitado}</div>
+                        </div>
+                        <div class="font-semibold ${c.disponible > 0 ? 'text-amber-400' : 'text-red-400'}">${dispText}</div>
+                    </div>
+                `;
+            });
+            listHtml += '</div>';
+            
+            Swal.fire({
+                icon: 'warning',
+                title: 'Conflicto de Stock',
+                html: `
+                    <div class="text-left text-xs space-y-2 text-gray-300">
+                        <p>Algunos productos en tu carrito ya no están disponibles en la cantidad solicitada debido a compras recientes de otros usuarios:</p>
+                        ${listHtml}
+                        <p class="text-[10px] text-gray-400">¿Deseas ajustar automáticamente tu pedido al stock disponible?</p>
+                    </div>
+                `,
+                background: '#151515', color: '#fff',
+                showCancelButton: true,
+                confirmButtonColor: '#d97706',
+                cancelButtonColor: '#374151',
+                confirmButtonText: 'Sí, ajustar',
+                cancelButtonText: 'No, revisar carrito',
+                customClass: { popup: 'border border-white/10 rounded-2xl max-w-sm' }
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    data.conflictos.forEach(conf => {
+                        const itemIdx = cart.findIndex(i => String(i.id_inventario) === String(conf.id_inventario));
+                        if (itemIdx !== -1) {
+                            if (conf.disponible > 0) {
+                                cart[itemIdx].cantidad = conf.disponible;
+                            } else {
+                                cart.splice(itemIdx, 1);
+                            }
+                        }
+                    });
+                    
+                    localStorage.setItem('cart', JSON.stringify(cart));
+                    updateCartBadge();
+                    renderCartItems();
+                    
+                    // Abrir el carrito con las nuevas piezas y totales actualizados para confirmación manual
+                    openCartModal();
+                } else {
+                    data.conflictos.forEach(conf => {
+                        if (conf.disponible <= 0) {
+                            const itemIdx = cart.findIndex(i => String(i.id_inventario) === String(conf.id_inventario));
+                            if (itemIdx !== -1) {
+                                cart.splice(itemIdx, 1);
+                            }
+                        }
+                    });
+                    localStorage.setItem('cart', JSON.stringify(cart));
+                    updateCartBadge();
+                    renderCartItems();
+                    
+                    // Abrir el carrito para revisión manual
+                    openCartModal();
+                }
+            });
         } else {
             throw new Error(data.message || 'Error desconocido al registrar pedido.');
         }
@@ -3983,6 +4307,7 @@ window.deleteOrderItem = async function(id_orden, id_detalle) {
             
             // Re-fetch orders to get the updated totals and items
             await fetchOrdenes();
+            fetchInitialProducts(); // 🔄 Refrescar catálogo para liberar stock devuelto
             
             // Re-open modal to reflect changes
             const updatedOrden = allFetchedOrdenes.find(o => o.id_orden === id_orden);
@@ -4193,6 +4518,211 @@ setTimeout(() => {
     document.getElementById('btn-save-user-order-changes')?.addEventListener('click', async () => {
         await saveUserOrderChanges();
     });
+
+    // --- VARIABLES DE ESTADO Y LOGICA DE MI PERFIL ---
+    let tempPerfilFotoUrl = "";
+    
+    function openUserPerfilModal() {
+        const loggedUserStr = localStorage.getItem('logged_user');
+        if (!loggedUserStr) return;
+        const user = JSON.parse(loggedUserStr);
+        
+        // Cargar campos
+        DOM.perfil.inputs.nombre.value = user.nombre_completo || "";
+        DOM.perfil.inputs.telefono.value = user.telefono || "";
+        DOM.perfil.inputs.usuario.value = user.usuario || "";
+        DOM.perfil.inputs.password.value = user.password || "";
+        DOM.perfil.inputs.calle.value = user.calle || "";
+        DOM.perfil.inputs.numero.value = user.numero || "";
+        DOM.perfil.inputs.colonia.value = user.colonia || "";
+        DOM.perfil.inputs.municipio.value = user.municipio || "";
+        DOM.perfil.inputs.cp.value = user.cp || "";
+        DOM.perfil.inputs.referencias.value = user.referencias || "";
+        
+        tempPerfilFotoUrl = user.foto || "";
+        updatePerfilAvatarPreview(user.nombre_completo || user.usuario || "U", tempPerfilFotoUrl);
+        
+        // Mostrar modal con animaciones
+        DOM.perfil.modal.classList.remove('hidden');
+        setTimeout(() => {
+            DOM.perfil.modal.classList.remove('opacity-0');
+            DOM.perfil.modal.querySelector('.bg-dark-100').classList.remove('scale-95');
+        }, 10);
+    }
+    
+    function closeUserPerfilModal() {
+        DOM.perfil.modal.classList.add('opacity-0');
+        DOM.perfil.modal.querySelector('.bg-dark-100').classList.add('scale-95');
+        setTimeout(() => {
+            DOM.perfil.modal.classList.add('hidden');
+        }, 300);
+    }
+    
+    function updatePerfilAvatarPreview(name, imgUrl) {
+        const preview = DOM.perfil.avatarPreview;
+        if (!preview) return;
+        if (imgUrl && imgUrl.trim().startsWith('http')) {
+            preview.classList.remove('bg-navy-500');
+            preview.innerHTML = `<img src="${imgUrl.trim()}" class="w-full h-full object-cover shadow-inner z-10" alt="Avatar">`;
+        } else {
+            preview.classList.add('bg-navy-500');
+            const letter = name ? name.trim().charAt(0).toUpperCase() : 'U';
+            preview.innerHTML = '';
+            preview.textContent = letter;
+        }
+    }
+    
+    // Bind buttons
+    if (DOM.perfil.btnMiPerfilDesktop) DOM.perfil.btnMiPerfilDesktop.addEventListener('click', openUserPerfilModal);
+    if (DOM.perfil.btnMiPerfilMobile) DOM.perfil.btnMiPerfilMobile.addEventListener('click', () => {
+        openUserPerfilModal();
+        closemobileMenu();
+    });
+    if (DOM.perfil.closeBtn) DOM.perfil.closeBtn.addEventListener('click', closeUserPerfilModal);
+    if (DOM.perfil.btnCancel) DOM.perfil.btnCancel.addEventListener('click', closeUserPerfilModal);
+    DOM.perfil.modal?.addEventListener('click', (e) => {
+        if (e.target.id === 'user-perfil-modal') closeUserPerfilModal();
+    });
+    
+    // File upload change handler
+    DOM.perfil.inputFile?.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        Swal.fire({
+            title: 'Subiendo imagen...',
+            text: 'Por favor espera mientras subimos tu foto de perfil a Google Drive.',
+            background: '#151515', color: '#fff',
+            allowOutsideClick: false,
+            didOpen: () => Swal.showLoading()
+        });
+        
+        try {
+            const base64Data = await readFileAsBase64(file);
+            const fileName = `avatar_${Date.now()}_${file.name}`;
+            const res = await uploadImageToDrive(base64Data, fileName);
+            
+            if (res.status === 'success' && res.url) {
+                tempPerfilFotoUrl = res.url;
+                const loggedUserStr = localStorage.getItem('logged_user');
+                const name = loggedUserStr ? JSON.parse(loggedUserStr).nombre_completo : 'U';
+                updatePerfilAvatarPreview(name, tempPerfilFotoUrl);
+                
+                Swal.fire({
+                    icon: 'success',
+                    title: '¡Imagen Cargada!',
+                    text: 'La foto se subió exitosamente a Drive. Recuerda presionar "Guardar Cambios" para completar la actualización de tu perfil.',
+                    background: '#151515', color: '#fff',
+                    confirmButtonColor: '#1d4ed8'
+                });
+            } else {
+                throw new Error(res.message || 'Error desconocido.');
+            }
+        } catch (err) {
+            console.error(err);
+            Swal.fire({
+                icon: 'error',
+                title: 'Error de carga',
+                text: 'Hubo un problema al subir la imagen: ' + err.message,
+                background: '#151515', color: '#fff'
+            });
+        }
+    });
+    
+    // Submit form handler
+    DOM.perfil.form?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const loggedUserStr = localStorage.getItem('logged_user');
+        if (!loggedUserStr) return;
+        const user = JSON.parse(loggedUserStr);
+        
+        const submitBtn = document.getElementById('btn-save-perfil');
+        const originalText = submitBtn.innerHTML;
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin inline-block mr-1"></span> Guardando...';
+        
+        Swal.fire({
+            title: 'Guardando perfil...',
+            text: 'Por favor espera mientras actualizamos tus datos y foto de perfil.',
+            background: '#151515', color: '#fff',
+            allowOutsideClick: false,
+            didOpen: () => Swal.showLoading()
+        });
+        
+        const payload = {
+            action: 'update_client',
+            token: localStorage.getItem('session_token') || '',
+            id_cliente: user.id_cliente,
+            nombre_completo: DOM.perfil.inputs.nombre.value.trim(),
+            telefono: DOM.perfil.inputs.telefono.value.trim(),
+            usuario: user.usuario, // mantener el usuario original
+            password: DOM.perfil.inputs.password.value.trim(),
+            perfil: user.perfil || 'Mayoreo',
+            calle: DOM.perfil.inputs.calle.value.trim(),
+            numero: DOM.perfil.inputs.numero.value.trim(),
+            colonia: DOM.perfil.inputs.colonia.value.trim(),
+            municipio: DOM.perfil.inputs.municipio.value.trim(),
+            cp: DOM.perfil.inputs.cp.value.trim(),
+            referencias: DOM.perfil.inputs.referencias.value.trim(),
+            activo: user.activo !== undefined ? user.activo : 1,
+            foto: tempPerfilFotoUrl
+        };
+        
+        try {
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify(payload)
+            });
+            const data = await response.json();
+            
+            if (data.status === 'success') {
+                // Actualizar localstorage
+                user.nombre_completo = payload.nombre_completo;
+                user.telefono = payload.telefono;
+                user.password = payload.password;
+                user.calle = payload.calle;
+                user.numero = payload.numero;
+                user.colonia = payload.colonia;
+                user.municipio = payload.municipio;
+                user.cp = payload.cp;
+                user.referencias = payload.referencias;
+                user.foto = tempPerfilFotoUrl;
+                
+                localStorage.setItem('logged_user', JSON.stringify(user));
+                
+                // Actualizar interfaz del header
+                const userNameText = user.nombre_completo || user.usuario || 'Usuario';
+                DOM.navUserName.textContent = userNameText;
+                if (DOM.mobileMenu.userName) DOM.mobileMenu.userName.textContent = userNameText;
+                updateUserLogoInitial(userNameText, tempPerfilFotoUrl);
+                
+                closeUserPerfilModal();
+                
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Perfil Guardado',
+                    text: 'Tus datos personales y foto de perfil han sido actualizados con éxito.',
+                    background: '#151515', color: '#fff',
+                    confirmButtonColor: '#1d4ed8'
+                });
+            } else {
+                throw new Error(data.message || 'Error al actualizar.');
+            }
+        } catch (err) {
+            console.error(err);
+            Swal.fire({
+                icon: 'error',
+                title: 'Error al Guardar',
+                text: 'Hubo un problema al guardar los cambios: ' + err.message,
+                background: '#151515', color: '#fff'
+            });
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalText;
+        }
+    });
 });
 
 async function fetchUserOrdenes(force = false) {
@@ -4379,7 +4909,7 @@ function renderUserOrderDetailsUI() {
     
     // Normalizar id_personalizacion si viene como String desde la API
     const orderProfile = currentUserOrderEditing.tipo_precio_aplicado || 'Menudeo';
-    const isMayoreo = orderProfile === 'Mayoreo' || orderProfile === 'Súper Mayoreo' || orderProfile === 'Mayoreo Súper';
+    const isMayoreo = esPerfilMayoreoOMas(orderProfile);
     currentUserOrderEditing.articulos_carrito.forEach(item => {
         if (item.id_personalizacion && typeof item.id_personalizacion !== 'object') {
             const pId = item.id_personalizacion;
@@ -4549,7 +5079,7 @@ function calculateUserOrderTotals() {
                                    || defaultPersonalizaciones.find(x => String(x.id) === String(pId));
                         if (pObj) {
                             const orderProfile = currentUserOrderEditing.tipo_precio_aplicado || 'Menudeo';
-                            const isMayoreo = orderProfile === 'Mayoreo' || orderProfile === 'Súper Mayoreo' || orderProfile === 'Mayoreo Súper';
+                            const isMayoreo = esPerfilMayoreoOMas(orderProfile);
                             itemPersPrice = isMayoreo ? parseFloat(pObj.precio_mayoreo || 0) : parseFloat(pObj.precio_Menudeo || 0);
                         }
                     }
@@ -4689,6 +5219,7 @@ async function saveUserOrderChanges() {
         
         // Refresh data
         allUserOrdenesFetched = await fetchUserOrdenes(true);
+        fetchInitialProducts(); // 🔄 Refrescar catálogo para actualizar stock en tiempo real
         // Refresh global orders if admin cache exists
         if (typeof fetchOrdenes !== 'undefined') {
             fetchOrdenes(); // Fire and forget update global cache

@@ -1,4 +1,4 @@
-export const API_URL = "https://script.google.com/macros/s/AKfycby3s2ikpC4ULAD5j4IN5B1oHdsHQ-V4T9XCibnVbwTKjvFbcasps55NbROGMPYyJw-RVg/exec";
+export const API_URL = window.API_URL || "https://script.google.com/macros/s/AKfycbwULvs_KrTTGdq0s1J5OOgRKF3r8iGqgqKDoGZYcVNlEIGO7UOABejoBY67qVJhEVU0oQ/exec";
 
 /**
  * Obtiene los catálogos de filtros disponibles.
