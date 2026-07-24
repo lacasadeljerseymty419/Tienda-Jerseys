@@ -431,14 +431,21 @@ function updateUserLogoInitial(username, imgUrl) {
     const headerBadge = DOM.headerLogoBadge;
     const mobileBadge = DOM.mobileHeaderLogoBadge;
     
+    const activeProfile = localStorage.getItem('current_perfil') || 'Menudeo';
+    const isSuperMayoreoActivo = (reglasMayoreoSuper.activo !== undefined) ? Number(reglasMayoreoSuper.activo) === 1 : true;
+    const isSuper = isSuperMayoreoActivo && esPerfilSuperMayoreo(activeProfile);
+    
+    const bgClass = isSuper ? 'bg-amber-500' : 'bg-navy-500';
+    const oldBgClass = isSuper ? 'bg-navy-500' : 'bg-amber-500';
+    
     if (imgUrl && String(imgUrl).trim().startsWith('http')) {
         const urlClean = String(imgUrl).trim();
         if (headerBadge) {
-            headerBadge.classList.remove('bg-navy-500');
+            headerBadge.classList.remove('bg-navy-500', 'bg-amber-500');
             headerBadge.innerHTML = `<img src="${urlClean}" class="w-full h-full object-cover shadow-inner z-10" alt="Avatar">`;
         }
         if (mobileBadge) {
-            mobileBadge.classList.remove('bg-navy-500');
+            mobileBadge.classList.remove('bg-navy-500', 'bg-amber-500');
             mobileBadge.innerHTML = `<img src="${urlClean}" class="w-full h-full object-cover shadow-inner z-10" alt="Avatar">`;
         }
     } else {
@@ -446,12 +453,14 @@ function updateUserLogoInitial(username, imgUrl) {
             ? username.trim().charAt(0).toUpperCase() 
             : 'J';
         if (headerBadge) {
-            headerBadge.classList.add('bg-navy-500');
+            headerBadge.classList.remove(oldBgClass);
+            headerBadge.classList.add(bgClass);
             headerBadge.innerHTML = '';
             headerBadge.textContent = letter;
         }
         if (mobileBadge) {
-            mobileBadge.classList.add('bg-navy-500');
+            mobileBadge.classList.remove(oldBgClass);
+            mobileBadge.classList.add(bgClass);
             mobileBadge.innerHTML = '';
             mobileBadge.textContent = letter;
         }
@@ -472,7 +481,6 @@ function esPerfilMayoreoOMas(profile) {
 
 function updateBrandTextColor() {
     const brandSpan = document.getElementById('brand-text-span');
-    if (!brandSpan) return;
     
     const isSuperMayoreoActivo = (reglasMayoreoSuper.activo !== undefined) ? Number(reglasMayoreoSuper.activo) === 1 : true;
     
@@ -482,26 +490,46 @@ function updateBrandTextColor() {
         profile = localStorage.getItem('current_subperfil') || 'Mayoreo';
     }
     
-    if (isSuperMayoreoActivo && esPerfilSuperMayoreo(profile)) {
-        brandSpan.classList.remove('text-navy-400');
-        brandSpan.classList.add('text-amber-400', 'font-semibold');
-        
-        // Agregar glow dorado al badge del header
-        const headerBadge = document.getElementById('header-logo-badge');
-        if (headerBadge) {
-            headerBadge.classList.add('shadow-[0_0_15px_rgba(245,158,11,0.4)]');
-            headerBadge.classList.remove('shadow-[0_0_15px_rgba(59,130,246,0.4)]');
+    const isSuper = isSuperMayoreoActivo && esPerfilSuperMayoreo(profile);
+    
+    if (brandSpan) {
+        if (isSuper) {
+            brandSpan.classList.remove('text-navy-400');
+            brandSpan.classList.add('text-amber-400', 'font-semibold');
+        } else {
+            brandSpan.classList.add('text-navy-400');
+            brandSpan.classList.remove('text-amber-400', 'font-semibold');
         }
-    } else {
-        brandSpan.classList.add('text-navy-400');
-        brandSpan.classList.remove('text-amber-400', 'font-semibold');
-        
-        // Restaurar glow azul original
-        const headerBadge = document.getElementById('header-logo-badge');
-        if (headerBadge) {
-            headerBadge.classList.remove('shadow-[0_0_15px_rgba(245,158,11,0.4)]');
-            headerBadge.classList.add('shadow-[0_0_15px_rgba(59,130,246,0.4)]');
+    }
+    
+    // Cambiar color de fondo y glow del badge del logo del header
+    const headerBadge = document.getElementById('header-logo-badge');
+    if (headerBadge) {
+        if (isSuper) {
+            headerBadge.classList.remove('bg-navy-500', 'shadow-[0_0_15px_rgba(59,130,246,0.4)]');
+            headerBadge.classList.add('bg-amber-500', 'shadow-[0_0_15px_rgba(245,158,11,0.5)]');
+        } else {
+            headerBadge.classList.remove('bg-amber-500', 'shadow-[0_0_15px_rgba(245,158,11,0.5)]');
+            headerBadge.classList.add('bg-navy-500', 'shadow-[0_0_15px_rgba(59,130,246,0.4)]');
         }
+    }
+
+    const mobileHeaderBadge = document.getElementById('mobile-header-logo-badge');
+    if (mobileHeaderBadge) {
+        if (isSuper) {
+            mobileHeaderBadge.classList.remove('bg-navy-500');
+            mobileHeaderBadge.classList.add('bg-amber-500');
+        } else {
+            mobileHeaderBadge.classList.remove('bg-amber-500');
+            mobileHeaderBadge.classList.add('bg-navy-500');
+        }
+    }
+    
+    // Forzar actualización de iniciales de usuario también
+    const loggedUserStr = localStorage.getItem('logged_user');
+    if (loggedUserStr) {
+        const u = JSON.parse(loggedUserStr);
+        updateUserLogoInitial(u.nombre_completo || u.usuario || 'Usuario', u.foto);
     }
 }
 
@@ -661,6 +689,7 @@ async function initApp() {
             DOM.mobileMenu.overlay.classList.add('hidden');
         }, 300);
     }
+    window.closemobileMenu = closemobileMenu;
     
     // Listeners del Modal de Carrito/Orden
     if (DOM.cart.closeBtn) DOM.cart.closeBtn.addEventListener('click', closeCartModal);
@@ -798,7 +827,7 @@ async function initApp() {
             DOM.admin.fotoPreviewContainer.innerHTML = `
                 <div class="col-span-4 flex flex-col items-center justify-center p-6 bg-dark-200/50 rounded-xl border border-white/5 w-full">
                     <svg class="animate-spin h-8 w-8 text-navy-400 mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                    <span class="text-xs text-gray-400">Subiendo a Google Drive...</span>
+                    <span class="text-xs text-gray-400">Subiendo al servidor...</span>
                 </div>
             `;
             
@@ -867,7 +896,7 @@ async function initApp() {
                 DOM.admin.updateFotoPreviewContainer.innerHTML = `
                     <div class="col-span-4 flex items-center justify-center p-4 bg-dark-200/50 rounded-xl border border-white/5 w-full">
                         <svg class="animate-spin h-5 w-5 text-navy-400 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                        <span class="text-xs text-gray-400">Subiendo a Google Drive...</span>
+                        <span class="text-xs text-gray-400">Subiendo al servidor...</span>
                     </div>
                 `;
             }
@@ -1291,8 +1320,17 @@ async function handleLoginSubmit(e) {
             localStorage.setItem('current_perfil', res.data.perfil || 'Menudeo');
             localStorage.setItem('session_token', res.data.token || '');
             
+            // 🧼 Limpiar caché de configuraciones para forzar la carga de datos frescos
+            localStorage.removeItem('jerseys_configs_v18');
+            localStorage.removeItem('jerseys_personalizations_v10');
+            
             // Al hacer login exitoso, reiniciamos el contador de inactividad
             resetInactivityTimer();
+            
+            // Recargar configuraciones frescas de la API e inventario
+            await loadCatalogs();
+            await fetchInitialProducts();
+            
             updateBrandTextColor();
             
             DOM.login.overlay.classList.add('opacity-0', 'pointer-events-none');
@@ -2346,11 +2384,16 @@ function createProductCard(producto) {
     let statusTextHtml = '';
     if (hasPrice) {
         const basePrice = getBasePriceForProfile(producto, profileToUse);
+        
+        const isSuperMayoreoActivo = (reglasMayoreoSuper.activo !== undefined) ? Number(reglasMayoreoSuper.activo) === 1 : true;
+        const isSuper = isSuperMayoreoActivo && esPerfilSuperMayoreo(profileToUse);
+        const priceColorClass = isSuper ? 'text-amber-400 font-bold' : 'text-navy-400';
+
         statusTextHtml = `
             <div class="mt-1 mb-2 bg-dark-200/40 border border-white/5 rounded-xl p-1.5 sm:p-2.5 space-y-0.5 sm:space-y-1 text-[9px] sm:text-xs z-10 relative backdrop-blur-sm">
                 <div class="flex justify-between items-center text-gray-400">
                     <span class="font-medium">Precio:</span>
-                    <span class="font-bold text-navy-400">$${basePrice.toFixed(2)}</span>
+                    <span class="font-bold ${priceColorClass}">$${basePrice.toFixed(2)}</span>
                 </div>
             </div>
         `;
@@ -3642,7 +3685,7 @@ async function submitOrder() {
     // Mostrar spinner de carga
     Swal.fire({
         title: 'Procesando Pedido',
-        text: 'Enviando orden a la base de datos...',
+        text: 'Enviando orden al servidor...',
         allowOutsideClick: false,
         background: '#151515', color: '#fff',
         didOpen: () => {
@@ -3755,9 +3798,6 @@ async function submitOrder() {
             );
             const waUrl = `https://wa.me/5218132698182?text=${waText}`;
             
-            // Intentar abrir WhatsApp automáticamente
-            window.open(waUrl, '_blank');
-            
             Swal.fire({
                 icon: 'success',
                 title: '¡Pedido Realizado!',
@@ -3765,8 +3805,18 @@ async function submitOrder() {
                 background: '#151515', color: '#fff',
                 confirmButtonColor: '#1d4ed8',
                 confirmButtonText: 'Entendido',
-                customClass: { popup: 'border border-white/10 rounded-2xl max-w-md' }
+                customClass: { popup: 'border border-white/10 rounded-2xl max-w-md shadow-2xl shadow-emerald-500/5' }
             });
+
+            // 🚀 Abrir WhatsApp automáticamente en otra pestaña (y fallback en la misma si el móvil bloquea el popup)
+            try {
+                const newWindow = window.open(waUrl, '_blank');
+                if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
+                    window.location.href = waUrl;
+                }
+            } catch (e) {
+                window.location.href = waUrl;
+            }
             
             // Vaciar carrito
             cart = [];
@@ -4450,7 +4500,7 @@ async function updateOrderStatus(id_orden, nuevo_estatus) {
                 
                 const htmlContent = `
                     <p class="mb-4 text-sm font-semibold text-white">¿Quisieras notificarle al cliente por WhatsApp?</p>
-                    <a href="${waUrl}" target="_blank" onclick="Swal.close()" class="inline-flex items-center justify-center gap-2 bg-[#25D366] text-white px-5 py-2.5 rounded-xl font-bold hover:bg-[#20b858] transition-colors shadow-lg shadow-[#25D366]/20 w-full mb-2">
+                    <a href="${waUrl}" target="_blank" class="inline-flex items-center justify-center gap-2 bg-[#25D366] text-white px-5 py-2.5 rounded-xl font-bold hover:bg-[#20b858] transition-colors shadow-lg shadow-[#25D366]/20 w-full mb-2">
                         <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
                         Notificar por WhatsApp
                     </a>
@@ -4561,11 +4611,18 @@ setTimeout(() => {
     function updatePerfilAvatarPreview(name, imgUrl) {
         const preview = DOM.perfil.avatarPreview;
         if (!preview) return;
+        
+        const activeProfile = localStorage.getItem('current_perfil') || 'Menudeo';
+        const isSuperMayoreoActivo = (reglasMayoreoSuper.activo !== undefined) ? Number(reglasMayoreoSuper.activo) === 1 : true;
+        const isSuper = isSuperMayoreoActivo && esPerfilSuperMayoreo(activeProfile);
+        const bgClass = isSuper ? 'bg-amber-500' : 'bg-navy-500';
+
         if (imgUrl && imgUrl.trim().startsWith('http')) {
-            preview.classList.remove('bg-navy-500');
+            preview.classList.remove('bg-navy-500', 'bg-amber-500');
             preview.innerHTML = `<img src="${imgUrl.trim()}" class="w-full h-full object-cover shadow-inner z-10" alt="Avatar">`;
         } else {
-            preview.classList.add('bg-navy-500');
+            preview.classList.remove('bg-navy-500', 'bg-amber-500');
+            preview.classList.add(bgClass);
             const letter = name ? name.trim().charAt(0).toUpperCase() : 'U';
             preview.innerHTML = '';
             preview.textContent = letter;
@@ -4591,7 +4648,7 @@ setTimeout(() => {
         
         Swal.fire({
             title: 'Subiendo imagen...',
-            text: 'Por favor espera mientras subimos tu foto de perfil a Google Drive.',
+            text: 'Por favor espera mientras subimos tu foto de perfil.',
             background: '#151515', color: '#fff',
             allowOutsideClick: false,
             didOpen: () => Swal.showLoading()
@@ -4611,7 +4668,7 @@ setTimeout(() => {
                 Swal.fire({
                     icon: 'success',
                     title: '¡Imagen Cargada!',
-                    text: 'La foto se subió exitosamente a Drive. Recuerda presionar "Guardar Cambios" para completar la actualización de tu perfil.',
+                    text: 'La foto se subió exitosamente. Recuerda presionar "Guardar Cambios" para completar la actualización de tu perfil.',
                     background: '#151515', color: '#fff',
                     confirmButtonColor: '#1d4ed8'
                 });

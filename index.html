@@ -88,7 +88,7 @@
         }
     </style>
 </head>
-<body class="font-sans antialiased min-h-screen flex flex-col selection:bg-navy-400/30 selection:text-navy-400">
+<body class="font-sans antialiased min-h-screen flex flex-col selection:bg-navy-400/30 selection:text-navy-400 overflow-x-hidden">
     
     <!-- Fondo del Catálogo Principal (Post-Login) - Mesh Gradient Orgánico -->
     <div class="fixed inset-0 pointer-events-none z-[-1] overflow-hidden bg-[#0b0b0b]">
@@ -217,6 +217,10 @@
                 <!-- Main Nav -->
                 <div>
                     <h3 class="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2 px-2">Navegación</h3>
+                    <button id="btn-mi-perfil-mobile" class="hidden w-full text-left px-4 py-3 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-xl transition-colors flex items-center gap-3">
+                        <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                        Mi Perfil
+                    </button>
                     <button class="action-nav-jerseys-view w-full text-left px-4 py-3 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-xl transition-colors flex items-center gap-3">
                         <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path></svg>
                         Ordenar
@@ -224,10 +228,6 @@
                     <button class="action-nav-mis-pedidos-view w-full text-left px-4 py-3 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-xl transition-colors flex items-center gap-3">
                         <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
                         Mis Pedidos
-                    </button>
-                    <button id="btn-mi-perfil-mobile" class="hidden w-full text-left px-4 py-3 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-xl transition-colors flex items-center gap-3">
-                        <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
-                        Mi Perfil
                     </button>
                 </div>
 
@@ -1411,9 +1411,9 @@
     </div>
 
     <!-- Configuración Global API -->
-    <script src="./js/config.js?v=1.0.0"></script>
+    <script src="./js/config.js?v=1.0.3"></script>
     <!-- Módulo Principal JS -->
-    <script src="./js/app2.js?v=2.1.8"></script>
+    <script src="./js/app2.js?v=2.2.3"></script>
 </body>
 </html>
 
