@@ -117,7 +117,7 @@ async function login_client(usuario, password) {
         return await response.json();
     } catch (error) {
         console.error("Error en login:", error);
-        return { status: "error", message: "Error de conexión al servidor." };
+        return { status: "error", message: "Error de conexión: " + error.message };
     }
 }
 async function uploadImageToDrive(base64Data, fileName) {
@@ -202,7 +202,8 @@ const DOM = {
         openCreate: document.querySelectorAll('.action-open-create'),
         openList: document.querySelectorAll('.action-open-list'),
         openClients: document.querySelectorAll('.action-open-clients'),
-        openOrders: document.querySelectorAll('.action-open-orders')
+        openOrders: document.querySelectorAll('.action-open-orders'),
+        openExcelOrders: document.querySelectorAll('.action-open-excel-orders')
     },
     mobileMenu: {
         toggleBtn: document.getElementById('btn-mobile-menu-toggle'),
@@ -357,6 +358,32 @@ const DOM = {
             listContainer: document.getElementById('admin-ordenes-list'),
             emptyState: document.getElementById('admin-ordenes-empty'),
             loadingState: document.getElementById('admin-ordenes-loading')
+        },
+        excelOrders: {
+            modal: document.getElementById('admin-excel-orders-modal'),
+            closeBtn: document.getElementById('close-excel-orders-modal'),
+            form: document.getElementById('form-excel-pedido-nuevo'),
+            inputs: {
+                code: document.getElementById('excel-pedido-code'),
+                foto: document.getElementById('excel-pedido-foto'),
+                fotoInfo: document.getElementById('excel-pedido-foto-info'),
+                imgPreviewContainer: document.getElementById('excel-pedido-img-preview-container'),
+                imgPreview: document.getElementById('excel-pedido-img-preview'),
+                imgClear: document.getElementById('excel-pedido-img-clear'),
+                version: document.getElementById('excel-pedido-version'),
+                genero: document.getElementById('excel-pedido-genero'),
+                size: document.getElementById('excel-pedido-size'),
+                qty: document.getElementById('excel-pedido-qty'),
+                name: document.getElementById('excel-pedido-name'),
+                number: document.getElementById('excel-pedido-number'),
+                patch: document.getElementById('excel-pedido-patch'),
+                price: document.getElementById('excel-pedido-price')
+            },
+            tableBody: document.getElementById('excel-pedido-table-body'),
+            tableEmpty: document.getElementById('excel-pedido-table-empty'),
+            countBadge: document.getElementById('excel-pedido-count-badge'),
+            totalQty: document.getElementById('excel-pedido-total-qty'),
+            btnDescargar: document.getElementById('btn-excel-pedido-descargar')
         }
     },
     perfil: {
@@ -467,6 +494,25 @@ function updateUserLogoInitial(username, imgUrl) {
     }
 }
 
+function isMobileDevice() {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 1024;
+}
+
+function abrirWhatsAppAutomatico(waUrl) {
+    if (isMobileDevice()) {
+        try {
+            const newWindow = window.open(waUrl, '_blank');
+            if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
+                window.location.href = waUrl;
+            }
+        } catch (e) {
+            window.location.href = waUrl;
+        }
+    } else {
+        window.open(waUrl, '_blank');
+    }
+}
+
 function esPerfilSuperMayoreo(profile) {
     if (!profile) return false;
     const norm = String(profile).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
@@ -491,6 +537,9 @@ function updateBrandTextColor() {
     }
     
     const isSuper = isSuperMayoreoActivo && esPerfilSuperMayoreo(profile);
+    
+    // Activar o desactivar el tema dorado en todo el cuerpo del documento (body)
+    document.body.classList.toggle('theme-super-mayoreo', isSuper);
     
     if (brandSpan) {
         if (isSuper) {
@@ -579,12 +628,23 @@ async function initApp() {
     startInactivityMonitor();
     
     const loggedUserStr = localStorage.getItem('logged_user');
-    if (!loggedUserStr) {
+    let loggedUser = null;
+    try {
+        if (loggedUserStr) {
+            loggedUser = JSON.parse(loggedUserStr);
+        }
+    } catch (e) {
+        console.warn("Sesión corrupta detectada, limpiando credenciales:", e);
+        localStorage.removeItem('logged_user');
+        localStorage.removeItem('current_perfil');
+        localStorage.removeItem('session_token');
+    }
+    
+    if (!loggedUser) {
         DOM.login.overlay.classList.remove('hidden');
         DOM.login.form.addEventListener('submit', handleLoginSubmit);
     } else {
         DOM.login.overlay.classList.add('hidden');
-        const loggedUser = JSON.parse(loggedUserStr);
         const userNameText = loggedUser.nombre_completo || loggedUser.usuario || 'Usuario';
         DOM.navUserName.textContent = userNameText;
         if (DOM.mobileMenu.userName) DOM.mobileMenu.userName.textContent = userNameText;
@@ -638,8 +698,13 @@ async function initApp() {
     }
 
     renderSkeletons(6);
-    await loadCatalogs();
-    await fetchInitialProducts(); // Cargar todos y renderizar
+    
+    // Cargar catálogos y catálogo de productos en paralelo (concurrencia)
+    await Promise.all([
+        loadCatalogs(),
+        fetchInitialProducts()
+    ]);
+    
     updateBrandTextColor();
     
     // Cargar la lista de clientes en segundo plano al iniciar la app
@@ -827,7 +892,7 @@ async function initApp() {
             DOM.admin.fotoPreviewContainer.innerHTML = `
                 <div class="col-span-4 flex flex-col items-center justify-center p-6 bg-dark-200/50 rounded-xl border border-white/5 w-full">
                     <svg class="animate-spin h-8 w-8 text-navy-400 mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                    <span class="text-xs text-gray-400">Subiendo al servidor...</span>
+                    <span class="text-xs text-gray-400">Guardando imagen...</span>
                 </div>
             `;
             
@@ -840,7 +905,7 @@ async function initApp() {
                     if (uploadRes.status === 'success') {
                         urls.push(uploadRes.url);
                     } else {
-                        throw new Error(uploadRes.message || "Error de servidor");
+                        throw new Error(uploadRes.message || "Error al subir");
                     }
                 } catch (err) {
                     uploadSuccess = false;
@@ -896,7 +961,7 @@ async function initApp() {
                 DOM.admin.updateFotoPreviewContainer.innerHTML = `
                     <div class="col-span-4 flex items-center justify-center p-4 bg-dark-200/50 rounded-xl border border-white/5 w-full">
                         <svg class="animate-spin h-5 w-5 text-navy-400 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                        <span class="text-xs text-gray-400">Subiendo al servidor...</span>
+                        <span class="text-xs text-gray-400">Guardando imagen...</span>
                     </div>
                 `;
             }
@@ -969,6 +1034,15 @@ async function initApp() {
     if (DOM.admin.Ordenes?.filtros?.nombre) DOM.admin.Ordenes.filtros.nombre.addEventListener('input', handleSearchOrdenes);
     if (DOM.admin.Ordenes?.filtros?.id) DOM.admin.Ordenes.filtros.id.addEventListener('input', handleSearchOrdenes);
     if (DOM.admin.Ordenes?.filtros?.estatus) DOM.admin.Ordenes.filtros.estatus.addEventListener('change', handleSearchOrdenes);
+    
+    // Eventos de Crear Pedido (Excel)
+    if (DOM.actions.openExcelOrders) DOM.actions.openExcelOrders.forEach(btn => btn.addEventListener('click', () => { openExcelOrdersModal(); closemobileMenu(); }));
+    if (DOM.excelOrders?.closeBtn) DOM.excelOrders.closeBtn.addEventListener('click', closeExcelOrdersModal);
+    if (DOM.excelOrders?.form) DOM.excelOrders.form.addEventListener('submit', handleAddManualItemExcel);
+    if (DOM.excelOrders?.inputs?.genero) DOM.excelOrders.inputs.genero.addEventListener('change', handleExcelGenderChange);
+    if (DOM.excelOrders?.inputs?.foto) DOM.excelOrders.inputs.foto.addEventListener('change', handleExcelPhotoChange);
+    if (DOM.excelOrders?.inputs?.imgClear) DOM.excelOrders.inputs.imgClear.addEventListener('click', handleExcelPhotoClear);
+    if (DOM.excelOrders?.btnDescargar) DOM.excelOrders.btnDescargar.addEventListener('click', generateExcelFromManualItems);
     
     const OrdenesPagePrev = document.getElementById('admin-ordenes-page-prev');
     const OrdenesPageNext = document.getElementById('admin-ordenes-page-next');
@@ -1081,26 +1155,81 @@ function closeModal() {
 
 async function loadCatalogs() {
     let configs = null;
+    let pers = null;
     const CACHE_KEY = 'jerseys_configs_v18';
-    const CACHE_TTL = 60 * 60 * 1000; // 1 hora en milisegundos
+    const PERS_CACHE_KEY = 'jerseys_personalizations_v10';
+    const CACHE_TTL = 60 * 60 * 1000; // 1 hora
     
-    // 1. Intentar cargar y parsear del localStorage de manera segura considerando la expiración (TTL)
+    // 1. Intentar cargar del localStorage
     try {
         const cachedStr = localStorage.getItem(CACHE_KEY);
         if (cachedStr) {
             const cachedObj = JSON.parse(cachedStr);
-            // Verificar si tiene el formato de objeto con timestamp y no ha expirado
             if (cachedObj && cachedObj.timestamp && (Date.now() - cachedObj.timestamp < CACHE_TTL)) {
                 configs = cachedObj.data;
-            } else {
-                console.log("Caché de configuraciones expirada o en formato antiguo. Se requerirá actualización.");
             }
         }
-    } catch (e) {
-        console.warn("No se pudo parsear jerseys_configs del localStorage, se obtendrá de la API:", e);
+    } catch (e) {}
+    
+    try {
+        const cachedPersStr = localStorage.getItem(PERS_CACHE_KEY);
+        if (cachedPersStr) {
+            const cachedPersObj = JSON.parse(cachedPersStr);
+            if (cachedPersObj && cachedPersObj.timestamp && (Date.now() - cachedPersObj.timestamp < CACHE_TTL)) {
+                pers = cachedPersObj.data;
+            }
+        }
+    } catch (e) {}
+    
+    // 2. Solicitar en paralelo lo que falte
+    let configsPromise = null;
+    let persPromise = null;
+    
+    if (!configs) {
+        configsPromise = get_configs();
+    }
+    if (!pers) {
+        persPromise = get_personalizations();
     }
     
-    // 2. Determinar si los datos en caché o de la API son válidos (soportando variantes singular/plural y diferentes niveles de anidación)
+    if (configsPromise || persPromise) {
+        try {
+            const [configsRes, persRes] = await Promise.all([
+                configsPromise ? configsPromise : Promise.resolve(null),
+                persPromise ? persPromise : Promise.resolve(null)
+            ]);
+            
+            if (configsRes) {
+                configs = configsRes;
+                try {
+                    localStorage.setItem(CACHE_KEY, JSON.stringify({ data: configsRes, timestamp: Date.now() }));
+                } catch (e) {}
+            }
+            
+            if (persRes && persRes.status === 'success' && Array.isArray(persRes.data)) {
+                pers = persRes.data;
+                try {
+                    localStorage.setItem(PERS_CACHE_KEY, JSON.stringify({ data: pers, timestamp: Date.now() }));
+                } catch (e) {}
+            }
+        } catch (err) {
+            console.error("Error al cargar catálogos desde la API en paralelo:", err);
+        }
+    }
+    
+    // 3. Procesar datos de personalizaciones
+    if (pers && pers.length > 0) {
+        allPersonalizaciones = pers.map(p => ({
+            id: p.id_personalizacion || p.id,
+            nombre: p.concepto || p.nombre || '',
+            precio_Menudeo: parseFloat((p.precio_Menudeo !== undefined && p.precio_Menudeo !== "") ? p.precio_Menudeo : (p.precio || 0)),
+            precio_mayoreo: parseFloat((p.precio_mayoreo !== undefined && p.precio_mayoreo !== "") ? p.precio_mayoreo : (p.precio || 0))
+        }));
+    } else {
+        allPersonalizaciones = defaultPersonalizaciones;
+    }
+    
+    // 4. Determinar si los datos en caché o de la API son válidos y poblar selects
     const getValidData = (obj) => {
         if (!obj) return null;
         const candidate = obj.configuraciones || obj.data || obj;
@@ -1125,70 +1254,7 @@ async function loadCatalogs() {
         return null;
     };
     
-    let validData = getValidData(configs);
-    
-    if (!validData) {
-        console.log("Caché de configuraciones ausente, expirada o inválida. Obteniendo de la API...");
-        try {
-            const apiResponse = await get_configs();
-            validData = getValidData(apiResponse);
-            if (validData) {
-                // Guardar la respuesta original de la API con timestamp para el TTL
-                const cacheWrapper = {
-                    data: apiResponse,
-                    timestamp: Date.now()
-                };
-                localStorage.setItem(CACHE_KEY, JSON.stringify(cacheWrapper));
-            }
-        } catch (error) {
-            console.error("Error al consultar la API para configuraciones:", error);
-        }
-    }
-    
-    // Cargar Catálogo de Personalizaciones
-    let pers = null;
-    const PERS_CACHE_KEY = 'jerseys_personalizations_v10';
-    try {
-        const cachedPersStr = localStorage.getItem(PERS_CACHE_KEY);
-        if (cachedPersStr) {
-            const cachedPersObj = JSON.parse(cachedPersStr);
-            if (cachedPersObj && cachedPersObj.timestamp && (Date.now() - cachedPersObj.timestamp < CACHE_TTL)) {
-                pers = cachedPersObj.data;
-            }
-        }
-    } catch (e) {
-        console.warn("Error al leer caché de personalizaciones:", e);
-    }
-    
-    if (!pers) {
-        console.log("Cargando personalizaciones desde la API...");
-        try {
-            const persResponse = await get_personalizations();
-            if (persResponse && persResponse.status === 'success' && Array.isArray(persResponse.data)) {
-                pers = persResponse.data;
-                const cacheWrapper = {
-                    data: pers,
-                    timestamp: Date.now()
-                };
-                localStorage.setItem(PERS_CACHE_KEY, JSON.stringify(cacheWrapper));
-            }
-        } catch (error) {
-            console.error("Error al obtener personalizaciones:", error);
-        }
-    }
-    
-    if (pers && pers.length > 0) {
-        allPersonalizaciones = pers.map(p => ({
-            id: p.id_personalizacion || p.id,
-            nombre: p.concepto || p.nombre || '',
-            precio_Menudeo: parseFloat((p.precio_Menudeo !== undefined && p.precio_Menudeo !== "") ? p.precio_Menudeo : (p.precio || 0)),
-            precio_mayoreo: parseFloat((p.precio_mayoreo !== undefined && p.precio_mayoreo !== "") ? p.precio_mayoreo : (p.precio || 0))
-        }));
-    } else {
-        allPersonalizaciones = defaultPersonalizaciones;
-    }
-    
-    // 3. Poblar los selects si tenemos datos válidos
+    const validData = getValidData(configs);
     if (validData) {
         if (validData.reglas_mayoreo_super) reglasMayoreoSuper = validData.reglas_mayoreo_super;
         if (validData.reglas_envio) reglasEnvio = validData.reglas_envio;
@@ -1327,9 +1393,11 @@ async function handleLoginSubmit(e) {
             // Al hacer login exitoso, reiniciamos el contador de inactividad
             resetInactivityTimer();
             
-            // Recargar configuraciones frescas de la API e inventario
-            await loadCatalogs();
-            await fetchInitialProducts();
+            // Recargar configuraciones frescas de la API e inventario en paralelo
+            await Promise.all([
+                loadCatalogs(),
+                fetchInitialProducts(true)
+            ]);
             
             updateBrandTextColor();
             
@@ -1432,12 +1500,16 @@ async function handleLoginSubmit(e) {
     } catch (err) {
         console.error(err);
         Swal.fire({
-            title: 'Error',
-            text: 'Ocurrió un problema al intentar iniciar sesión.',
+            title: 'Error de Conexión',
+            html: `<div class="text-left text-xs space-y-1 text-gray-300">
+                <p>Ocurrió un problema al intentar iniciar sesión.</p>
+                <p class="text-red-400 font-mono">Detalle: ${err.message || String(err)}</p>
+                ${err.stack ? `<pre class="bg-black/40 p-2 rounded text-[10px] overflow-x-auto text-gray-400 max-h-24 select-text">${err.stack.split('\n').slice(0, 2).join('\n')}</pre>` : ''}
+            </div>`,
             icon: 'error',
             background: '#151515',
             color: '#ffffff',
-            confirmButtonColor: '#1d4ed8'
+            confirmButtonColor: '#ef4444'
         });
     } finally {
         btn.innerHTML = originalText;
@@ -2028,9 +2100,9 @@ function closeCreateModal() {
 
 function getTallasForGender(gender) {
     const gen = String(gender || '').trim().toLowerCase();
-    if (gen.includes('hombre')) return configTallasHombre;
-    if (gen.includes('mujer') || gen.includes('dama')) return configTallasDama;
-    if (gen.includes('niño') || gen.includes('nino') || gen.includes('unisex')) return configTallasNino;
+    if (gen.includes('hombre') || gen.includes('caballero') || gen.includes('mens') || gen.includes('men') || gen === 'h') return configTallasHombre;
+    if (gen.includes('mujer') || gen.includes('dama') || gen.includes('womens') || gen.includes('women') || gen === 'm' || gen === 'd') return configTallasDama;
+    if (gen.includes('niño') || gen.includes('nino') || gen.includes('niña') || gen.includes('nina') || gen.includes('kids') || gen.includes('kid') || gen.includes('unisex') || gen === '') return configTallasNino;
     return [];
 }
 
@@ -2201,7 +2273,7 @@ async function handleCreateProduct(e) {
         } else {
             Swal.fire({
                 icon: 'error',
-                title: 'Error del servidor',
+                title: 'Error de conexión',
                 text: data.message || 'Error desconocido',
                 background: '#151515',
                 color: '#ffffff',
@@ -2226,20 +2298,93 @@ async function handleCreateProduct(e) {
     }
 }
 
-async function fetchInitialProducts() {
-    const filtros = { nombre: "", tipo: "", version: "", genero: "" };
-    const response = await search(filtros);
+async function fetchInitialProducts(force = false) {
+    const CACHE_KEY = 'jerseys_products_cache_v5';
+    const CACHE_TTL = 5 * 60 * 1000; // 5 minutos
     
-    if (Array.isArray(response)) {
-        allProducts = response;
-    } else if (response && response.status === 'success') {
-        if (Array.isArray(response.data)) {
-            allProducts = response.data;
-        } else if (Array.isArray(response.productos)) {
-            allProducts = response.productos;
-        }
+    if (force) {
+        localStorage.removeItem(CACHE_KEY);
     }
     
+    let cachedProducts = null;
+    try {
+        const cachedStr = localStorage.getItem(CACHE_KEY);
+        if (cachedStr) {
+            const cachedObj = JSON.parse(cachedStr);
+            if (cachedObj && cachedObj.timestamp && (Date.now() - cachedObj.timestamp < CACHE_TTL)) {
+                cachedProducts = cachedObj.data;
+            }
+        }
+    } catch (e) {}
+    
+    if (cachedProducts) {
+        // Cargar instantáneamente del caché
+        allProducts = cachedProducts;
+        renderProductsWithFilters();
+        
+        // Revalidar en segundo plano silenciosamente
+        revalidateProductsBackground(CACHE_KEY);
+    } else {
+        // Cargar de la API de forma síncrona
+        await loadProductsFromApi(CACHE_KEY);
+    }
+}
+
+async function loadProductsFromApi(cacheKey) {
+    const filtros = { nombre: "", tipo: "", version: "", genero: "" };
+    try {
+        const response = await search(filtros);
+        let productsData = [];
+        if (Array.isArray(response)) {
+            productsData = response;
+        } else if (response && response.status === 'success') {
+            productsData = response.data || response.productos || [];
+        }
+        
+        allProducts = productsData;
+        
+        // Guardar en caché
+        try {
+            const wrapper = { data: productsData, timestamp: Date.now() };
+            localStorage.setItem(cacheKey, JSON.stringify(wrapper));
+        } catch (e) {}
+        
+        renderProductsWithFilters();
+    } catch (err) {
+        console.error("Error al cargar productos de la API:", err);
+    }
+}
+
+async function revalidateProductsBackground(cacheKey) {
+    const filtros = { nombre: "", tipo: "", version: "", genero: "" };
+    try {
+        const response = await search(filtros);
+        let productsData = [];
+        if (Array.isArray(response)) {
+            productsData = response;
+        } else if (response && response.status === 'success') {
+            productsData = response.data || response.productos || [];
+        }
+        
+        // Guardar en caché
+        try {
+            const wrapper = { data: productsData, timestamp: Date.now() };
+            localStorage.setItem(cacheKey, JSON.stringify(wrapper));
+        } catch (e) {}
+        
+        // Solo actualizar silenciosamente en pantalla si el usuario no tiene modal abierto
+        const isUserActive = document.getElementById('add-to-pedido-modal')?.classList.contains('hidden') === false;
+                             
+        if (!isUserActive) {
+            allProducts = productsData;
+            renderProductsWithFilters();
+        }
+    } catch (err) {
+        console.warn("Error en revalidación de productos en segundo plano:", err);
+    }
+}
+
+function renderProductsWithFilters() {
     // Aplicar filtros locales de búsqueda si existen
     const hasActiveFilters = (DOM.filters.nombre && DOM.filters.nombre.value.trim() !== "") ||
                              (DOM.filters.tipo && DOM.filters.tipo.value !== "") ||
@@ -2247,10 +2392,10 @@ async function fetchInitialProducts() {
                              (DOM.filters.genero && DOM.filters.genero.value !== "");
                              
     if (hasActiveFilters) {
-        const nombreQ = DOM.filters.nombre.value.trim().toLowerCase();
-        const tipoQ = DOM.filters.tipo.value;
-        const versionQ = DOM.filters.version.value;
-        const generoQ = DOM.filters.genero.value;
+        const nombreQ = DOM.filters.nombre ? DOM.filters.nombre.value.trim().toLowerCase() : "";
+        const tipoQ = DOM.filters.tipo ? DOM.filters.tipo.value : "";
+        const versionQ = DOM.filters.version ? DOM.filters.version.value : "";
+        const generoQ = DOM.filters.genero ? DOM.filters.genero.value : "";
         
         const filtrados = allProducts.filter(p => {
             let match = true;
@@ -3685,7 +3830,7 @@ async function submitOrder() {
     // Mostrar spinner de carga
     Swal.fire({
         title: 'Procesando Pedido',
-        text: 'Enviando orden al servidor...',
+        text: 'Por favor espera un momento...',
         allowOutsideClick: false,
         background: '#151515', color: '#fff',
         didOpen: () => {
@@ -3808,15 +3953,8 @@ async function submitOrder() {
                 customClass: { popup: 'border border-white/10 rounded-2xl max-w-md shadow-2xl shadow-emerald-500/5' }
             });
 
-            // 🚀 Abrir WhatsApp automáticamente en otra pestaña (y fallback en la misma si el móvil bloquea el popup)
-            try {
-                const newWindow = window.open(waUrl, '_blank');
-                if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
-                    window.location.href = waUrl;
-                }
-            } catch (e) {
-                window.location.href = waUrl;
-            }
+            // 🚀 Abrir WhatsApp automáticamente
+            abrirWhatsAppAutomatico(waUrl);
             
             // Vaciar carrito
             cart = [];
@@ -4498,23 +4636,8 @@ async function updateOrderStatus(id_orden, nuevo_estatus) {
                 const waText = encodeURIComponent(`*Actualización de Pedido* 📦\n\nHola ${nombreCorto},\nEl estatus de tu orden *${id_orden}* ha cambiado a: *${nuevo_estatus}*.\n\n¡Gracias por tu preferencia!`);
                 const waUrl = `https://wa.me/${finalPhone}?text=${waText}`;
                 
-                const htmlContent = `
-                    <p class="mb-4 text-sm font-semibold text-white">¿Quisieras notificarle al cliente por WhatsApp?</p>
-                    <a href="${waUrl}" target="_blank" class="inline-flex items-center justify-center gap-2 bg-[#25D366] text-white px-5 py-2.5 rounded-xl font-bold hover:bg-[#20b858] transition-colors shadow-lg shadow-[#25D366]/20 w-full mb-2">
-                        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
-                        Notificar por WhatsApp
-                    </a>
-                `;
-                
-                Swal.fire({
-                    title: 'Aviso Opcional',
-                    html: htmlContent,
-                    background: '#151515', color: '#fff',
-                    showConfirmButton: true,
-                    confirmButtonText: 'No, gracias',
-                    confirmButtonColor: '#3f3f46',
-                    customClass: { popup: 'border border-white/10 rounded-2xl max-w-sm' }
-                });
+                // 🚀 Abrir WhatsApp automáticamente
+                abrirWhatsAppAutomatico(waUrl);
             }
             
             const idx = currentOrdenes.findIndex(o => o.id_orden === id_orden);
@@ -4808,7 +4931,8 @@ async function fetchUserOrdenes(force = false) {
             return [];
         }
     } catch (e) {
-        console.error('Error in fetchUserOrdenes:', e); Swal.fire({ icon: 'error', title: 'Error API', text: String(e), background: '#151515', color: '#fff' });
+        console.error('Error in fetchUserOrdenes:', e);
+        Swal.fire({ icon: 'error', title: 'Error de conexión', text: 'No se pudieron obtener tus pedidos. Por favor, inténtalo de nuevo.', background: '#151515', color: '#fff' });
         return [];
     }
 }
@@ -5317,12 +5441,814 @@ function getEstatusColor(estatus) {
         case 'Revisando': return { color: 'purple', bg: 'bg-purple-500/20', text: 'text-purple-400', border: 'border-purple-500/20' };
         case 'Disponible - Para recoger': return { color: 'teal', bg: 'bg-teal-500/20', text: 'text-teal-400', border: 'border-teal-500/20' };
         case 'Disponible - Para enviar': return { color: 'blue', bg: 'bg-blue-500/20', text: 'text-blue-400', border: 'border-blue-500/20' };
-        case 'Entregada - Paqueteria':
-        case 'Finalizada': return { color: 'emerald', bg: 'bg-emerald-500/20', text: 'text-emerald-400', border: 'border-emerald-500/20' };
         case 'Cancelada': return { color: 'red', bg: 'bg-red-500/20', text: 'text-red-400', border: 'border-red-500/20' };
         default: return { color: 'gray', bg: 'bg-gray-500/20', text: 'text-gray-400', border: 'border-gray-500/20' };
     }
 }
+
+// =========================================================================
+// MÓDULO: CREAR PEDIDO (EXPORTAR EXCEL DE PROVEEDOR) - MANUAL FORM
+// =========================================================================
+
+let itemsPedidoExcel = [];
+let currentUploadedImageBase64 = null;
+let currentUploadedImageWidth = 100;
+let currentUploadedImageHeight = 100;
+let currentUploadedPatchBase64 = null;
+let currentUploadedPatchWidth = 100;
+let currentUploadedPatchHeight = 100;
+
+function ensureExcelDOM() {
+    if (!DOM.excelOrders || !DOM.excelOrders.modal || !DOM.excelOrders.inputs || !DOM.excelOrders.inputs.foto) {
+        DOM.excelOrders = {
+            modal: document.getElementById('admin-excel-orders-modal'),
+            closeBtn: document.getElementById('close-excel-orders-modal'),
+            form: document.getElementById('form-excel-pedido-nuevo'),
+            inputs: {
+                code: document.getElementById('excel-pedido-code'),
+                foto: document.getElementById('excel-pedido-foto'),
+                fotoInfo: document.getElementById('excel-pedido-foto-info'),
+                imgPreviewContainer: document.getElementById('excel-pedido-img-preview-container'),
+                imgPreview: document.getElementById('excel-pedido-img-preview'),
+                imgClear: document.getElementById('excel-pedido-img-clear'),
+                version: document.getElementById('excel-pedido-version'),
+                genero: document.getElementById('excel-pedido-genero'),
+                size: document.getElementById('excel-pedido-size'),
+                qty: document.getElementById('excel-pedido-qty'),
+                name: document.getElementById('excel-pedido-name'),
+                number: document.getElementById('excel-pedido-number'),
+                patch: document.getElementById('excel-pedido-patch-foto'),
+                price: document.getElementById('excel-pedido-price')
+            },
+            tableBody: document.getElementById('excel-pedido-table-body'),
+            tableEmpty: document.getElementById('excel-pedido-table-empty'),
+            countBadge: document.getElementById('excel-pedido-count-badge'),
+            totalQty: document.getElementById('excel-pedido-total-qty'),
+            btnDescargar: document.getElementById('btn-excel-pedido-descargar')
+        };
+    }
+}
+
+function openExcelOrdersModal() {
+    ensureExcelDOM();
+
+    const loggedUserStr = localStorage.getItem('logged_user');
+    if (!loggedUserStr) return;
+    const loggedUser = JSON.parse(loggedUserStr);
+    if (loggedUser.perfil !== 'Administrador') return;
+
+    if (DOM.excelOrders.modal) {
+        DOM.excelOrders.modal.classList.remove('hidden');
+        setTimeout(() => {
+            DOM.excelOrders.modal.classList.remove('opacity-0');
+            const modalContainer = DOM.excelOrders.modal.querySelector('.bg-dark-100');
+            if (modalContainer) modalContainer.classList.remove('scale-95');
+        }, 10);
+    }
+    
+    // Limpiar formulario y temporales
+    itemsPedidoExcel = [];
+    if (DOM.excelOrders.form) DOM.excelOrders.form.reset();
+    handleExcelPhotoClear();
+    
+    // Poblar selects del formulario desde el catálogo
+    const selectVersion = DOM.excelOrders.inputs.version;
+    const selectGenero = DOM.excelOrders.inputs.genero;
+    
+    if (selectVersion) {
+        selectVersion.innerHTML = '<option value="" disabled selected>Selecciona versión</option>';
+        const filterVersion = DOM.filters.version;
+        if (filterVersion) {
+            Array.from(filterVersion.options).forEach(opt => {
+                if (opt.value !== "") {
+                    const newOpt = document.createElement('option');
+                    newOpt.value = opt.value;
+                    newOpt.textContent = opt.textContent;
+                    selectVersion.appendChild(newOpt);
+                }
+            });
+        }
+    }
+    
+    if (selectGenero) {
+        selectGenero.innerHTML = '<option value="" disabled selected>Selecciona género</option>';
+        const filterGenero = DOM.filters.genero;
+        if (filterGenero) {
+            Array.from(filterGenero.options).forEach(opt => {
+                if (opt.value !== "") {
+                    const newOpt = document.createElement('option');
+                    newOpt.value = opt.value;
+                    newOpt.textContent = opt.textContent;
+                    selectGenero.appendChild(newOpt);
+                }
+            });
+        }
+    }
+    
+    // Forzar limpieza de tallas
+    if (DOM.excelOrders.inputs.size) {
+        DOM.excelOrders.inputs.size.innerHTML = '<option value="" disabled selected>Selecciona género primero</option>';
+    }
+    
+    renderManualExcelItems();
+}
+window.openExcelOrdersModal = openExcelOrdersModal;
+
+function closeExcelOrdersModal() {
+    ensureExcelDOM();
+    if (DOM.excelOrders.modal) {
+        DOM.excelOrders.modal.classList.add('opacity-0');
+        const modalContainer = DOM.excelOrders.modal.querySelector('.bg-dark-100');
+        if (modalContainer) modalContainer.classList.add('scale-95');
+        setTimeout(() => {
+            DOM.excelOrders.modal.classList.add('hidden');
+        }, 300);
+    }
+}
+window.closeExcelOrdersModal = closeExcelOrdersModal;
+
+function handleExcelGenderChange(e) {
+    ensureExcelDOM();
+    const genero = String(e.target.value || '').trim();
+    const sizesGrid = document.getElementById('excel-pedido-sizes-grid');
+    if (!sizesGrid) return;
+    
+    sizesGrid.innerHTML = '';
+    sizesGrid.className = 'grid grid-cols-2 sm:grid-cols-3 gap-2 bg-black/20 p-2.5 rounded-xl border border-white/5';
+    
+    let tallas = getTallasForGender(genero);
+    
+    // Fallback completo e inteligente si las listas del catálogo de tallas están vacías
+    if (!tallas || tallas.length === 0) {
+        const genLower = genero.toLowerCase();
+        if (genLower.includes('hombre') || genLower.includes('caballero') || genLower.includes('mens') || genLower.includes('men') || genLower === 'h') {
+            tallas = ['S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL', '6XL'];
+        } else if (genLower.includes('dama') || genLower.includes('mujer') || genLower.includes('womens') || genLower.includes('women') || genLower === 'm' || genLower === 'd') {
+            tallas = ['S', 'M', 'L', 'XL', '2XL'];
+        } else if (genLower.includes('niño') || genLower.includes('nino') || genLower.includes('niña') || genLower.includes('nina') || genLower.includes('kids') || genLower.includes('kid')) {
+            tallas = ['2', '4', '6', '8', '10', '12', '14', '16'];
+        } else {
+            tallas = ['S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL', '6XL'];
+        }
+    }
+    
+    tallas.forEach(talla => {
+        const itemDiv = document.createElement('div');
+        itemDiv.className = 'flex items-center justify-between gap-1.5 bg-dark-100/50 px-2 py-1.5 rounded-lg border border-white/5';
+        itemDiv.innerHTML = `
+            <span class="text-[9px] font-bold text-gray-300 uppercase">${talla}</span>
+            <input type="number" min="0" value="0" data-size="${talla}" class="w-12 bg-black/40 border border-white/10 rounded px-1 py-0.5 text-center text-[10px] text-white focus:outline-none focus:border-navy-400 excel-qty-input transition-colors font-mono">
+        `;
+        sizesGrid.appendChild(itemDiv);
+    });
+}
+window.handleExcelGenderChange = handleExcelGenderChange;
+
+function handleExcelPhotoChange(e) {
+    ensureExcelDOM();
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    if (!file.type.startsWith('image/')) {
+        Swal.fire({ icon: 'error', title: 'Archivo Inválido', text: 'Por favor selecciona un archivo de imagen.', background: '#151515', color: '#fff' });
+        return;
+    }
+    
+    if (DOM.excelOrders.inputs.fotoInfo) {
+        DOM.excelOrders.inputs.fotoInfo.textContent = file.name;
+    }
+    
+    const reader = new FileReader();
+    reader.onload = function(evt) {
+        const rawBase64 = evt.target.result;
+        
+        // Cargar imagen de forma asíncrona para obtener sus dimensiones físicas originales
+        const img = new Image();
+        img.onload = function() {
+            currentUploadedImageWidth = img.naturalWidth || 100;
+            currentUploadedImageHeight = img.naturalHeight || 100;
+            
+            // Crear canvas para normalizar formato a JPEG y reducir tamaño para no inflar el Excel
+            const canvas = document.createElement('canvas');
+            const maxDim = 300; // tamaño máximo de la miniatura
+            let w = currentUploadedImageWidth;
+            let h = currentUploadedImageHeight;
+            
+            if (w > maxDim || h > maxDim) {
+                if (w > h) {
+                    h = Math.round((maxDim / w) * h);
+                    w = maxDim;
+                } else {
+                    w = Math.round((maxDim / h) * w);
+                    h = maxDim;
+                }
+            }
+            
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, w, h);
+            
+            // SIEMPRE convertir a JPEG compatible
+            currentUploadedImageBase64 = canvas.toDataURL('image/jpeg', 0.85);
+            
+            if (DOM.excelOrders.inputs.imgPreview) {
+                DOM.excelOrders.inputs.imgPreview.src = currentUploadedImageBase64;
+            }
+            if (DOM.excelOrders.inputs.imgPreviewContainer) {
+                DOM.excelOrders.inputs.imgPreviewContainer.classList.remove('hidden');
+            }
+        };
+        img.src = rawBase64;
+    };
+    reader.readAsDataURL(file);
+}
+window.handleExcelPhotoChange = handleExcelPhotoChange;
+
+function handleExcelPhotoClear() {
+    ensureExcelDOM();
+    currentUploadedImageBase64 = null;
+    currentUploadedImageWidth = 100;
+    currentUploadedImageHeight = 100;
+    if (DOM.excelOrders && DOM.excelOrders.inputs) {
+        if (DOM.excelOrders.inputs.foto) DOM.excelOrders.inputs.foto.value = '';
+        if (DOM.excelOrders.inputs.fotoInfo) DOM.excelOrders.inputs.fotoInfo.textContent = 'Haz clic o arrastra un archivo aquí';
+        if (DOM.excelOrders.inputs.imgPreviewContainer) DOM.excelOrders.inputs.imgPreviewContainer.classList.add('hidden');
+        if (DOM.excelOrders.inputs.imgPreview) DOM.excelOrders.inputs.imgPreview.src = '';
+    }
+}
+window.handleExcelPhotoClear = handleExcelPhotoClear;
+
+function handleExcelPatchPhotoChange(e) {
+    ensureExcelDOM();
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    if (!file.type.startsWith('image/')) {
+        Swal.fire({ icon: 'error', title: 'Archivo Inválido', text: 'Por favor selecciona un archivo de imagen para el parche.', background: '#151515', color: '#fff' });
+        return;
+    }
+    
+    const infoEl = document.getElementById('excel-pedido-patch-foto-info');
+    if (infoEl) infoEl.textContent = file.name;
+    
+    const reader = new FileReader();
+    reader.onload = function(evt) {
+        const rawBase64 = evt.target.result;
+        
+        const img = new Image();
+        img.onload = function() {
+            currentUploadedPatchWidth = img.naturalWidth || 100;
+            currentUploadedPatchHeight = img.naturalHeight || 100;
+            
+            // Crear canvas para normalizar formato a JPEG y optimizar tamaño del parche
+            const canvas = document.createElement('canvas');
+            const maxDim = 200; // parches son más chicos, 200px es perfecto
+            let w = currentUploadedPatchWidth;
+            let h = currentUploadedPatchHeight;
+            
+            if (w > maxDim || h > maxDim) {
+                if (w > h) {
+                    h = Math.round((maxDim / w) * h);
+                    w = maxDim;
+                } else {
+                    w = Math.round((maxDim / h) * w);
+                    h = maxDim;
+                }
+            }
+            
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, w, h);
+            
+            // Guardar como JPEG compatible
+            currentUploadedPatchBase64 = canvas.toDataURL('image/jpeg', 0.85);
+            
+            const preview = document.getElementById('excel-pedido-patch-img-preview');
+            const container = document.getElementById('excel-pedido-patch-img-preview-container');
+            if (preview) preview.src = currentUploadedPatchBase64;
+            if (container) container.classList.remove('hidden');
+        };
+        img.src = rawBase64;
+    };
+    reader.readAsDataURL(file);
+}
+window.handleExcelPatchPhotoChange = handleExcelPatchPhotoChange;
+
+function handleExcelPatchPhotoClear() {
+    ensureExcelDOM();
+    currentUploadedPatchBase64 = null;
+    currentUploadedPatchWidth = 100;
+    currentUploadedPatchHeight = 100;
+    
+    const input = document.getElementById('excel-pedido-patch-foto');
+    if (input) input.value = '';
+    const infoEl = document.getElementById('excel-pedido-patch-foto-info');
+    if (infoEl) infoEl.textContent = 'Haz clic o arrastra aquí';
+    const container = document.getElementById('excel-pedido-patch-img-preview-container');
+    if (container) container.classList.add('hidden');
+    const preview = document.getElementById('excel-pedido-patch-img-preview');
+    if (preview) preview.src = '';
+}
+window.handleExcelPatchPhotoClear = handleExcelPatchPhotoClear;
+
+function handleAddManualItemExcel(e) {
+    ensureExcelDOM();
+    if (e) e.preventDefault();
+    
+    const code = '';
+    const version = DOM.excelOrders.inputs.version.value;
+    const genero = DOM.excelOrders.inputs.genero.value;
+    const name = DOM.excelOrders.inputs.name.value.trim().toUpperCase();
+    const number = DOM.excelOrders.inputs.number.value.trim().toUpperCase();
+    const patch = currentUploadedPatchBase64 || '';
+    const price = 0.00;
+    
+    // Imagen, versión y género son obligatorios
+    if (!currentUploadedImageBase64) {
+        Swal.fire({ icon: 'warning', title: 'Imagen requerida', text: 'Por favor selecciona la imagen de la playera que quieres.', background: '#151515', color: '#fff' });
+        return;
+    }
+    if (!version || !genero) {
+        Swal.fire({ icon: 'warning', title: 'Campos requeridos', text: 'Por favor selecciona la versión y el género.', background: '#151515', color: '#fff' });
+        return;
+    }
+    
+    // Obtener todas las tallas seleccionadas del grid con cantidad > 0
+    const qtyInputs = document.querySelectorAll('.excel-qty-input');
+    const itemsToAdd = [];
+    
+    qtyInputs.forEach(input => {
+        const qtyVal = parseInt(input.value) || 0;
+        const sizeVal = input.getAttribute('data-size');
+        if (qtyVal > 0 && sizeVal) {
+            itemsToAdd.push({
+                size: sizeVal,
+                qty: qtyVal
+            });
+        }
+    });
+    
+    if (itemsToAdd.length === 0) {
+        Swal.fire({ icon: 'warning', title: 'Tallas requeridas', text: 'Por favor ingresa una cantidad (mayor a 0) en al menos una talla.', background: '#151515', color: '#fff' });
+        return;
+    }
+    
+    // Código es opcional (si no se indica, usar '-')
+    const finalCode = code || '-';
+    
+    // Concatena Versión + Género para Remark
+    const remark = `${version} ${genero}`;
+    
+    // Generar un groupKey único para este artículo / lote de tallas
+    const groupKey = 'group_' + Date.now() + Math.random().toString(36).substr(2, 9);
+    
+    // Agregar un registro individual para cada talla ingresada en esta tanda
+    itemsToAdd.forEach(sizeItem => {
+        const newItem = {
+            id: Date.now() + Math.random().toString(36).substr(2, 9),
+            groupKey: groupKey,
+            code: finalCode,
+            foto: currentUploadedImageBase64 || '',
+            fotoWidth: currentUploadedImageWidth || 100,
+            fotoHeight: currentUploadedImageHeight || 100,
+            remark,
+            size: sizeItem.size,
+            qty: sizeItem.qty,
+            name,
+            number,
+            patch,
+            price
+        };
+        itemsPedidoExcel.push(newItem);
+    });
+    
+    // Limpiar completamente el formulario tras agregar el artículo (ya que capturó todas sus tallas de una vez)
+    resetExcelOrderForm();
+    renderManualExcelItems();
+}
+window.handleAddManualItemExcel = handleAddManualItemExcel;
+
+function toggleExcelOrderDetails(checkbox) {
+    const panel = document.getElementById('excel-pedido-details-panel');
+    if (panel) {
+        if (checkbox.checked) {
+            panel.classList.remove('hidden');
+        } else {
+            panel.classList.add('hidden');
+        }
+    }
+}
+window.toggleExcelOrderDetails = toggleExcelOrderDetails;
+
+function resetExcelOrderForm() {
+    ensureExcelDOM();
+    if (DOM.excelOrders.form) DOM.excelOrders.form.reset();
+    handleExcelPhotoClear();
+    handleExcelPatchPhotoClear();
+    
+    // Ocultar el panel de personalización opcional y desmarcar el checkbox
+    const showDetailsCheckbox = document.getElementById('excel-pedido-show-details');
+    if (showDetailsCheckbox) showDetailsCheckbox.checked = false;
+    const detailsPanel = document.getElementById('excel-pedido-details-panel');
+    if (detailsPanel) detailsPanel.classList.add('hidden');
+    
+    // Resetear el grid de tallas a su estado inicial
+    const sizesGrid = document.getElementById('excel-pedido-sizes-grid');
+    if (sizesGrid) {
+        sizesGrid.innerHTML = 'Selecciona un género primero para cargar las tallas';
+        sizesGrid.className = 'grid grid-cols-1 bg-black/20 p-3 rounded-xl border border-white/5 min-h-[80px] items-center justify-center text-center text-xs text-gray-500';
+    }
+}
+window.resetExcelOrderForm = resetExcelOrderForm;
+
+function deleteManualExcelItem(itemId) {
+    itemsPedidoExcel = itemsPedidoExcel.filter(item => item.id !== itemId);
+    renderManualExcelItems();
+}
+
+function renderManualExcelItems() {
+    const tbody = DOM.excelOrders.tableBody;
+    const cardsContainer = document.getElementById('excel-pedido-cards-list');
+    const emptyState = DOM.excelOrders.tableEmpty;
+    const countBadge = DOM.excelOrders.countBadge;
+    const totalQtyEl = DOM.excelOrders.totalQty;
+    const btnDescargar = DOM.excelOrders.btnDescargar;
+    
+    if (tbody) tbody.innerHTML = '';
+    if (cardsContainer) cardsContainer.innerHTML = '';
+    
+    let totalQty = 0;
+    
+    if (itemsPedidoExcel.length === 0) {
+        if (emptyState) emptyState.classList.remove('hidden');
+        if (countBadge) countBadge.textContent = '0';
+        if (totalQtyEl) totalQtyEl.textContent = '0';
+        if (btnDescargar) btnDescargar.disabled = true;
+        return;
+    }
+    
+    if (emptyState) emptyState.classList.add('hidden');
+    if (countBadge) countBadge.textContent = itemsPedidoExcel.length;
+    if (btnDescargar) btnDescargar.disabled = false;
+    
+    itemsPedidoExcel.forEach(item => {
+        totalQty += item.qty;
+        
+        // 1. Renderizar fila de tabla para Desktop
+        if (tbody) {
+            const tr = document.createElement('tr');
+            tr.className = 'border-b border-white/5 hover:bg-white/5 transition-colors';
+            
+            const tdFoto = document.createElement('td');
+            tdFoto.className = 'p-3 align-middle';
+            if (item.foto) {
+                tdFoto.innerHTML = `<img src="${item.foto}" class="w-10 h-10 object-contain rounded bg-black/40 border border-white/10 p-0.5">`;
+            } else {
+                tdFoto.innerHTML = `<div class="w-10 h-10 bg-dark-200 border border-white/5 flex items-center justify-center text-[8px] text-gray-600 rounded">Sin foto</div>`;
+            }
+            
+            const tdRemark = document.createElement('td');
+            tdRemark.className = 'p-3 text-gray-300 align-middle';
+            tdRemark.textContent = item.remark;
+            
+            const tdTallaQty = document.createElement('td');
+            tdTallaQty.className = 'p-3 align-middle';
+            tdTallaQty.innerHTML = `
+                <span class="px-2 py-0.5 rounded bg-white/5 border border-white/10 text-gray-400 font-bold text-[10px]">${item.size}</span>
+                <span class="text-gray-500 mx-1">x</span>
+                <span class="text-white font-bold">${item.qty}</span>
+            `;
+            
+            const tdPers = document.createElement('td');
+            tdPers.className = 'p-3 align-middle';
+            let persHtml = '';
+            if (item.name) persHtml += `<div class="text-emerald-400 font-mono font-bold text-[9px] uppercase">Name: ${item.name}</div>`;
+            if (item.number) persHtml += `<div class="text-emerald-500 font-mono font-bold text-[9px] uppercase">Num: ${item.number}</div>`;
+            if (item.patch) {
+                persHtml += `
+                    <div class="mt-1 flex items-center gap-1.5">
+                        <span class="text-gray-400 text-[9px]">Patch:</span>
+                        <img src="${item.patch}" class="w-6 h-6 object-contain rounded bg-black/40 border border-white/10 p-0.5">
+                    </div>
+                `;
+            }
+            if (!persHtml) persHtml = '<span class="text-gray-600">-</span>';
+            tdPers.innerHTML = persHtml;
+            
+            const tdAccion = document.createElement('td');
+            tdAccion.className = 'p-3 text-center align-middle';
+            const deleteBtn = document.createElement('button');
+            deleteBtn.type = 'button';
+            deleteBtn.className = 'text-red-500 hover:text-red-400 p-1.5 hover:bg-red-500/10 rounded-lg transition-colors';
+            deleteBtn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>`;
+            deleteBtn.addEventListener('click', () => deleteManualExcelItem(item.id));
+            tdAccion.appendChild(deleteBtn);
+            
+            tr.appendChild(tdFoto);
+            tr.appendChild(tdRemark);
+            tr.appendChild(tdTallaQty);
+            tr.appendChild(tdPers);
+            tr.appendChild(tdAccion);
+            tbody.appendChild(tr);
+        }
+        
+        // 2. Renderizar card para Mobile
+        if (cardsContainer) {
+            const card = document.createElement('div');
+            card.className = 'bg-dark-100/60 border border-white/5 p-3 rounded-xl flex items-center gap-3 relative';
+            card.innerHTML = `
+                <div class="w-12 h-12 flex-shrink-0 bg-black/40 border border-white/10 rounded overflow-hidden flex items-center justify-center p-0.5">
+                    ${item.foto ? `<img src="${item.foto}" class="w-full h-full object-contain">` : `<span class="text-[8px] text-gray-600">Sin foto</span>`}
+                </div>
+                <div class="flex-grow min-w-0 pr-6">
+                    <div class="flex items-center gap-1.5 flex-wrap">
+                        <span class="text-xs font-bold text-white">${item.remark}</span>
+                    </div>
+                    <div class="flex items-center gap-2 mt-1 flex-wrap text-[10px]">
+                        <span class="px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-gray-400 font-bold">Talla: ${item.size}</span>
+                        <span class="text-gray-400">Cant: <strong class="text-white">${item.qty}</strong></span>
+                    </div>
+                    ${(item.name || item.number || item.patch) ? `
+                    <div class="mt-1.5 pt-1.5 border-t border-white/5 text-[9px] space-y-0.5">
+                        ${item.name ? `<div class="text-emerald-400 font-mono">NAME: ${item.name}</div>` : ''}
+                        ${item.number ? `<div class="text-emerald-500 font-mono">NUM: ${item.number}</div>` : ''}
+                        ${item.patch ? `
+                        <div class="mt-1 flex items-center gap-1.5">
+                            <span class="text-gray-400">PATCH:</span>
+                            <img src="${item.patch}" class="w-6 h-6 object-contain rounded bg-black/40 border border-white/10 p-0.5">
+                        </div>` : ''}
+                    </div>` : ''}
+                </div>
+            `;
+            const deleteBtnMobile = document.createElement('button');
+            deleteBtnMobile.type = 'button';
+            deleteBtnMobile.className = 'absolute top-2 right-2 text-red-500 hover:text-red-400 p-1 hover:bg-red-500/10 rounded-lg transition-colors';
+            deleteBtnMobile.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>`;
+            deleteBtnMobile.addEventListener('click', () => deleteManualExcelItem(item.id));
+            card.appendChild(deleteBtnMobile);
+            
+            cardsContainer.appendChild(card);
+        }
+    });
+    
+    if (totalQtyEl) totalQtyEl.textContent = totalQty;
+}
+
+async function generateExcelFromManualItems() {
+    ensureExcelDOM();
+    if (typeof ExcelJS === 'undefined') {
+        Swal.fire({ icon: 'error', title: 'Librería no cargada', text: 'La librería ExcelJS no se encuentra disponible. Por favor recarga la página.', background: '#151515', color: '#fff' });
+        return;
+    }
+    
+    if (itemsPedidoExcel.length === 0) {
+        Swal.fire({ icon: 'warning', title: 'Pedido vacío', text: 'No hay artículos en el pedido para exportar.', background: '#151515', color: '#fff' });
+        return;
+    }
+    
+    const btn = DOM.excelOrders.btnDescargar;
+    if (!btn) {
+        console.error("Download button not found in DOM");
+        return;
+    }
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = `<svg class="animate-spin h-4 w-4 text-white inline mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Descargando Excel...`;
+    
+    try {
+        let calculatedTotalQty = 0;
+        let calculatedTotalAmount = 0;
+        itemsPedidoExcel.forEach(item => {
+            calculatedTotalQty += Number(item.qty) || 0;
+            calculatedTotalAmount += (Number(item.qty) || 0) * (Number(item.price) || 0);
+        });
+
+        const grouped = {};
+        itemsPedidoExcel.forEach(item => {
+            const key = item.groupKey;
+            if (!grouped[key]) {
+                grouped[key] = {
+                    code: item.code,
+                    foto: item.foto || '',
+                    fotoWidth: item.fotoWidth || 100,
+                    fotoHeight: item.fotoHeight || 100,
+                    patch: item.patch || '',
+                    remark: item.remark || '-',
+                    items: []
+                };
+            }
+            grouped[key].items.push(item);
+        });
+        
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet('Pedido');
+        
+        worksheet.columns = [
+            { header: 'Code', key: 'code', width: 18 },
+            { header: 'Image', key: 'image', width: 22 },
+            { header: 'Remark', key: 'remark', width: 22 },
+            { header: 'size', key: 'size', width: 10 },
+            { header: 'Qty', key: 'qty', width: 10 },
+            { header: 'Name', key: 'name', width: 18 },
+            { header: 'Number', key: 'number', width: 12 },
+            { header: 'patch', key: 'patch', width: 14 },
+            { header: 'Unit Price ($)', key: 'unit_price_aux', width: 16 },
+            { header: 'Unit Price ($)', key: 'unit_price_usd', width: 16 },
+            { header: 'Total($)', key: 'total', width: 16 }
+        ];
+        
+        // Estilo de cabeceras (¡COLOR AMARILLO #FFFF00!)
+        const headerRow = worksheet.getRow(1);
+        headerRow.height = 32;
+        headerRow.eachCell((cell) => {
+            cell.font = { name: '宋体', bold: true, color: { argb: 'FF000000' }, size: 11 };
+            cell.fill = {
+                type: 'pattern',
+                pattern: 'solid',
+                fgColor: { argb: 'FFFFFF00' } // Amarillo Puro (#FFFF00)
+            };
+            cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        });
+        
+        let currentRow = 2;
+        
+        for (const code of Object.keys(grouped)) {
+            const prod = grouped[code];
+            const numRows = prod.items.length;
+            const rowStart = currentRow;
+            const rowEnd = currentRow + numRows - 1;
+            
+            const targetBlockHeight = 85;
+            const singleRowHeight = Math.max(30, targetBlockHeight / numRows);
+            
+            for (let idx = 0; idx < numRows; idx++) {
+                const item = prod.items[idx];
+                const price = Number(item.price) || 0;
+                
+                const row = worksheet.getRow(currentRow);
+                row.height = singleRowHeight;
+                row.values = [
+                    prod.code,
+                    "",
+                    prod.remark,
+                    item.size,
+                    Number(item.qty) || 0,
+                    item.name,
+                    item.number,
+                    "", // Parche (Imagen en columna H)
+                    price,
+                    price,
+                    { formula: `J${currentRow}*E${currentRow}` }
+                ];
+                
+                row.eachCell((cell, colNum) => {
+                    cell.alignment = { vertical: 'middle', horizontal: 'center' };
+                    cell.font = { name: '宋体', size: 10 };
+                    
+                    if (colNum === 9 || colNum === 10 || colNum === 11) {
+                        cell.numFmt = '$#,##0.00';
+                    }
+                });
+                
+                currentRow++;
+            }
+            
+            worksheet.mergeCells(`A${rowStart}:A${rowEnd}`);
+            worksheet.mergeCells(`B${rowStart}:B${rowEnd}`);
+            worksheet.mergeCells(`C${rowStart}:C${rowEnd}`);
+            worksheet.mergeCells(`H${rowStart}:H${rowEnd}`);
+            
+            const cellA = worksheet.getCell(`A${rowStart}`);
+            cellA.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+            cellA.font = { name: '宋体', bold: true, size: 10 };
+            
+            const cellC = worksheet.getCell(`C${rowStart}`);
+            cellC.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+            cellC.font = { name: '宋体', size: 10 };
+            
+            const cellH = worksheet.getCell(`H${rowStart}`);
+            cellH.alignment = { vertical: 'middle', horizontal: 'center' };
+            
+            if (prod.foto) {
+                try {
+                    const cleanBase64 = prod.foto.replace(/^data:image\/\w+;base64,/, "");
+                    let ext = 'png';
+                    if (prod.foto.includes('image/jpeg') || prod.foto.includes('image/jpg')) ext = 'jpeg';
+                    
+                    const imageId = workbook.addImage({
+                        base64: cleanBase64,
+                        extension: ext
+                    });
+                    
+                    worksheet.addImage(imageId, `B${rowStart}:B${rowEnd}`);
+                } catch (imgError) {
+                    console.error("Error al procesar imagen local para Excel:", imgError);
+                }
+            }
+            
+            if (prod.patch) {
+                try {
+                    const cleanPatchBase64 = prod.patch.replace(/^data:image\/\w+;base64,/, "");
+                    let patchExt = 'png';
+                    if (prod.patch.includes('image/jpeg') || prod.patch.includes('image/jpg')) patchExt = 'jpeg';
+                    
+                    const patchImageId = workbook.addImage({
+                        base64: cleanPatchBase64,
+                        extension: patchExt
+                    });
+                    
+                    worksheet.addImage(patchImageId, `H${rowStart}:H${rowEnd}`);
+                } catch (patchImgError) {
+                    console.error("Error al procesar imagen de parche para Excel:", patchImgError);
+                }
+            }
+        }
+        
+        const totalRow = worksheet.getRow(currentRow);
+        totalRow.height = 35;
+        
+        // Escribir valores directamente en las celdas y asociar el resultado pre-calculado en JS para validar
+        totalRow.getCell('B').value = 'total';
+        totalRow.getCell('E').value = { formula: `SUM(E2:E${currentRow - 1})`, result: calculatedTotalQty };
+        totalRow.getCell('K').value = { formula: `SUM(K2:K${currentRow - 1})`, result: calculatedTotalAmount };
+        
+        totalRow.eachCell((cell, colNum) => {
+            cell.font = { name: '宋体', bold: true, size: 11 };
+            cell.alignment = { vertical: 'middle', horizontal: 'center' };
+            
+            cell.border = {
+                top: { style: 'thin', color: { argb: 'FF000000' } },
+                bottom: { style: 'double', color: { argb: 'FF000000' } }
+            };
+            
+            if (colNum === 11) {
+                cell.numFmt = '$#,##0.00';
+            }
+        });
+        
+        const cellTotalText = totalRow.getCell(2);
+        cellTotalText.alignment = { vertical: 'middle', horizontal: 'center' };
+        cellTotalText.font = { name: '宋体', bold: true, size: 11, italic: true };
+        
+        worksheet.eachRow((row, rowNumber) => {
+            row.eachCell((cell) => {
+                if (rowNumber < currentRow) {
+                    cell.border = {
+                        top: { style: 'thin', color: { argb: 'FFD9D9D9' } },
+                        left: { style: 'thin', color: { argb: 'FFD9D9D9' } },
+                        bottom: { style: 'thin', color: { argb: 'FFD9D9D9' } },
+                        right: { style: 'thin', color: { argb: 'FFD9D9D9' } }
+                    };
+                }
+            });
+        });
+        
+        const dateObj = new Date();
+        const month = dateObj.getMonth() + 1;
+        const day = dateObj.getDate();
+        const fileName = `${month}-${day} Marco.xlsx`;
+        
+        const buffer = await workbook.xlsx.writeBuffer();
+        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        a.click();
+        window.URL.revokeObjectURL(url);
+        
+        // Mostrar alerta de descarga exitosa informando la sumatoria validada de piezas
+        Swal.fire({
+            icon: 'success',
+            title: '¡Excel de Pedido Descargado!',
+            text: `El archivo "${fileName}" se descargó exitosamente con un total de ${calculatedTotalQty} piezas.`,
+            background: '#151515', color: '#fff',
+            confirmButtonColor: '#1d4ed8'
+        });
+        
+        // Limpiar completamente el formulario y el listado de partidas temporales
+        itemsPedidoExcel = [];
+        if (DOM.excelOrders.form) DOM.excelOrders.form.reset();
+        handleExcelPhotoClear();
+        renderManualExcelItems();
+        
+    } catch (e) {
+        console.error("Error al generar Excel:", e);
+        Swal.fire({
+            icon: 'error',
+            title: 'Error de Generación',
+            text: e.message || 'No se pudo crear el archivo Excel.',
+            background: '#151515', color: '#fff',
+            confirmButtonColor: '#ef4444'
+        });
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    }
+}
+window.generateExcelFromManualItems = generateExcelFromManualItems;
 
 
 

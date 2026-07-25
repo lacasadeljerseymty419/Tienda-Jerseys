@@ -234,7 +234,7 @@
                     body: JSON.stringify(payload)
                 });
 
-                if (!response.ok) throw new Error("Error de conexión al servidor.");
+                if (!response.ok) throw new Error("Error de conexión. Inténtalo de nuevo.");
                 const data = await response.json();
 
                 if (data.status === 'success') {
