@@ -5609,13 +5609,15 @@ function handleExcelPhotoChange(e) {
     const file = e.target.files[0];
     if (!file) return;
     
-    if (!file.type.startsWith('image/')) {
+    const isImageType = file.type && file.type.startsWith('image/');
+    const isImageExt = file.name && file.name.match(/\.(jpg|jpeg|png|webp|heic|heif|gif|bmp|tiff|avif)$/i);
+    if (file.type && !isImageType && !isImageExt) {
         Swal.fire({ icon: 'error', title: 'Archivo Inválido', text: 'Por favor selecciona un archivo de imagen.', background: '#151515', color: '#fff' });
         return;
     }
     
     if (DOM.excelOrders.inputs.fotoInfo) {
-        DOM.excelOrders.inputs.fotoInfo.textContent = file.name;
+        DOM.excelOrders.inputs.fotoInfo.textContent = file.name || 'Imagen cargada';
     }
     
     const reader = new FileReader();
@@ -5659,6 +5661,16 @@ function handleExcelPhotoChange(e) {
                 DOM.excelOrders.inputs.imgPreviewContainer.classList.remove('hidden');
             }
         };
+        img.onerror = function() {
+            // Fallback si la imagen no se puede renderizar en canvas (ej. formatos nativos Safari)
+            currentUploadedImageBase64 = rawBase64;
+            if (DOM.excelOrders.inputs.imgPreview) {
+                DOM.excelOrders.inputs.imgPreview.src = rawBase64;
+            }
+            if (DOM.excelOrders.inputs.imgPreviewContainer) {
+                DOM.excelOrders.inputs.imgPreviewContainer.classList.remove('hidden');
+            }
+        };
         img.src = rawBase64;
     };
     reader.readAsDataURL(file);
@@ -5684,13 +5696,15 @@ function handleExcelPatchPhotoChange(e) {
     const file = e.target.files[0];
     if (!file) return;
     
-    if (!file.type.startsWith('image/')) {
+    const isImageType = file.type && file.type.startsWith('image/');
+    const isImageExt = file.name && file.name.match(/\.(jpg|jpeg|png|webp|heic|heif|gif|bmp|tiff|avif)$/i);
+    if (file.type && !isImageType && !isImageExt) {
         Swal.fire({ icon: 'error', title: 'Archivo Inválido', text: 'Por favor selecciona un archivo de imagen para el parche.', background: '#151515', color: '#fff' });
         return;
     }
     
     const infoEl = document.getElementById('excel-pedido-patch-foto-info');
-    if (infoEl) infoEl.textContent = file.name;
+    if (infoEl) infoEl.textContent = file.name || 'Parche cargado';
     
     const reader = new FileReader();
     reader.onload = function(evt) {
@@ -5728,6 +5742,13 @@ function handleExcelPatchPhotoChange(e) {
             const preview = document.getElementById('excel-pedido-patch-img-preview');
             const container = document.getElementById('excel-pedido-patch-img-preview-container');
             if (preview) preview.src = currentUploadedPatchBase64;
+            if (container) container.classList.remove('hidden');
+        };
+        img.onerror = function() {
+            currentUploadedPatchBase64 = rawBase64;
+            const preview = document.getElementById('excel-pedido-patch-img-preview');
+            const container = document.getElementById('excel-pedido-patch-img-preview-container');
+            if (preview) preview.src = rawBase64;
             if (container) container.classList.remove('hidden');
         };
         img.src = rawBase64;
@@ -6118,7 +6139,6 @@ async function generateExcelFromManualItems() {
             worksheet.mergeCells(`A${rowStart}:A${rowEnd}`);
             worksheet.mergeCells(`B${rowStart}:B${rowEnd}`);
             worksheet.mergeCells(`C${rowStart}:C${rowEnd}`);
-            worksheet.mergeCells(`H${rowStart}:H${rowEnd}`);
             
             const cellA = worksheet.getCell(`A${rowStart}`);
             cellA.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
@@ -6128,14 +6148,12 @@ async function generateExcelFromManualItems() {
             cellC.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
             cellC.font = { name: '宋体', size: 10 };
             
-            const cellH = worksheet.getCell(`H${rowStart}`);
-            cellH.alignment = { vertical: 'middle', horizontal: 'center' };
-            
             if (prod.foto) {
                 try {
-                    const cleanBase64 = prod.foto.replace(/^data:image\/\w+;base64,/, "");
-                    let ext = 'png';
-                    if (prod.foto.includes('image/jpeg') || prod.foto.includes('image/jpg')) ext = 'jpeg';
+                    const cleanBase64 = prod.foto.includes(',') ? prod.foto.split(',')[1] : prod.foto;
+                    let ext = 'jpeg';
+                    if (prod.foto.includes('image/png')) ext = 'png';
+                    else if (prod.foto.includes('image/gif')) ext = 'gif';
                     
                     const imageId = workbook.addImage({
                         base64: cleanBase64,
@@ -6149,10 +6167,17 @@ async function generateExcelFromManualItems() {
             }
             
             if (prod.patch) {
+                if (numRows > 1) {
+                    worksheet.mergeCells(`H${rowStart}:H${rowEnd}`);
+                }
+                const cellH = worksheet.getCell(`H${rowStart}`);
+                cellH.alignment = { vertical: 'middle', horizontal: 'center' };
+                
                 try {
-                    const cleanPatchBase64 = prod.patch.replace(/^data:image\/\w+;base64,/, "");
-                    let patchExt = 'png';
-                    if (prod.patch.includes('image/jpeg') || prod.patch.includes('image/jpg')) patchExt = 'jpeg';
+                    const cleanPatchBase64 = prod.patch.includes(',') ? prod.patch.split(',')[1] : prod.patch;
+                    let patchExt = 'jpeg';
+                    if (prod.patch.includes('image/png')) patchExt = 'png';
+                    else if (prod.patch.includes('image/gif')) patchExt = 'gif';
                     
                     const patchImageId = workbook.addImage({
                         base64: cleanPatchBase64,
