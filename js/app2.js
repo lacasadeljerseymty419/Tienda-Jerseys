@@ -6191,9 +6191,9 @@ async function generateExcelFromManualItems() {
                     });
                     
                     worksheet.addImage(imageId, {
-                        tl: { col: 1, row: rowStart - 1 },
-                        br: { col: 2, row: rowEnd },
-                        editAs: 'oneCell'
+                        tl: { col: 1.05, row: rowStart - 0.95 },
+                        br: { col: 1.95, row: rowEnd - 0.05 },
+                        editAs: 'twoCell'
                     });
                 } catch (imgError) {
                     console.error("Error al procesar imagen local para Excel:", imgError);
@@ -6219,9 +6219,9 @@ async function generateExcelFromManualItems() {
                     });
                     
                     worksheet.addImage(patchImageId, {
-                        tl: { col: 7, row: rowStart - 1 },
-                        br: { col: 8, row: rowEnd },
-                        editAs: 'oneCell'
+                        tl: { col: 7.05, row: rowStart - 0.95 },
+                        br: { col: 7.95, row: rowEnd - 0.05 },
+                        editAs: 'twoCell'
                     });
                 } catch (patchImgError) {
                     console.error("Error al procesar imagen de parche para Excel:", patchImgError);
