@@ -1004,7 +1004,7 @@
                 <div class="lg:col-span-7 flex flex-col space-y-4 min-h-0">
                     <h3 class="text-sm font-bold text-white uppercase tracking-wider border-b border-white/5 pb-2">Artículos en el Pedido (<span id="excel-pedido-count-badge">0</span>)</h3>
                     
-                    <div class="flex-grow overflow-y-auto border border-white/5 rounded-2xl bg-dark-200/20 min-h-[250px] custom-scrollbar flex flex-col">
+                    <div id="excel-pedido-list-scroll-container" class="flex-grow overflow-y-auto min-h-[220px] max-h-[350px] sm:max-h-[420px] lg:max-h-[460px] border border-white/5 rounded-2xl bg-dark-200/20 custom-scrollbar flex flex-col">
                         <!-- Vista de Tabla para Desktop (oculta en móvil) -->
                         <div class="hidden md:block overflow-x-auto w-full">
                             <table class="w-full text-left border-collapse text-[11px]">
@@ -1666,7 +1666,7 @@
     <!-- Configuración Global API -->
     <script src="./js/config.js?v=1.0.4"></script>
     <!-- Módulo Principal JS -->
-    <script src="./js/app2.js?v=2.6.0"></script>
+    <script src="./js/app2.js?v=2.6.3"></script>
 </body>
 </html>
 

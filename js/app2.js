@@ -4560,12 +4560,12 @@ async function updateOrderStatus(id_orden, nuevo_estatus) {
     const estatusNormalizado = String(nuevo_estatus).trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     
     let trackingGuide = "";
-    if (estatusNormalizado === "entregada - paqueteria" && tieneEnvio) {
+    if (estatusNormalizado.includes("entregada - paqueteria") || estatusNormalizado.includes("paqueteria")) {
         const { value: trackingNum } = await Swal.fire({
             title: 'Número de Guía',
-            text: 'Por favor, ingresa el número de guía de la paquetería:',
+            text: 'Por favor, ingresa el número de guía / rastreo de la paquetería:',
             input: 'text',
-            inputPlaceholder: 'Ej. DHL123456789',
+            inputPlaceholder: 'Ej. DHL123456789 / Estafeta987654321',
             showCancelButton: true,
             confirmButtonColor: '#1d4ed8',
             cancelButtonColor: '#3f3f46',
@@ -4573,7 +4573,7 @@ async function updateOrderStatus(id_orden, nuevo_estatus) {
             cancelButtonText: 'Cancelar',
             background: '#151515', color: '#fff',
             inputValidator: (value) => {
-                if (!value) {
+                if (!value || !value.trim()) {
                     return 'Debes ingresar un número de guía para continuar.';
                 }
             }
@@ -4588,7 +4588,7 @@ async function updateOrderStatus(id_orden, nuevo_estatus) {
             }
             return;
         }
-        trackingGuide = trackingNum;
+        trackingGuide = trackingNum.trim();
     }
     
     const payload = {
@@ -4610,30 +4610,52 @@ async function updateOrderStatus(id_orden, nuevo_estatus) {
         if (data.status === 'success') {
             await Swal.fire({ icon: 'success', title: '¡Actualizado!', text: data.message, background: '#151515', color: '#fff', timer: 1500, showConfirmButton: false });
             
-            const ordenOriginal = currentOrdenes.find(o => o.id_orden === id_orden) || allFetchedOrdenes.find(o => o.id_orden === id_orden);
+            const targetOrden = currentOrdenes.find(o => String(o.id_orden).trim() === id) 
+                || allFetchedOrdenes.find(o => String(o.id_orden).trim() === id)
+                || ordenOriginal;
             
-            // El telefono viene directamente en la orden como telefono_cliente
-            let rawPhone = ordenOriginal?.telefono_cliente;
+            // El teléfono viene directamente en la orden como telefono_cliente o telefono
+            let rawPhone = targetOrden?.telefono_cliente || targetOrden?.telefono || targetOrden?.celular;
             
-            // Si no está, intentamos el catálogo
+            // Si no está, intentamos el catálogo de clientes
             if (!rawPhone) {
-                const clientObj = window.allClients ? window.allClients.find(c => String(c.id_cliente) === String(ordenOriginal?.id_cliente)) : null;
-                rawPhone = clientObj ? (clientObj.telefono_cliente || clientObj.telefono) : null;
+                const clientObj = window.allClients ? window.allClients.find(c => String(c.id_cliente) === String(targetOrden?.id_cliente)) : null;
+                rawPhone = clientObj ? (clientObj.telefono_cliente || clientObj.telefono || clientObj.celular) : null;
             }
             
             let finalPhone = rawPhone ? String(rawPhone).replace(/\D/g, '') : null;
-            
             if (finalPhone && finalPhone.length === 10) {
                 finalPhone = '52' + finalPhone;
             }
             
+            // Si no se encontró teléfono registrado, solicitarlo al administrador
+            if (!finalPhone) {
+                const { value: manualPhone } = await Swal.fire({
+                    title: 'Notificar por WhatsApp',
+                    text: `No se encontró teléfono registrado para la orden ${id_orden}. Ingresa el número de WhatsApp del cliente:`,
+                    input: 'text',
+                    inputPlaceholder: 'Ej. 5512345678',
+                    showCancelButton: true,
+                    confirmButtonColor: '#25D366',
+                    confirmButtonText: 'Enviar WhatsApp',
+                    cancelButtonText: 'Omitir Notificación',
+                    background: '#151515', color: '#fff'
+                });
+                if (manualPhone) {
+                    let clean = manualPhone.replace(/\D/g, '');
+                    if (clean.length === 10) clean = '52' + clean;
+                    if (clean) finalPhone = clean;
+                }
+            }
+            
             if (finalPhone) {
                 let nombreCorto = 'Cliente';
-                if (ordenOriginal?.nombre_cliente) {
-                    nombreCorto = ordenOriginal.nombre_cliente.split(' ')[0];
+                if (targetOrden?.nombre_cliente) {
+                    nombreCorto = targetOrden.nombre_cliente.split(' ')[0];
                 }
                 
-                const waText = encodeURIComponent(`*Actualización de Pedido* 📦\n\nHola ${nombreCorto},\nEl estatus de tu orden *${id_orden}* ha cambiado a: *${nuevo_estatus}*.\n\n¡Gracias por tu preferencia!`);
+                const mensajeGuia = trackingGuide ? `\n\n📦 *Número de Guía / Rastreo:* ${trackingGuide}` : '';
+                const waText = encodeURIComponent(`*Actualización de Pedido* 🚚\n\nHola ${nombreCorto},\nEl estatus de tu orden *${id_orden}* ha cambiado a: *${nuevo_estatus}*.${mensajeGuia}\n\n¡Gracias por tu preferencia!`);
                 const waUrl = `https://wa.me/${finalPhone}?text=${waText}`;
                 
                 // 🚀 Abrir WhatsApp automáticamente
@@ -6015,6 +6037,14 @@ function renderManualExcelItems() {
     });
     
     if (totalQtyEl) totalQtyEl.textContent = totalQty;
+    
+    // Auto-scroll al final del contenedor para visualizar inmediatamente la prenda agregada
+    const scrollBox = document.getElementById('excel-pedido-list-scroll-container');
+    if (scrollBox) {
+        setTimeout(() => {
+            scrollBox.scrollTop = scrollBox.scrollHeight;
+        }, 50);
+    }
 }
 
 async function generateExcelFromManualItems() {
@@ -6160,7 +6190,11 @@ async function generateExcelFromManualItems() {
                         extension: ext
                     });
                     
-                    worksheet.addImage(imageId, `B${rowStart}:B${rowEnd}`);
+                    worksheet.addImage(imageId, {
+                        tl: { col: 1, row: rowStart - 1 },
+                        br: { col: 2, row: rowEnd },
+                        editAs: 'oneCell'
+                    });
                 } catch (imgError) {
                     console.error("Error al procesar imagen local para Excel:", imgError);
                 }
@@ -6184,7 +6218,11 @@ async function generateExcelFromManualItems() {
                         extension: patchExt
                     });
                     
-                    worksheet.addImage(patchImageId, `H${rowStart}:H${rowEnd}`);
+                    worksheet.addImage(patchImageId, {
+                        tl: { col: 7, row: rowStart - 1 },
+                        br: { col: 8, row: rowEnd },
+                        editAs: 'oneCell'
+                    });
                 } catch (patchImgError) {
                     console.error("Error al procesar imagen de parche para Excel:", patchImgError);
                 }
