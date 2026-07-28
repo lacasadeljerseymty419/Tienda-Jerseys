@@ -196,32 +196,50 @@
                             <span class="hidden sm:inline">Administración</span>
                         </button>
                         <!-- Menú desplegable -->
-                        <div class="absolute right-0 mt-2 w-48 bg-dark-100 border border-white/10 rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 transform origin-top-right translate-y-2 group-hover:translate-y-0 z-50">
-                            <div class="p-2">
-                                <button class="action-nav-catalogo w-full text-left px-4 py-2 text-sm text-gray-300 hover:text-white hover:bg-navy-500/20 rounded-lg transition-colors flex items-center gap-2">
+                        <div class="absolute right-0 mt-2 w-52 bg-dark-100 border border-white/10 rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 transform origin-top-right translate-y-2 group-hover:translate-y-0 z-50">
+                            <div class="p-2 space-y-0.5">
+                                <button class="action-nav-catalogo w-full text-left px-3.5 py-2 text-xs font-medium text-gray-300 hover:text-white hover:bg-navy-500/20 rounded-lg transition-colors flex items-center gap-2">
                                     <svg class="w-4 h-4 text-navy-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
                                     Catálogo
                                 </button>
-                                <button class="action-open-create w-full text-left px-4 py-2 text-sm text-gray-300 hover:text-white hover:bg-navy-500/20 rounded-lg transition-colors flex items-center gap-2 mt-1">
+                                <button class="action-open-create w-full text-left px-3.5 py-2 text-xs font-medium text-gray-300 hover:text-white hover:bg-navy-500/20 rounded-lg transition-colors flex items-center gap-2">
                                     <svg class="w-4 h-4 text-navy-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
                                     Nuevo Jersey
                                 </button>
-                                <button class="action-open-list w-full text-left px-4 py-2 text-sm text-gray-300 hover:text-white hover:bg-navy-500/20 rounded-lg transition-colors flex items-center gap-2 mt-1">
+                                <button class="action-open-list w-full text-left px-3.5 py-2 text-xs font-medium text-gray-300 hover:text-white hover:bg-navy-500/20 rounded-lg transition-colors flex items-center gap-2">
                                     <svg class="w-4 h-4 text-navy-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path></svg>
                                     Mis Jerseys
                                 </button>
-                                <button class="action-open-clients w-full text-left px-4 py-2 text-sm text-gray-300 hover:text-white hover:bg-navy-500/20 rounded-lg transition-colors flex items-center gap-2 mt-1">
+                                <button class="action-open-clients w-full text-left px-3.5 py-2 text-xs font-medium text-gray-300 hover:text-white hover:bg-navy-500/20 rounded-lg transition-colors flex items-center gap-2">
                                     <svg class="w-4 h-4 text-navy-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
                                     Clientes
                                 </button>
-                                <button class="action-open-orders w-full text-left px-4 py-2 text-sm text-gray-300 hover:text-white hover:bg-navy-500/20 rounded-lg transition-colors flex items-center gap-2 mt-1">
+                                <button class="action-open-orders w-full text-left px-3.5 py-2 text-xs font-medium text-gray-300 hover:text-white hover:bg-navy-500/20 rounded-lg transition-colors flex items-center gap-2">
                                     <svg class="w-4 h-4 text-navy-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
                                     Órdenes/Pedidos
                                 </button>
-                                <button onclick="if(window.openExcelOrdersModal) window.openExcelOrdersModal(); if(window.closemobileMenu) window.closemobileMenu();" class="action-open-excel-orders w-full text-left px-4 py-2 text-sm text-gray-300 hover:text-white hover:bg-navy-500/20 rounded-lg transition-colors flex items-center gap-2 mt-1">
-                                    <svg class="w-4 h-4 text-navy-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                                    Crear Pedido (Excel)
-                                </button>
+
+                                <!-- Submenú Proveedor -->
+                                <div class="relative group/sub pt-1 border-t border-white/10">
+                                    <button class="w-full text-left px-3.5 py-2 text-xs font-semibold text-gray-200 hover:text-white hover:bg-navy-500/20 rounded-lg transition-colors flex items-center justify-between">
+                                        <span class="flex items-center gap-2">
+                                            <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
+                                            Proveedor
+                                        </span>
+                                        <svg class="w-3.5 h-3.5 text-gray-400 group-hover/sub:text-white transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                                    </button>
+                                    <!-- Menú Desplegable Secundario (Flyout) -->
+                                    <div class="absolute left-full top-0 ml-1 w-64 bg-dark-100 border border-white/10 rounded-xl shadow-2xl opacity-0 invisible group-hover/sub:opacity-100 group-hover/sub:visible transition-all duration-200 z-50 p-2 space-y-1">
+                                        <button onclick="if(window.openExcelOrdersModal) window.openExcelOrdersModal();" class="action-open-excel-orders w-full text-left px-3 py-2 text-xs text-gray-300 hover:text-white hover:bg-navy-500/20 rounded-lg transition-colors flex items-center gap-2">
+                                            <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                                            Crear Pedidos Proveedor Excel
+                                        </button>
+                                        <button onclick="if(window.openSupplierOrdersModal) window.openSupplierOrdersModal();" class="action-open-supplier-orders w-full text-left px-3 py-2 text-xs text-gray-300 hover:text-white hover:bg-navy-500/20 rounded-lg transition-colors flex items-center gap-2">
+                                            <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 4H6a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-2m-4-1v8m0 0l3-3m-3 3L9 8m-5 5h2.586a1 1 0 01.707.293l2.414 2.414a1 1 0 00.707.293h3.172a1 1 0 00.707-.293l2.414-2.414a1 1 0 01.707-.293H20"></path></svg>
+                                            Pedidos a Proveedor
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -323,10 +341,24 @@
                         <svg class="w-5 h-5 text-navy-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
                         Órdenes/Pedidos
                     </button>
-                    <button onclick="if(window.openExcelOrdersModal) window.openExcelOrdersModal(); if(window.closemobileMenu) window.closemobileMenu();" class="action-open-excel-orders w-full text-left px-4 py-3 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-xl transition-colors flex items-center gap-3">
-                        <svg class="w-5 h-5 text-navy-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                        Crear Pedido (Excel)
-                    </button>
+
+                    <!-- Submenú Proveedor Móvil -->
+                    <div class="mt-2 pt-2 border-t border-white/5">
+                        <div class="px-2 py-1 text-[10px] font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-2">
+                            <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
+                            Proveedor
+                        </div>
+                        <div class="pl-2 space-y-1 mt-1">
+                            <button onclick="if(window.openExcelOrdersModal) window.openExcelOrdersModal(); if(window.closemobileMenu) window.closemobileMenu();" class="action-open-excel-orders w-full text-left px-4 py-2.5 text-xs text-gray-300 hover:text-white hover:bg-white/5 rounded-xl transition-colors flex items-center gap-3">
+                                <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                                Crear Pedidos Proveedor Excel
+                            </button>
+                            <button onclick="if(window.openSupplierOrdersModal) window.openSupplierOrdersModal(); if(window.closemobileMenu) window.closemobileMenu();" class="action-open-supplier-orders w-full text-left px-4 py-2.5 text-xs text-gray-300 hover:text-white hover:bg-white/5 rounded-xl transition-colors flex items-center gap-3">
+                                <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 4H6a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-2m-4-1v8m0 0l3-3m-3 3L9 8m-5 5h2.586a1 1 0 01.707.293l2.414 2.414a1 1 0 00.707.293h3.172a1 1 0 00.707-.293l2.414-2.414a1 1 0 01.707-.293H20"></path></svg>
+                                Pedidos a Proveedor
+                            </button>
+                        </div>
+                    </div>
                 </div>
                 
                 <!-- User actions -->
@@ -1052,6 +1084,112 @@
         </div>
     </div>
 
+    <!-- Modal de Administración: Pedidos a Proveedor (Historial & Ingesta a Stock) -->
+    <div id="admin-supplier-orders-modal" class="fixed inset-0 z-[60] flex items-center justify-center hidden bg-dark/90 backdrop-blur-sm transition-opacity duration-300 opacity-0 overflow-y-auto py-6 sm:py-10">
+        <div class="bg-dark-100 border border-white/10 rounded-2xl w-full max-w-5xl mx-4 shadow-2xl shadow-navy-500/10 transform scale-95 transition-transform duration-300 flex flex-col my-auto relative max-h-none sm:max-h-[90vh]">
+            <!-- Header -->
+            <div class="p-4 sm:p-6 border-b border-white/5 flex justify-between items-center bg-dark-100/90 backdrop-blur-md rounded-t-2xl z-10 flex-shrink-0">
+                <div>
+                    <h2 class="text-xl sm:text-2xl font-bold text-white flex items-center gap-3">
+                        <span class="bg-navy-500/20 text-navy-400 p-2 rounded-lg">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 4H6a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-2m-4-1v8m0 0l3-3m-3 3L9 8m-5 5h2.586a1 1 0 01.707.293l2.414 2.414a1 1 0 00.707.293h3.172a1 1 0 00.707-.293l2.414-2.414a1 1 0 01.707-.293H20"></path></svg>
+                        </span>
+                        Pedidos a Proveedor
+                    </h2>
+                    <p class="text-xs sm:text-sm text-gray-400 mt-1">Historial de pedidos a proveedor, asignación de catálogo y migración a stock.</p>
+                </div>
+                <button onclick="if(window.closeSupplierOrdersModal) window.closeSupplierOrdersModal();" class="text-white/50 hover:text-white transition-colors p-2 bg-white/5 rounded-full hover:bg-white/10">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            
+            <div class="p-4 sm:p-6 flex-grow overflow-y-auto flex flex-col space-y-4">
+                <!-- Filtros -->
+                <div class="bg-dark-200/50 p-4 rounded-xl border border-white/5 flex flex-wrap gap-3 items-end">
+                    <div class="flex-grow min-w-[180px]">
+                        <label class="block text-[10px] text-gray-400 mb-1 uppercase tracking-wider">Buscar por Folio</label>
+                        <input type="text" id="admin-supplier-filtro-folio" oninput="if(window.filterSupplierOrders) window.filterSupplierOrders();" placeholder="Ej. PROV-..." class="w-full bg-dark-100 border border-white/10 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-navy-400 text-white placeholder-gray-500 transition-colors">
+                    </div>
+                    <div class="w-full sm:w-[220px]">
+                        <label class="block text-[10px] text-gray-400 mb-1 uppercase tracking-wider">Estatus</label>
+                        <select id="admin-supplier-filtro-estatus" onchange="if(window.filterSupplierOrders) window.filterSupplierOrders();" class="w-full bg-dark-100 border border-white/10 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-navy-400 text-white cursor-pointer">
+                            <option value="Pendientes" selected>Pendientes / Parciales (Por Ingresar)</option>
+                            <option value="Ingresado a Stock">Completados (Ingresados a Stock)</option>
+                            <option value="Todos">Todos los Pedidos</option>
+                        </select>
+                    </div>
+                    <button onclick="if(window.loadSupplierOrders) window.loadSupplierOrders();" class="px-4 py-2 rounded-lg bg-navy-500 hover:bg-navy-400 text-white font-bold transition-all shadow hover:shadow-navy-500/30 text-xs flex items-center gap-2 h-[38px]">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                        Refrescar
+                    </button>
+                </div>
+                
+                <!-- Tabla de Historial -->
+                <div class="flex-grow border border-white/5 rounded-2xl bg-dark-200/20 overflow-x-auto min-h-[300px]">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead>
+                            <tr class="border-b border-white/5 bg-black/40 text-gray-400 font-bold uppercase tracking-wider text-[10px]">
+                                <th class="p-3.5">Folio Pedido</th>
+                                <th class="p-3.5">Fecha</th>
+                                <th class="p-3.5">Total Piezas</th>
+                                <th class="p-3.5">Estatus</th>
+                                <th class="p-3.5 text-center">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="supplier-orders-tbody" class="divide-y divide-white/5">
+                            <!-- Filas dinámicas -->
+                        </tbody>
+                    </table>
+                    
+                    <!-- Empty State / Loading -->
+                    <div id="supplier-orders-empty" class="hidden p-10 text-center text-gray-500">
+                        <svg class="w-12 h-12 mx-auto mb-3 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path></svg>
+                        <p class="font-bold text-gray-400 text-sm">No hay pedidos a proveedor registrados</p>
+                        <p class="text-xs text-gray-600 mt-1">Crea pedidos en la sección "Crear Pedido (Excel)".</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Asignación y Migración a Stock de Pedido Proveedor -->
+    <div id="admin-supplier-order-details-modal" class="fixed inset-0 z-[70] flex items-center justify-center hidden bg-dark/95 backdrop-blur-md transition-opacity duration-300 opacity-0 overflow-y-auto py-6 sm:py-10">
+        <div class="bg-dark-100 border border-white/10 rounded-2xl w-full max-w-4xl mx-4 shadow-2xl shadow-navy-500/10 transform scale-95 transition-transform duration-300 flex flex-col my-auto relative max-h-none sm:max-h-[90vh]">
+            <div class="p-4 sm:p-6 border-b border-white/5 flex justify-between items-center bg-dark-100/90 backdrop-blur-md rounded-t-2xl flex-shrink-0">
+                <div>
+                    <h2 class="text-lg sm:text-xl font-bold text-white flex items-center gap-3">
+                        <span class="bg-navy-500/20 text-navy-400 p-2 rounded-lg">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        </span>
+                        Asignación e Ingesta a Stock: <span id="supplier-detail-folio" class="text-navy-400 font-mono"></span>
+                    </h2>
+                    <p class="text-xs text-gray-400 mt-0.5">Selecciona el id_producto del catálogo para ver la previsualización del jersey y confirmar la migración a inventario.</p>
+                </div>
+                <button onclick="if(window.closeSupplierOrderDetailsModal) window.closeSupplierOrderDetailsModal();" class="text-white/50 hover:text-white transition-colors p-2 bg-white/5 rounded-full hover:bg-white/10">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+
+            <div class="p-4 sm:p-6 flex-grow overflow-y-auto space-y-6 custom-scrollbar">
+                <!-- Desglose de Prendas del Pedido -->
+                <div id="supplier-detail-items-container" class="space-y-4">
+                    <!-- Tarjetas de asignación generadas dinámicamente -->
+                </div>
+            </div>
+
+            <!-- Footer con Botón de Confirmación -->
+            <div class="p-4 sm:p-5 bg-dark-200/50 border-t border-white/5 flex justify-between items-center rounded-b-2xl flex-shrink-0">
+                <div class="text-xs text-gray-400">
+                    Estatus: <span id="supplier-detail-status-badge" class="font-bold"></span>
+                </div>
+                <button id="btn-confirm-supplier-stock-migration" onclick="if(window.confirmSupplierStockMigration) window.confirmSupplierStockMigration();" class="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition-all shadow hover:shadow-emerald-500/20 active:scale-[0.98] text-xs flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                    Confirmar e Ingresar a Stock
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal de Detalles de Orden -->
     <div id="admin-order-details-modal" class="fixed inset-0 z-[70] flex items-center justify-center hidden bg-dark/90 backdrop-blur-sm transition-opacity duration-300 opacity-0 overflow-y-auto py-6 sm:py-10">
         <div class="bg-dark-100 border border-white/10 rounded-2xl w-full max-w-2xl mx-4 shadow-2xl shadow-navy-500/10 transform scale-95 transition-transform duration-300 flex flex-col relative max-h-[85vh]">
@@ -1664,9 +1802,9 @@
     </div>
 
     <!-- Configuración Global API -->
-    <script src="./js/config.js?v=1.0.4"></script>
+    <script src="./js/config.js?v=1.0.9"></script>
     <!-- Módulo Principal JS -->
-    <script src="./js/app2.js?v=2.6.4"></script>
+    <script src="./js/app2.js?v=2.8.8"></script>
 </body>
 </html>
 

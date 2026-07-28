@@ -6047,6 +6047,42 @@ function renderManualExcelItems() {
     }
 }
 
+function prepareCleanImageForExcel(dataUrl) {
+    return new Promise((resolve) => {
+        if (!dataUrl) return resolve(null);
+        const img = new Image();
+        img.crossOrigin = "Anonymous";
+        img.onload = () => {
+            try {
+                const canvas = document.createElement('canvas');
+                const w = img.naturalWidth || img.width || 300;
+                const h = img.naturalHeight || img.height || 400;
+                canvas.width = w;
+                canvas.height = h;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#FFFFFF';
+                ctx.fillRect(0, 0, w, h);
+                ctx.drawImage(img, 0, 0, w, h);
+                const jpegUrl = canvas.toDataURL('image/jpeg', 0.85);
+                resolve({
+                    base64: jpegUrl.split(',')[1],
+                    extension: 'jpeg',
+                    width: w,
+                    height: h
+                });
+            } catch(e) {
+                const clean = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
+                resolve({ base64: clean, extension: 'jpeg', width: 300, height: 400 });
+            }
+        };
+        img.onerror = () => {
+            const clean = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
+            resolve({ base64: clean, extension: 'jpeg', width: 300, height: 400 });
+        };
+        img.src = dataUrl;
+    });
+}
+
 async function generateExcelFromManualItems() {
     ensureExcelDOM();
     if (typeof ExcelJS === 'undefined') {
@@ -6066,7 +6102,7 @@ async function generateExcelFromManualItems() {
     }
     const originalText = btn.innerHTML;
     btn.disabled = true;
-    btn.innerHTML = `<svg class="animate-spin h-4 w-4 text-white inline mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Descargando Excel...`;
+    btn.innerHTML = `<svg class="animate-spin h-4 w-4 text-white inline mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Procesando fotos e imágenes...`;
     
     try {
         let calculatedTotalQty = 0;
@@ -6083,8 +6119,6 @@ async function generateExcelFromManualItems() {
                 grouped[key] = {
                     code: item.code,
                     foto: item.foto || '',
-                    fotoWidth: item.fotoWidth || 100,
-                    fotoHeight: item.fotoHeight || 100,
                     patch: item.patch || '',
                     remark: item.remark || '-',
                     items: []
@@ -6093,24 +6127,36 @@ async function generateExcelFromManualItems() {
             grouped[key].items.push(item);
         });
         
+        // Re-codificar e higienizar imágenes a formato estándar JPEG vía Canvas (100% compatible con visores móviles)
+        const preparedImagesMap = {};
+        await Promise.all(Object.keys(grouped).map(async (code) => {
+            const prod = grouped[code];
+            if (prod.foto) {
+                preparedImagesMap[code] = await prepareCleanImageForExcel(prod.foto);
+            }
+            if (prod.patch) {
+                preparedImagesMap[code + '_patch'] = await prepareCleanImageForExcel(prod.patch);
+            }
+        }));
+        
         const workbook = new ExcelJS.Workbook();
         const worksheet = workbook.addWorksheet('Pedido');
         
         worksheet.columns = [
             { header: 'Code', key: 'code', width: 18 },
-            { header: 'Image', key: 'image', width: 22 },
+            { header: 'Image', key: 'image', width: 26 },
             { header: 'Remark', key: 'remark', width: 22 },
             { header: 'size', key: 'size', width: 10 },
             { header: 'Qty', key: 'qty', width: 10 },
             { header: 'Name', key: 'name', width: 18 },
             { header: 'Number', key: 'number', width: 12 },
-            { header: 'patch', key: 'patch', width: 14 },
+            { header: 'patch', key: 'patch', width: 16 },
             { header: 'Unit Price ($)', key: 'unit_price_aux', width: 16 },
             { header: 'Unit Price ($)', key: 'unit_price_usd', width: 16 },
             { header: 'Total($)', key: 'total', width: 16 }
         ];
         
-        // Estilo de cabeceras (¡COLOR AMARILLO #FFFF00!)
+        // Estilo de cabeceras (COLOR AMARILLO #FFFF00)
         const headerRow = worksheet.getRow(1);
         headerRow.height = 32;
         headerRow.eachCell((cell) => {
@@ -6118,7 +6164,7 @@ async function generateExcelFromManualItems() {
             cell.fill = {
                 type: 'pattern',
                 pattern: 'solid',
-                fgColor: { argb: 'FFFFFF00' } // Amarillo Puro (#FFFF00)
+                fgColor: { argb: 'FFFFFF00' }
             };
             cell.alignment = { vertical: 'middle', horizontal: 'center' };
         });
@@ -6131,8 +6177,8 @@ async function generateExcelFromManualItems() {
             const rowStart = currentRow;
             const rowEnd = currentRow + numRows - 1;
             
-            const targetBlockHeight = 85;
-            const singleRowHeight = Math.max(30, targetBlockHeight / numRows);
+            const targetBlockHeight = Math.max(95, numRows * 35);
+            const singleRowHeight = Math.max(32, targetBlockHeight / numRows);
             
             for (let idx = 0; idx < numRows; idx++) {
                 const item = prod.items[idx];
@@ -6178,29 +6224,40 @@ async function generateExcelFromManualItems() {
             cellC.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
             cellC.font = { name: '宋体', size: 10 };
             
-            if (prod.foto) {
+            const prepFoto = preparedImagesMap[code];
+            if (prepFoto && prepFoto.base64) {
                 try {
-                    const cleanBase64 = prod.foto.includes(',') ? prod.foto.split(',')[1] : prod.foto;
-                    let ext = 'jpeg';
-                    if (prod.foto.includes('image/png')) ext = 'png';
-                    else if (prod.foto.includes('image/gif')) ext = 'gif';
-                    
                     const imageId = workbook.addImage({
-                        base64: cleanBase64,
-                        extension: ext
+                        base64: prepFoto.base64,
+                        extension: prepFoto.extension || 'jpeg'
                     });
+                    
+                    const totalBlockHeightPx = Math.max(80, (singleRowHeight * numRows) * 1.30);
+                    const colWidthPx = 180;
+                    const maxBoxW = 160;
+                    const maxBoxH = totalBlockHeightPx - 8;
+                    
+                    // Escalar preservando la relación de aspecto original de la fotografía
+                    const scale = Math.min(maxBoxW / prepFoto.width, maxBoxH / prepFoto.height);
+                    const finalW = Math.max(30, Math.round(prepFoto.width * scale));
+                    const finalH = Math.max(30, Math.round(prepFoto.height * scale));
+                    
+                    // Offsets para centrado horizontal y vertical en la celda B
+                    const colCenterOffset = Math.max(0.04, (colWidthPx - finalW) / (2 * colWidthPx));
+                    const rowCenterOffset = Math.max(0.04, (totalBlockHeightPx - finalH) / (2 * totalBlockHeightPx));
                     
                     worksheet.addImage(imageId, {
-                        tl: { col: 1.05, row: rowStart - 0.95 },
-                        br: { col: 1.95, row: rowEnd - 0.05 },
-                        editAs: 'twoCell'
+                        tl: { col: 1.0 + colCenterOffset, row: (rowStart - 1.0) + rowCenterOffset },
+                        ext: { width: finalW, height: finalH },
+                        editAs: 'oneCell' // Estándar de anclaje universal para visores móviles (Apple Files/QuickLook/Excel Mobile)
                     });
                 } catch (imgError) {
-                    console.error("Error al procesar imagen local para Excel:", imgError);
+                    console.error("Error al procesar imagen limpia para Excel:", imgError);
                 }
             }
             
-            if (prod.patch) {
+            const prepPatch = preparedImagesMap[code + '_patch'];
+            if (prepPatch && prepPatch.base64) {
                 if (numRows > 1) {
                     worksheet.mergeCells(`H${rowStart}:H${rowEnd}`);
                 }
@@ -6208,23 +6265,23 @@ async function generateExcelFromManualItems() {
                 cellH.alignment = { vertical: 'middle', horizontal: 'center' };
                 
                 try {
-                    const cleanPatchBase64 = prod.patch.includes(',') ? prod.patch.split(',')[1] : prod.patch;
-                    let patchExt = 'jpeg';
-                    if (prod.patch.includes('image/png')) patchExt = 'png';
-                    else if (prod.patch.includes('image/gif')) patchExt = 'gif';
-                    
                     const patchImageId = workbook.addImage({
-                        base64: cleanPatchBase64,
-                        extension: patchExt
+                        base64: prepPatch.base64,
+                        extension: prepPatch.extension || 'jpeg'
                     });
+                    
+                    const pMaxBox = Math.min(50, Math.max(25, (singleRowHeight * numRows * 1.30) - 8));
+                    const pScale = Math.min(pMaxBox / prepPatch.width, pMaxBox / prepPatch.height);
+                    const pFinalW = Math.max(15, Math.round(prepPatch.width * pScale));
+                    const pFinalH = Math.max(15, Math.round(prepPatch.height * pScale));
                     
                     worksheet.addImage(patchImageId, {
-                        tl: { col: 7.05, row: rowStart - 0.95 },
-                        br: { col: 7.95, row: rowEnd - 0.05 },
-                        editAs: 'twoCell'
+                        tl: { col: 7.1, row: (rowStart - 1.0) + 0.05 },
+                        ext: { width: pFinalW, height: pFinalH },
+                        editAs: 'oneCell'
                     });
                 } catch (patchImgError) {
-                    console.error("Error al procesar imagen de parche para Excel:", patchImgError);
+                    console.error("Error al procesar parche limpio para Excel:", patchImgError);
                 }
             }
         }
@@ -6274,21 +6331,104 @@ async function generateExcelFromManualItems() {
         const fileName = `${month}-${day} Marco.xlsx`;
         
         const buffer = await workbook.xlsx.writeBuffer();
-        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = fileName;
-        a.click();
-        window.URL.revokeObjectURL(url);
         
-        // Mostrar alerta de descarga exitosa informando la sumatoria validada de piezas
+        // Convertir buffer a base64 Data URL para compatibilidad total con celulares (iOS Safari y Android)
+        let binaryStr = '';
+        const bytes = new Uint8Array(buffer);
+        for (let i = 0; i < bytes.byteLength; i++) {
+            binaryStr += String.fromCharCode(bytes[i]);
+        }
+        const base64Excel = window.btoa(binaryStr);
+        const dataUrlExcel = 'data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,' + base64Excel;
+        
+        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const blobUrl = window.URL.createObjectURL(blob);
+        
+        // Intentar descarga automática en escritorio
+        try {
+            const a = document.createElement('a');
+            a.href = blobUrl;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        } catch(autoErr) {
+            console.warn("Descarga automática bloqueada por el navegador móvil:", autoErr);
+        }
+        
+        // Guardar también el pedido en Google Sheets con número de foto (no_foto)
+        const folioSupplier = 'PROV-' + Date.now() + Math.random().toString(36).substring(2, 5).toUpperCase();
+        try {
+            const supplierItems = [];
+            let photoNum = 1;
+            for (const code of Object.keys(grouped)) {
+                const prod = grouped[code];
+                prod.items.forEach(item => {
+                    supplierItems.push({
+                        no_foto: photoNum,
+                        id_producto: item.id_producto || '',
+                        equipo: item.remark || '',
+                        foto: item.foto || '',
+                        remark: item.remark || '',
+                        size: item.size || '',
+                        qty: item.qty || 0,
+                        name: item.name || '',
+                        number: item.number || '',
+                        patch: item.patch || ''
+                    });
+                });
+                photoNum++;
+            }
+            
+            const fechaCentroMx = new Intl.DateTimeFormat('es-MX', {
+                timeZone: 'America/Mexico_City',
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: true
+            }).format(new Date());
+            
+            const supplierPayload = {
+                action: 'save_supplier_order',
+                id_pedido_proveedor: folioSupplier,
+                fecha: fechaCentroMx,
+                items: supplierItems
+            };
+            fetch(API_URL, {
+                method: 'POST',
+                body: JSON.stringify(supplierPayload)
+            }).catch(err => console.error("Error al guardar pedido en Google Sheets:", err));
+        } catch (saveErr) {
+            console.error("Error al estructurar pedido proveedor:", saveErr);
+        }
+        
+        // Mostrar modal interactivo con botón directo de descarga para celulares (evita bloqueos de pop-up en iOS/Android)
         Swal.fire({
             icon: 'success',
-            title: '¡Excel de Pedido Descargado!',
-            text: `El archivo "${fileName}" se descargó exitosamente con un total de ${calculatedTotalQty} piezas.`,
-            background: '#151515', color: '#fff',
-            confirmButtonColor: '#1d4ed8'
+            title: '¡Excel Generado con Éxito!',
+            html: `
+                <div class="text-center space-y-3 py-2">
+                    <p class="text-xs sm:text-sm text-gray-300">
+                        Folio: <strong class="text-white font-mono">${folioSupplier}</strong> | Total: <strong class="text-emerald-400 font-bold">${calculatedTotalQty} pcs</strong>
+                    </p>
+                    <p class="text-xs text-yellow-400 bg-yellow-500/10 border border-yellow-500/20 p-2.5 rounded-lg text-left">
+                        📱 <strong>Si estás en un celular (iPhone o Android):</strong> Presiona el botón verde a continuación para guardar el archivo Excel directamente en tu dispositivo.
+                    </p>
+                    <div class="pt-2 flex flex-col gap-2">
+                        <a href="${dataUrlExcel}" download="${fileName}" class="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-lg transition-all text-sm flex items-center justify-center gap-2">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                            📥 Toca aquí para Descargar ${fileName}
+                        </a>
+                    </div>
+                </div>
+            `,
+            showConfirmButton: false,
+            showCloseButton: true,
+            background: '#151515',
+            color: '#fff'
         });
         
         // Limpiar completamente el formulario y el listado de partidas temporales
@@ -6312,6 +6452,555 @@ async function generateExcelFromManualItems() {
     }
 }
 window.generateExcelFromManualItems = generateExcelFromManualItems;
+
+// =========================================================================
+// MÓDULO: GESTIÓN DE PEDIDOS A PROVEEDOR & INGESTA / MIGRACIÓN A STOCK
+// =========================================================================
+
+let allSupplierOrders = [];
+let currentSupplierOrderEditing = null;
+
+async function openSupplierOrdersModal() {
+    const modal = document.getElementById('admin-supplier-orders-modal');
+    if (!modal) return;
+    modal.classList.remove('hidden');
+    setTimeout(() => {
+        modal.classList.remove('opacity-0');
+        const box = modal.children[0];
+        if (box) box.classList.remove('scale-95');
+    }, 10);
+    
+    if (typeof allProducts === 'undefined' || !allProducts || allProducts.length === 0) {
+        if (window.fetchInitialProducts) await window.fetchInitialProducts();
+    }
+    window.allProducts = allProducts;
+    
+    loadSupplierOrders();
+}
+window.openSupplierOrdersModal = openSupplierOrdersModal;
+
+function closeSupplierOrdersModal() {
+    const modal = document.getElementById('admin-supplier-orders-modal');
+    if (!modal) return;
+    modal.classList.add('opacity-0');
+    const box = modal.children[0];
+    if (box) box.classList.add('scale-95');
+    setTimeout(() => {
+        modal.classList.add('hidden');
+    }, 300);
+}
+window.closeSupplierOrdersModal = closeSupplierOrdersModal;
+
+async function loadSupplierOrders() {
+    const tbody = document.getElementById('supplier-orders-tbody');
+    const emptyState = document.getElementById('supplier-orders-empty');
+    
+    if (tbody) tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-gray-400"><div class="w-8 h-8 border-4 border-navy-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>Cargando pedidos a proveedor...</td></tr>`;
+    if (emptyState) emptyState.classList.add('hidden');
+    
+    try {
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'get_supplier_orders' })
+        });
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            allSupplierOrders = data.orders || [];
+            renderSupplierOrdersList(allSupplierOrders);
+        } else {
+            throw new Error(data.message || 'Error al obtener pedidos a proveedor');
+        }
+    } catch (error) {
+        console.error("Error al cargar pedidos a proveedor:", error);
+        if (tbody) tbody.innerHTML = '';
+        if (emptyState) {
+            emptyState.classList.remove('hidden');
+            emptyState.querySelector('p').textContent = 'No se pudieron cargar los pedidos. Intenta nuevamente.';
+        }
+    }
+}
+window.loadSupplierOrders = loadSupplierOrders;
+
+function filterSupplierOrders() {
+    const filterFolio = (document.getElementById('admin-supplier-filtro-folio')?.value || '').trim().toLowerCase();
+    const filterStatus = (document.getElementById('admin-supplier-filtro-estatus')?.value || '').trim();
+    
+    let filtered = allSupplierOrders.filter(order => {
+        const matchFolio = !filterFolio || String(order.id_pedido_proveedor).toLowerCase().includes(filterFolio);
+        const matchStatus = !filterStatus || order.estatus === filterStatus;
+        return matchFolio && matchStatus;
+    });
+    
+    renderSupplierOrdersList(filtered);
+}
+window.filterSupplierOrders = filterSupplierOrders;
+
+function renderSupplierOrdersList(orders) {
+    const tbody = document.getElementById('supplier-orders-tbody');
+    const emptyState = document.getElementById('supplier-orders-empty');
+    
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    
+    if (!orders || orders.length === 0) {
+        if (emptyState) emptyState.classList.remove('hidden');
+        return;
+    }
+    
+    if (emptyState) emptyState.classList.add('hidden');
+    
+    orders.forEach(order => {
+        const tr = document.createElement('tr');
+        tr.className = 'border-b border-white/5 hover:bg-white/5 transition-colors';
+        
+        const isMigrated = (order.estatus === 'Ingresado a Stock');
+        const isParcial = (order.estatus === 'Parcial');
+        const badgeColor = isMigrated 
+            ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' 
+            : (isParcial 
+                ? 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30' 
+                : 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30');
+            
+        let formattedDate = String(order.fecha || '-');
+        if (formattedDate.includes('T') || formattedDate.includes('Z')) {
+            try {
+                const d = new Date(order.fecha);
+                formattedDate = d.toLocaleString('es-MX', { timeZone: 'America/Mexico_City' });
+            } catch(e) {}
+        }
+        
+        tr.innerHTML = `
+            <td class="p-3.5 font-mono font-bold text-white">${order.id_pedido_proveedor}</td>
+            <td class="p-3.5 text-gray-400 text-[11px]">${formattedDate}</td>
+            <td class="p-3.5 text-gray-200 font-bold text-center">${order.total_piezas} pcs</td>
+            <td class="p-3.5">
+                <span class="px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider border ${badgeColor}">${order.estatus || 'Pendiente'}</span>
+            </td>
+            <td class="p-3.5 text-center">
+                <button type="button" onclick="window.openSupplierOrderDetailsModal('${order.id_pedido_proveedor}')" class="px-3 py-1.5 rounded-lg ${isMigrated ? 'bg-white/5 text-gray-300 hover:bg-white/10' : 'bg-emerald-600 hover:bg-emerald-500 text-white'} font-bold transition-all text-[11px] inline-flex items-center gap-1.5 shadow">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                    ${isMigrated ? 'Ver Detalle' : 'Asignar e Ingresar a Stock'}
+                </button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+async function openSupplierOrderDetailsModal(folio) {
+    const order = allSupplierOrders.find(o => String(o.id_pedido_proveedor) === String(folio));
+    if (!order) {
+        Swal.fire({ icon: 'error', title: 'Pedido no encontrado', text: 'No se encontraron los datos del pedido ' + folio, background: '#151515', color: '#fff' });
+        return;
+    }
+    
+    if (typeof allProducts === 'undefined' || !allProducts || allProducts.length === 0) {
+        if (window.fetchInitialProducts) await window.fetchInitialProducts();
+    }
+    window.allProducts = allProducts;
+    
+    currentSupplierOrderEditing = order;
+    
+    const modal = document.getElementById('admin-supplier-order-details-modal');
+    if (!modal) return;
+    
+    const folioEl = document.getElementById('supplier-detail-folio');
+    if (folioEl) folioEl.textContent = order.id_pedido_proveedor;
+    
+    const badgeEl = document.getElementById('supplier-detail-status-badge');
+    const isMigrated = (order.estatus === 'Ingresado a Stock');
+    const isParcial = (order.estatus === 'Parcial');
+    if (badgeEl) {
+        badgeEl.textContent = order.estatus || 'Pendiente';
+        badgeEl.className = isMigrated ? 'text-emerald-400 font-bold' : (isParcial ? 'text-cyan-400 font-bold' : 'text-yellow-400 font-bold');
+    }
+    
+    const confirmBtn = document.getElementById('btn-confirm-supplier-stock-migration');
+    if (confirmBtn) {
+        confirmBtn.disabled = isMigrated;
+        if (isMigrated) {
+            confirmBtn.innerHTML = `✓ Ya Ingresado a Stock`;
+            confirmBtn.className = `px-6 py-2.5 rounded-xl bg-white/10 text-gray-500 font-bold cursor-not-allowed text-xs flex items-center gap-2`;
+        } else {
+            confirmBtn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg> Confirmar e Ingresar a Stock`;
+            confirmBtn.className = `px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition-all shadow hover:shadow-emerald-500/20 active:scale-[0.98] text-xs flex items-center gap-2`;
+        }
+    }
+    
+    renderSupplierItemAssignments(order);
+    
+    modal.classList.remove('hidden');
+    setTimeout(() => {
+        modal.classList.remove('opacity-0');
+        const box = modal.children[0];
+        if (box) box.classList.remove('scale-95');
+    }, 10);
+}
+window.openSupplierOrderDetailsModal = openSupplierOrderDetailsModal;
+
+function closeSupplierOrderDetailsModal() {
+    const modal = document.getElementById('admin-supplier-order-details-modal');
+    if (!modal) return;
+    modal.classList.add('opacity-0');
+    const box = modal.children[0];
+    if (box) box.classList.add('scale-95');
+    setTimeout(() => {
+        modal.classList.add('hidden');
+    }, 300);
+}
+window.closeSupplierOrderDetailsModal = closeSupplierOrderDetailsModal;
+
+function renderSupplierItemAssignments(order) {
+    const container = document.getElementById('supplier-detail-items-container');
+    if (!container) return;
+    container.innerHTML = '';
+    
+    // Agrupar ítems por no_foto / foto / remark para presentar tarjetas agrupadas por jersey
+    const groupedItems = {};
+    order.items.forEach((item, itemIdx) => {
+        const photoNo = item.no_foto || (Object.keys(groupedItems).length + 1);
+        const key = item.no_foto ? `Foto_${item.no_foto}` : (item.foto || item.remark || `Item_${itemIdx}`);
+        if (!groupedItems[key]) {
+            groupedItems[key] = {
+                no_foto: photoNo,
+                remark: item.remark,
+                foto: item.foto,
+                id_producto: item.id_producto || '',
+                tallasQty: {},
+                items: []
+            };
+        }
+        groupedItems[key].items.push(item);
+        const s = item.size || 'Única';
+        groupedItems[key].tallasQty[s] = (groupedItems[key].tallasQty[s] || 0) + (Number(item.qty) || 0);
+    });
+    
+    // Guardar referencia en el objeto global para confirmSupplierStockMigration
+    currentSupplierOrderEditing._groupedItems = groupedItems;
+    
+    // Obtener la lista de productos del catálogo de la memoria global
+    const catalogProducts = (typeof allProducts !== 'undefined' && allProducts && allProducts.length > 0) ? allProducts : (window.allProducts || []);
+    
+    Object.keys(groupedItems).forEach((groupKey, idx) => {
+        const group = groupedItems[groupKey];
+        
+        const card = document.createElement('div');
+        card.className = 'bg-dark-200/40 border border-white/5 rounded-2xl p-4 sm:p-5 space-y-4';
+        
+        let tallasBadgesHtml = '';
+        Object.keys(group.tallasQty).forEach(sz => {
+            const pendingQty = group.tallasQty[sz];
+            tallasBadgesHtml += `
+                <div class="flex items-center gap-1.5 bg-black/40 border border-white/10 p-1.5 rounded-lg my-0.5">
+                    <span class="text-gray-300 text-xs font-mono font-bold">${sz}:</span>
+                    <input type="number" id="supplier-qty-input-${idx}-${sz}" data-size="${sz}" data-pending="${pendingQty}" value="${pendingQty}" min="0" max="${pendingQty}" class="w-14 bg-dark-100 border border-white/10 text-emerald-400 font-bold text-xs rounded px-1.5 py-0.5 text-center focus:border-emerald-400 focus:outline-none">
+                    <span class="text-[10px] text-gray-400 font-mono">/ ${pendingQty} pend.</span>
+                </div>
+            `;
+        });
+        
+        // Crear opciones para el select de catálogo
+        let selectOptionsHtml = `<option value="">-- Seleccionar Playera del Catálogo (${catalogProducts.length} disponib.) --</option>`;
+        catalogProducts.forEach(prod => {
+            const pId = prod.id_producto || prod.id || prod.code || '';
+            const isSelected = String(pId) === String(group.id_producto);
+            const teamTitle = prod.nombre || prod.equipo || prod.titulo || 'Jersey del Catálogo';
+            const verGen = [prod.tipo, prod.version, prod.genero].filter(Boolean).join(' ');
+            const displayLabel = verGen ? `${teamTitle} (${verGen})` : teamTitle;
+            selectOptionsHtml += `<option value="${pId}" ${isSelected ? 'selected' : ''}>${displayLabel}</option>`;
+        });
+        
+        card.innerHTML = `
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
+                <!-- Columna Izquierda: Datos solicitados al Proveedor -->
+                <div class="md:col-span-6 space-y-3 bg-black/20 p-3.5 rounded-xl border border-white/5">
+                    <div class="flex justify-between items-center border-b border-white/5 pb-1 flex-wrap gap-1">
+                        <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                            <span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-mono font-bold text-[11px] border border-emerald-500/30">Foto #${group.no_foto}</span>
+                            Solicitado a Proveedor
+                        </span>
+                        <span class="text-[9px] text-emerald-400 font-bold">Modifica si llegaron menos</span>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <div class="w-14 h-14 flex-shrink-0 bg-dark-100 border border-white/10 rounded-lg overflow-hidden p-0.5 mt-1">
+                            ${group.foto ? `<img src="${group.foto}" class="w-full h-full object-contain">` : `<div class="w-full h-full flex items-center justify-center text-[8px] text-gray-600">Sin foto</div>`}
+                        </div>
+                        <div class="flex-grow">
+                            <div class="text-xs font-bold text-white mb-1.5">${group.remark}</div>
+                            <div class="flex flex-wrap gap-1.5">${tallasBadgesHtml}</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Columna Derecha: Selección e Previsualización del Catálogo -->
+                <div class="md:col-span-6 space-y-3">
+                    <div>
+                        <label class="block text-[10px] font-bold text-navy-400 uppercase tracking-wider mb-1">Conectar con Producto del Catálogo (Stock)</label>
+                        <div class="space-y-1.5">
+                            <div class="relative">
+                                <input type="text" id="supplier-item-search-${idx}" oninput="window.filterSupplierCatalogSelect(${idx}, this.value)" placeholder="🔍 Filtrar por nombre, tipo o versión (ej. Tigres, Local, Jugador)..." class="w-full bg-dark-100/90 border border-white/10 rounded-lg pl-8 pr-3 py-2 text-xs focus:outline-none focus:border-navy-400 text-white placeholder-gray-500 transition-colors">
+                                <svg class="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-2.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                            </div>
+                            <select id="supplier-item-select-${idx}" data-group-key="${groupKey}" onchange="window.handleSupplierProductSelectChange(${idx}, this.value)" class="w-full bg-dark-100 border border-white/10 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-navy-400 text-white cursor-pointer">
+                                ${selectOptionsHtml}
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- Tarjeta de Previsualización Visual de la Playera -->
+                    <div id="supplier-item-preview-card-${idx}" class="transition-all duration-300">
+                        <!-- Se puebla dinámicamente -->
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        container.appendChild(card);
+        
+        // Disparar render inicial si ya tenía id_producto pre-seleccionado
+        if (group.id_producto) {
+            handleSupplierProductSelectChange(idx, group.id_producto);
+        } else {
+            handleSupplierProductSelectChange(idx, '');
+        }
+    });
+}
+
+function removeAccentsAndSpecialChars(str) {
+    if (!str) return '';
+    return String(str)
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9\s]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+}
+window.removeAccentsAndSpecialChars = removeAccentsAndSpecialChars;
+
+function filterSupplierCatalogSelect(idx, searchText) {
+    const select = document.getElementById(`supplier-item-select-${idx}`);
+    if (!select) return;
+    
+    const catalogProducts = (typeof allProducts !== 'undefined' && allProducts && allProducts.length > 0) ? allProducts : (window.allProducts || []);
+    const cleanQuery = removeAccentsAndSpecialChars(searchText);
+    
+    const currentVal = select.value;
+    
+    const filtered = catalogProducts.filter(prod => {
+        if (!cleanQuery) return true;
+        const title = removeAccentsAndSpecialChars(prod.nombre || prod.equipo || prod.titulo || '');
+        const verGen = removeAccentsAndSpecialChars([prod.tipo, prod.version, prod.genero].filter(Boolean).join(' '));
+        const fullTarget = (title + ' ' + verGen).trim();
+        
+        const queryWords = cleanQuery.split(' ').filter(Boolean);
+        return queryWords.every(word => fullTarget.includes(word));
+    });
+    
+    let optionsHtml = `<option value="">-- ${cleanQuery ? `Coincidencias (${filtered.length})` : `Seleccionar Playera del Catálogo (${catalogProducts.length} disponib.)`} --</option>`;
+    
+    filtered.forEach(prod => {
+        const pId = prod.id_producto || prod.id || prod.code || '';
+        const isSelected = String(pId) === String(currentVal);
+        const teamTitle = prod.nombre || prod.equipo || prod.titulo || 'Jersey del Catálogo';
+        const verGen = [prod.tipo, prod.version, prod.genero].filter(Boolean).join(' ');
+        const displayLabel = verGen ? `${teamTitle} (${verGen})` : teamTitle;
+        optionsHtml += `<option value="${pId}" ${isSelected ? 'selected' : ''}>${displayLabel}</option>`;
+    });
+    
+    select.innerHTML = optionsHtml;
+    
+    // Auto-seleccionar si hay coincidencia única para máxima rapidez
+    if (filtered.length === 1 && cleanQuery.length >= 2) {
+        const singleId = filtered[0].id_producto || filtered[0].id || filtered[0].code;
+        select.value = singleId;
+        handleSupplierProductSelectChange(idx, singleId);
+    }
+}
+window.filterSupplierCatalogSelect = filterSupplierCatalogSelect;
+
+function handleSupplierProductSelectChange(idx, selectedId) {
+    const cardContainer = document.getElementById(`supplier-item-preview-card-${idx}`);
+    if (!cardContainer) return;
+    
+    if (!selectedId) {
+        cardContainer.innerHTML = `
+            <div class="p-3 bg-dark-100/50 border border-dashed border-white/10 rounded-xl text-center text-xs text-gray-500 flex items-center justify-center gap-2">
+                <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                Selecciona el producto del catálogo para verificar la playera.
+            </div>
+        `;
+        return;
+    }
+    
+    const catalogProducts = (typeof allProducts !== 'undefined' && allProducts && allProducts.length > 0) ? allProducts : (window.allProducts || []);
+    const prod = catalogProducts.find(p => String(p.id_producto || p.id || p.code) === String(selectedId));
+    
+    if (!prod) {
+        cardContainer.innerHTML = `<div class="p-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-xs">Producto no encontrado en inventario local.</div>`;
+        return;
+    }
+    
+    const prodImg = (prod.foto || prod.imagen || '').split(',')[0] || '';
+    const teamTitle = prod.nombre || prod.equipo || prod.titulo || 'Jersey del Catálogo';
+    const verGen = [prod.tipo, prod.version, prod.genero].filter(Boolean).join(' ');
+    const prodId = prod.id_producto || prod.id || prod.code || '';
+    
+    // Obtener tallas actuales en el catálogo
+    let stockBadges = '';
+    if (Array.isArray(prod.tallas)) {
+        prod.tallas.forEach(t => {
+            const val = t.stock !== undefined ? t.stock : t.inventario;
+            stockBadges += `<span class="px-1.5 py-0.5 rounded bg-black/40 border border-white/10 text-[10px] text-emerald-400 font-mono font-bold mr-1">${t.talla}: ${val}</span>`;
+        });
+    } else {
+        const tallasDict = prod.tallas || prod.stock || {};
+        Object.keys(tallasDict).forEach(sz => {
+            stockBadges += `<span class="px-1.5 py-0.5 rounded bg-black/40 border border-white/10 text-[10px] text-emerald-400 font-mono font-bold mr-1">${sz}: ${tallasDict[sz]}</span>`;
+        });
+    }
+    if (!stockBadges) stockBadges = '<span class="text-[10px] text-gray-500">Sin registro de tallas</span>';
+    
+    cardContainer.innerHTML = `
+        <div class="p-3.5 bg-emerald-500/10 border border-emerald-500/30 rounded-xl space-y-2 relative">
+            <div class="flex items-center gap-3">
+                <div class="w-12 h-12 flex-shrink-0 bg-dark-200 border border-white/10 rounded-lg overflow-hidden p-0.5">
+                    ${prodImg ? `<img src="${prodImg}" class="w-full h-full object-contain">` : `<div class="w-full h-full flex items-center justify-center text-[8px] text-gray-500">Sin foto</div>`}
+                </div>
+                <div class="min-w-0 flex-grow">
+                    <div class="flex items-center justify-between gap-1">
+                        <span class="text-xs font-bold text-white truncate">${teamTitle}</span>
+                        <span class="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-[9px] font-bold uppercase tracking-wider flex items-center gap-1 flex-shrink-0">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            Verificado
+                        </span>
+                    </div>
+                    <div class="text-[10px] text-gray-400 truncate">${verGen || 'Catálogo'} | ID: <strong class="text-gray-200 font-mono">${prodId}</strong></div>
+                </div>
+            </div>
+            <div class="pt-2 border-t border-white/5">
+                <div class="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Stock Actual en Catálogo:</div>
+                <div class="flex flex-wrap gap-1">${stockBadges}</div>
+            </div>
+        </div>
+    `;
+}
+window.handleSupplierProductSelectChange = handleSupplierProductSelectChange;
+
+async function confirmSupplierStockMigration() {
+    if (!currentSupplierOrderEditing) return;
+    
+    const folio = currentSupplierOrderEditing.id_pedido_proveedor;
+    const groupedItems = currentSupplierOrderEditing._groupedItems || {};
+    const groupKeys = Object.keys(groupedItems);
+    
+    // Recopilar asignaciones de id_producto para cada grupo de prendas
+    const assignments = [];
+    const container = document.getElementById('supplier-detail-items-container');
+    if (!container) return;
+    
+    const selectElements = container.querySelectorAll('select[id^="supplier-item-select-"]');
+    let hasUnassigned = false;
+    let totalReceivedInThisIngress = 0;
+    
+    selectElements.forEach((sel, idx) => {
+        const selectedId = sel.value;
+        const groupKey = groupKeys[idx];
+        const group = groupedItems[groupKey];
+        
+        if (!selectedId) {
+            hasUnassigned = true;
+        } else if (group && group.tallasQty) {
+            const tallasReceived = {};
+            const tallasRemaining = {};
+            
+            Object.keys(group.tallasQty).forEach(sz => {
+                const pendingQty = Number(group.tallasQty[sz]) || 0;
+                const inputEl = document.getElementById(`supplier-qty-input-${idx}-${sz}`);
+                const val = Number(inputEl?.value);
+                const receivedQty = (isNaN(val) || val < 0) ? pendingQty : Math.min(pendingQty, val);
+                
+                tallasReceived[sz] = receivedQty;
+                tallasRemaining[sz] = Math.max(0, pendingQty - receivedQty);
+                totalReceivedInThisIngress += receivedQty;
+            });
+            
+            assignments.push({
+                no_foto: group.no_foto || (idx + 1),
+                id_producto: selectedId,
+                groupKey: groupKey,
+                foto: group.foto || '',
+                remark: group.remark || '',
+                tallas_received: tallasReceived,
+                tallas_remaining: tallasRemaining
+            });
+        }
+    });
+    
+    if (hasUnassigned) {
+        const result = await Swal.fire({
+            title: '¿Continuar con prendas sin asignar?',
+            text: 'Algunas prendas no tienen un ID de producto seleccionado. Solo las prendas asignadas se sumarán al stock del catálogo.',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#1d4ed8',
+            cancelButtonColor: '#3f3f46',
+            confirmButtonText: 'Sí, continuar',
+            cancelButtonText: 'Asignar faltantes',
+            background: '#151515', color: '#fff'
+        });
+        if (!result.isConfirmed) return;
+    }
+    
+    if (assignments.length === 0 || totalReceivedInThisIngress === 0) {
+        Swal.fire({ icon: 'warning', title: 'Sin piezas recibidas', text: 'Ingresa al menos 1 pieza recibida en los campos para poder actualizar el inventario.', background: '#151515', color: '#fff' });
+        return;
+    }
+    
+    try {
+        Swal.fire({ title: 'Actualizando Inventario...', text: 'Sumando piezas recibidas al stock de catálogo...', allowOutsideClick: false, background: '#151515', color: '#fff', didOpen: () => { Swal.showLoading(); }});
+        
+        const payload = {
+            action: 'migrate_supplier_order_to_stock',
+            id_pedido_proveedor: folio,
+            assignments: assignments
+        };
+        
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            body: JSON.stringify(payload)
+        });
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            const finalStatus = data.final_status || 'Ingresado a Stock';
+            const isCompleted = (finalStatus === 'Ingresado a Stock');
+            
+            await Swal.fire({
+                icon: 'success',
+                title: isCompleted ? '¡Pedido Completado e Ingresado!' : '¡Ingreso Parcial Registrado!',
+                text: isCompleted 
+                    ? `Se sumaron ${totalReceivedInThisIngress} piezas al stock y el pedido ${folio} ha sido marcado como COMPLETADO.` 
+                    : `Se sumaron ${totalReceivedInThisIngress} piezas al stock. El pedido ${folio} permanece PENDIENTE/PARCIAL por las piezas restantes.`,
+                background: '#151515', color: '#fff',
+                confirmButtonColor: '#10b981'
+            });
+            
+            closeSupplierOrderDetailsModal();
+            loadSupplierOrders();
+            
+            // Recargar catálogo de la app si está disponible
+            if (window.loadCatalog) window.loadCatalog();
+        } else {
+            throw new Error(data.message || 'Error al migrar al stock');
+        }
+    } catch (err) {
+        console.error("Error al migrar pedido a stock:", err);
+        Swal.fire({ icon: 'error', title: 'Error de Ingesta', text: err.message || 'No se pudo actualizar el inventario.', background: '#151515', color: '#fff' });
+    }
+}
+window.confirmSupplierStockMigration = confirmSupplierStockMigration;
 
 
 
