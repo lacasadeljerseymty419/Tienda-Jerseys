@@ -313,6 +313,7 @@ const DOM = {
         filterTipo: document.getElementById('admin-filter-tipo'),
         filterVersion: document.getElementById('admin-filter-version'),
         filterGenero: document.getElementById('admin-filter-genero'),
+        filterActivo: document.getElementById('admin-filter-activo'),
         pagePrev: document.getElementById('admin-page-prev'),
         pageNext: document.getElementById('admin-page-next'),
         pageInfo: document.getElementById('admin-pagination-info'),
@@ -860,8 +861,11 @@ async function initApp() {
     if (DOM.admin.formUpdatePrecios) DOM.admin.formUpdatePrecios.addEventListener('submit', handleUpdatePrecios);
     
     // Filtros y paginación
-    ['filterSearch', 'filterTipo', 'filterVersion', 'filterGenero'].forEach(id => {
-        if(DOM.admin[id]) DOM.admin[id].addEventListener('input', applyAdminFilters);
+    ['filterSearch', 'filterTipo', 'filterVersion', 'filterGenero', 'filterActivo'].forEach(id => {
+        if(DOM.admin[id]) {
+            DOM.admin[id].addEventListener('input', () => applyAdminFilters());
+            DOM.admin[id].addEventListener('change', () => applyAdminFilters());
+        }
     });
     if(DOM.admin.pagePrev) DOM.admin.pagePrev.addEventListener('click', () => { if(adminCurrentPage>1) {adminCurrentPage--; renderAdminTable();} });
     if(DOM.admin.pageNext) DOM.admin.pageNext.addEventListener('click', () => { if(adminCurrentPage*adminItemsPerPage < adminFilteredProducts.length) {adminCurrentPage++; renderAdminTable();} });
@@ -1564,13 +1568,16 @@ function applyAdminFilters(keepPage = false) {
     const tipo = DOM.admin.filterTipo.value;
     const version = DOM.admin.filterVersion.value;
     const genero = DOM.admin.filterGenero.value;
+    const activoSel = DOM.admin.filterActivo ? DOM.admin.filterActivo.value : "1";
     
     adminFilteredProducts = allProducts.filter(p => {
+        const isActivoVal = (p.activo === undefined || p.activo === null || p.activo === "" || Number(p.activo) === 1) ? 1 : 0;
+        const matchActivo = (activoSel === "all") || (isActivoVal === Number(activoSel));
         const matchName = !term || (p.nombre && p.nombre.toLowerCase().includes(term));
         const matchTipo = !tipo || p.tipo === tipo;
         const matchVersion = !version || p.version === version;
         const matchGenero = !genero || p.genero === genero;
-        return matchName && matchTipo && matchVersion && matchGenero;
+        return matchActivo && matchName && matchTipo && matchVersion && matchGenero;
     });
     
     if (keepPage === true) {
@@ -1587,13 +1594,13 @@ function applyAdminFilters(keepPage = false) {
 }
 
 function openListModal() {
-    adminFilteredProducts = [...allProducts];
-    adminCurrentPage = 1;
-    
     if(DOM.admin.filterSearch) DOM.admin.filterSearch.value = '';
     if(DOM.admin.filterTipo) DOM.admin.filterTipo.value = '';
     if(DOM.admin.filterVersion) DOM.admin.filterVersion.value = '';
     if(DOM.admin.filterGenero) DOM.admin.filterGenero.value = '';
+    if(DOM.admin.filterActivo) DOM.admin.filterActivo.value = '1';
+    
+    applyAdminFilters();
     
     DOM.admin.listModal.classList.remove('hidden');
     if (document.getElementById('user-filter-id')) document.getElementById('user-filter-id').value = '';
@@ -1651,17 +1658,24 @@ function renderAdminTable() {
         }
         
         const imgUrl = getFirstImage(producto.foto || producto.imagen) || 'https://images.unsplash.com/photo-1577212017184-807dd6acefd6?auto=format&fit=crop&q=80&w=100';
-        
         const colorGenero = getGenderColorClass(producto.genero);
+        const isActivo = (producto.activo === undefined || producto.activo === null || producto.activo === "" || Number(producto.activo) === 1);
         
+        const statusBadgeHtml = isActivo
+            ? `<span class="inline-flex items-center text-[9px] font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.5 rounded leading-none">Activo</span>`
+            : `<span class="inline-flex items-center text-[9px] font-bold uppercase tracking-wider bg-red-500/20 text-red-400 border border-red-500/30 px-1.5 py-0.5 rounded leading-none">Inactivo</span>`;
+
         const tr = document.createElement('tr');
-        tr.className = 'hover:bg-white/5 transition-colors group';
+        tr.className = `hover:bg-white/5 transition-colors group ${!isActivo ? 'opacity-65 bg-red-950/10' : ''}`;
         tr.innerHTML = `
             <td class="px-3 py-2">
                 <div class="flex items-center gap-3">
                     <img src="${imgUrl}" alt="Foto" class="w-10 h-10 rounded-lg object-cover bg-dark">
                     <div>
-                        <div class="font-bold text-white text-xs group-hover:text-navy-400 transition-colors cursor-default leading-tight">${producto.nombre || 'Sin nombre'}</div>
+                        <div class="font-bold text-white text-xs group-hover:text-navy-400 transition-colors cursor-default leading-tight flex items-center gap-2">
+                            ${producto.nombre || 'Sin nombre'}
+                            ${statusBadgeHtml}
+                        </div>
                         <div class="text-[9px] font-mono text-gray-500 mt-0.5">ID: ${producto.id || 'N/A'}</div>
                     </div>
                 </div>
@@ -1683,9 +1697,14 @@ function renderAdminTable() {
                     <button class="p-1.5 rounded-md bg-navy-500/10 hover:bg-navy-500 text-navy-400 hover:text-white transition-all duration-300 shadow hover:shadow-navy-500/30 btn-manage-inv" title="Gestionar Inventario" data-id="${producto.id}">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
                     </button>
-                    <button class="p-1.5 rounded-md bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white transition-all duration-300 shadow hover:shadow-red-500/30" title="¿¿¿Eliminar Jersey" onclick="Swal.fire({icon:'info', title:'Próximamente', text:'Función de ¿¿¿Eliminar en desarrollo', background:'#151515', color:'#fff', confirmButtonColor:'#1d4ed8', customClass: {popup: 'border border-white/10 rounded-2xl'}})">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                    </button>
+                    ${isActivo 
+                        ? `<button class="p-1.5 rounded-md bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white transition-all duration-300 shadow hover:shadow-red-500/30" title="Desactivar / Borrar Lógicamente" onclick="window.handleToggleProductActive('${producto.id}', 0)">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                           </button>`
+                        : `<button class="p-1.5 rounded-md bg-emerald-500/10 hover:bg-emerald-500 text-emerald-400 hover:text-white transition-all duration-300 shadow hover:shadow-emerald-500/30" title="Reactivar Jersey" onclick="window.handleToggleProductActive('${producto.id}', 1)">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                           </button>`
+                    }
                 </div>
             </td>
         `;
@@ -1701,6 +1720,83 @@ function renderAdminTable() {
         });
     });
 }
+
+async function handleToggleProductActive(id, newStatus) {
+    const prod = allProducts.find(p => p.id === id);
+    const name = prod ? (prod.nombre || id) : id;
+    const isDeactivating = (newStatus === 0);
+
+    const confirm = await Swal.fire({
+        title: isDeactivating ? '¿Desactivar Jersey?' : '¿Reactivar Jersey?',
+        html: isDeactivating
+            ? `El jersey <strong class="text-white">${name}</strong> se marcará como <strong class="text-red-400">Inactivo (Activo = 0)</strong> y ya no se mostrará en los catálogos de venta.`
+            : `El jersey <strong class="text-white">${name}</strong> se marcará como <strong class="text-emerald-400">Activo (Activo = 1)</strong> y volverá a ser visible en los catálogos de venta.`,
+        icon: isDeactivating ? 'warning' : 'question',
+        showCancelButton: true,
+        confirmButtonColor: isDeactivating ? '#ef4444' : '#10b981',
+        cancelButtonColor: '#374151',
+        confirmButtonText: isDeactivating ? 'Sí, Desactivar' : 'Sí, Reactivar',
+        cancelButtonText: 'Cancelar',
+        background: '#151515',
+        color: '#fff',
+        customClass: { popup: 'border border-white/10 rounded-2xl' }
+    });
+
+    if (!confirm.isConfirmed) return;
+
+    Swal.fire({
+        title: isDeactivating ? 'Desactivando...' : 'Reactivando...',
+        text: 'Actualizando registro en Google Sheets...',
+        allowOutsideClick: false,
+        background: '#151515',
+        color: '#fff',
+        didOpen: () => Swal.showLoading()
+    });
+
+    try {
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            body: JSON.stringify({
+                action: 'delete_product',
+                id_producto: id,
+                activo: newStatus
+            })
+        });
+        const data = await response.json();
+
+        if (data.status === 'success') {
+            if (prod) prod.activo = newStatus;
+
+            // Limpiar caché de localStorage para actualizar vista pública inmediatamente
+            localStorage.removeItem('jerseys_products_cache_v5');
+
+            applyAdminFilters(true);
+            renderProductsWithFilters();
+
+            Swal.fire({
+                icon: 'success',
+                title: isDeactivating ? 'Jersey Desactivado' : 'Jersey Reactivado',
+                text: isDeactivating 
+                    ? 'El jersey ha sido desactivado y removido de los catálogos de venta.'
+                    : 'El jersey vuelve a estar activo y visible en los catálogos.',
+                background: '#151515',
+                color: '#fff'
+            });
+        } else {
+            throw new Error(data.message || 'No se pudo actualizar el estado del producto.');
+        }
+    } catch (err) {
+        console.error("Error al cambiar estado activo del producto:", err);
+        Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: err.message || 'Ocurrió un problema al comunicarse con el servidor.',
+            background: '#151515',
+            color: '#fff'
+        });
+    }
+}
+window.handleToggleProductActive = handleToggleProductActive;
 
 function updateNewTallaSelect(producto) {
     if (DOM.admin.newTallaVal) {
@@ -2304,6 +2400,7 @@ async function fetchInitialProducts(force = false) {
     
     if (force) {
         localStorage.removeItem(CACHE_KEY);
+        renderSkeletons(8);
     }
     
     let cachedProducts = null;
@@ -2317,7 +2414,7 @@ async function fetchInitialProducts(force = false) {
         }
     } catch (e) {}
     
-    if (cachedProducts) {
+    if (cachedProducts && !force) {
         // Cargar instantáneamente del caché
         allProducts = cachedProducts;
         renderProductsWithFilters();
@@ -2325,12 +2422,14 @@ async function fetchInitialProducts(force = false) {
         // Revalidar en segundo plano silenciosamente
         revalidateProductsBackground(CACHE_KEY);
     } else {
-        // Cargar de la API de forma síncrona
+        // Cargar de la API de forma síncrona mostrando animación de carga
+        renderSkeletons(8);
         await loadProductsFromApi(CACHE_KEY);
     }
 }
 
 async function loadProductsFromApi(cacheKey) {
+    renderSkeletons(8);
     const filtros = { nombre: "", tipo: "", version: "", genero: "" };
     try {
         const response = await search(filtros);
@@ -2385,6 +2484,9 @@ async function revalidateProductsBackground(cacheKey) {
 }
 
 function renderProductsWithFilters() {
+    // Filtrar únicamente los productos activos (Activo = 1 o vacío) para la vista pública de catálogo
+    const activeProductsOnly = (allProducts || []).filter(p => p.activo === undefined || p.activo === null || p.activo === "" || Number(p.activo) === 1);
+
     // Aplicar filtros locales de búsqueda si existen
     const hasActiveFilters = (DOM.filters.nombre && DOM.filters.nombre.value.trim() !== "") ||
                              (DOM.filters.tipo && DOM.filters.tipo.value !== "") ||
@@ -2397,7 +2499,7 @@ function renderProductsWithFilters() {
         const versionQ = DOM.filters.version ? DOM.filters.version.value : "";
         const generoQ = DOM.filters.genero ? DOM.filters.genero.value : "";
         
-        const filtrados = allProducts.filter(p => {
+        const filtrados = activeProductsOnly.filter(p => {
             let match = true;
             if (nombreQ && !(p.nombre || '').toLowerCase().includes(nombreQ)) match = false;
             if (tipoQ && p.tipo !== tipoQ) match = false;
@@ -2407,7 +2509,7 @@ function renderProductsWithFilters() {
         });
         renderLocalProducts(filtrados);
     } else {
-        renderLocalProducts(allProducts);
+        renderLocalProducts(activeProductsOnly);
     }
     
     // Si el modal de administración de lista está abierto, actualizar sus filtros e interfaz conservando la página
@@ -2426,12 +2528,13 @@ function handleLocalSearch() {
     
     // Simulamos un pequeño retraso para mostrar la animación visual de que se está filtrando
     setTimeout(() => {
+        const activeProductsOnly = (allProducts || []).filter(p => p.activo === undefined || p.activo === null || p.activo === "" || Number(p.activo) === 1);
         const nombreQ = DOM.filters.nombre.value.trim().toLowerCase();
         const tipoQ = DOM.filters.tipo.value;
         const versionQ = DOM.filters.version.value;
         const generoQ = DOM.filters.genero.value;
         
-        const filtrados = allProducts.filter(p => {
+        const filtrados = activeProductsOnly.filter(p => {
             let match = true;
             if (nombreQ && !(p.nombre || '').toLowerCase().includes(nombreQ)) match = false;
             if (tipoQ && p.tipo !== tipoQ) match = false;
