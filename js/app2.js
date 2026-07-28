@@ -1,4 +1,4 @@
-const API_URL = window.API_URL || "https://script.google.com/macros/s/AKfycbwULvs_KrTTGdq0s1J5OOgRKF3r8iGqgqKDoGZYcVNlEIGO7UOABejoBY67qVJhEVU0oQ/exec";
+const API_URL = window.API_URL || "https://script.google.com/macros/s/AKfycbwFJOc0jVAcOPbfJN8hgf59I-MoE9_JCbVQCDyBRHXRThVnMUcIinKmnACc4hu_P5H0bg/exec";
 
 // --- MONKEY PATCH FETCH PARA INYECCIÓN Y VALIDACIÓN DE TOKENS ---
 (function() {
@@ -1568,7 +1568,7 @@ function applyAdminFilters(keepPage = false) {
     const tipo = DOM.admin.filterTipo.value;
     const version = DOM.admin.filterVersion.value;
     const genero = DOM.admin.filterGenero.value;
-    const activoSel = DOM.admin.filterActivo ? DOM.admin.filterActivo.value : "1";
+    const activoSel = DOM.admin.filterActivo ? DOM.admin.filterActivo.value : "all";
     
     adminFilteredProducts = allProducts.filter(p => {
         const isActivoVal = (p.activo === undefined || p.activo === null || p.activo === "" || Number(p.activo) === 1) ? 1 : 0;
@@ -1598,7 +1598,7 @@ function openListModal() {
     if(DOM.admin.filterTipo) DOM.admin.filterTipo.value = '';
     if(DOM.admin.filterVersion) DOM.admin.filterVersion.value = '';
     if(DOM.admin.filterGenero) DOM.admin.filterGenero.value = '';
-    if(DOM.admin.filterActivo) DOM.admin.filterActivo.value = '1';
+    if(DOM.admin.filterActivo) DOM.admin.filterActivo.value = 'all';
     
     applyAdminFilters();
     
@@ -2079,10 +2079,12 @@ async function handleUpdatePrecios(e) {
     const generoVal = DOM.admin.updateSelects && DOM.admin.updateSelects.genero ? DOM.admin.updateSelects.genero.value : '';
     const personalizacionVal = DOM.admin.updateSelects && DOM.admin.updateSelects.personalizacion ? DOM.admin.updateSelects.personalizacion.value : '';
     
-    const fotoUrl = DOM.admin.updateFotoUrl ? DOM.admin.updateFotoUrl.value.trim() : '';
+    const inputFoto = DOM.admin.updateFotoUrl ? DOM.admin.updateFotoUrl.value.trim() : '';
+    const fotoUrl = inputFoto || (currentJerseyToManage ? (currentJerseyToManage.foto || currentJerseyToManage.imagen || '') : '');
 
     const payload = {
         action: "update",
+        token: localStorage.getItem('session_token') || '',
         id: currentJerseyToManage.id,
         nombre: nombreVal,
         tipo: tipoVal,
@@ -2124,8 +2126,8 @@ async function handleUpdatePrecios(e) {
                 DOM.admin.updateFotoFileInfo.textContent = 'Sin archivos';
             }
             
-            // Refrescar data en segundo plano
-            await fetchInitialProducts();
+            // Refrescar data de productos silenciando resets innecesarios
+            await fetchInitialProducts(true);
             
             // Buscar la playera actualizada
             const updatedProduct = allProducts.find(p => p.id === currentJerseyToManage.id);
@@ -2154,7 +2156,7 @@ async function handleUpdatePrecios(e) {
             throw new Error(data.message || 'Error al actualizar precios');
         }
     } catch (error) {
-        Swal.fire({icon: 'error', title: 'Error', text: error.message, background: '#151515', color: '#fff'});
+        Swal.fire({icon: 'error', title: 'Error al Actualizar', text: error.message, background: '#151515', color: '#fff'});
     } finally {
         btnSubmit.disabled = false;
         btnSubmit.innerHTML = originalContent;
@@ -6247,13 +6249,13 @@ async function generateExcelFromManualItems() {
         
         worksheet.columns = [
             { header: 'Code', key: 'code', width: 18 },
-            { header: 'Image', key: 'image', width: 26 },
-            { header: 'Remark', key: 'remark', width: 22 },
+            { header: 'Image', key: 'image', width: 28 },
+            { header: 'Remark', key: 'remark', width: 24 },
             { header: 'size', key: 'size', width: 10 },
             { header: 'Qty', key: 'qty', width: 10 },
             { header: 'Name', key: 'name', width: 18 },
             { header: 'Number', key: 'number', width: 12 },
-            { header: 'patch', key: 'patch', width: 16 },
+            { header: 'patch', key: 'patch', width: 18 },
             { header: 'Unit Price ($)', key: 'unit_price_aux', width: 16 },
             { header: 'Unit Price ($)', key: 'unit_price_usd', width: 16 },
             { header: 'Total($)', key: 'total', width: 16 }
@@ -6280,15 +6282,16 @@ async function generateExcelFromManualItems() {
             const rowStart = currentRow;
             const rowEnd = currentRow + numRows - 1;
             
-            const targetBlockHeight = Math.max(95, numRows * 35);
-            const singleRowHeight = Math.max(32, targetBlockHeight / numRows);
+            // Garantizar altura suficiente para la celda combinada (mínimo 105pt para 1 fila)
+            const targetBlockHeightPt = Math.max(105, numRows * 38);
+            const singleRowHeightPt = Math.max(35, targetBlockHeightPt / numRows);
             
             for (let idx = 0; idx < numRows; idx++) {
                 const item = prod.items[idx];
                 const price = Number(item.price) || 0;
                 
                 const row = worksheet.getRow(currentRow);
-                row.height = singleRowHeight;
+                row.height = singleRowHeightPt;
                 row.values = [
                     prod.code,
                     "",
@@ -6327,6 +6330,10 @@ async function generateExcelFromManualItems() {
             cellC.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
             cellC.font = { name: '宋体', size: 10 };
             
+            // Conversión precisa de puntos Excel a píxeles (1pt = 1.333px a 96 DPI)
+            const totalBlockHeightPx = Math.round(targetBlockHeightPt * 1.3333);
+            const colWidthPx = 200; // Ancho en píxeles aproximado de columna B (width: 28)
+            
             const prepFoto = preparedImagesMap[code];
             if (prepFoto && prepFoto.base64) {
                 try {
@@ -6335,24 +6342,23 @@ async function generateExcelFromManualItems() {
                         extension: prepFoto.extension || 'jpeg'
                     });
                     
-                    const totalBlockHeightPx = Math.max(80, (singleRowHeight * numRows) * 1.30);
-                    const colWidthPx = 180;
-                    const maxBoxW = 160;
-                    const maxBoxH = totalBlockHeightPx - 8;
+                    // Margen de seguridad interno para evitar que toque los bordes superior/inferior de la celda
+                    const maxBoxW = colWidthPx - 24; // 176px máx
+                    const maxBoxH = totalBlockHeightPx - 24; // Mínimo 16px de espacio libre vertical
                     
-                    // Escalar preservando la relación de aspecto original de la fotografía
+                    // Escalar preservando la relación de aspecto exacta de la foto
                     const scale = Math.min(maxBoxW / prepFoto.width, maxBoxH / prepFoto.height);
-                    const finalW = Math.max(30, Math.round(prepFoto.width * scale));
-                    const finalH = Math.max(30, Math.round(prepFoto.height * scale));
+                    const finalW = Math.max(25, Math.round(prepFoto.width * scale));
+                    const finalH = Math.max(25, Math.round(prepFoto.height * scale));
                     
-                    // Offsets para centrado horizontal y vertical en la celda B
-                    const colCenterOffset = Math.max(0.04, (colWidthPx - finalW) / (2 * colWidthPx));
-                    const rowCenterOffset = Math.max(0.04, (totalBlockHeightPx - finalH) / (2 * totalBlockHeightPx));
+                    // Fracción exacta de desplazamiento para centrar la imagen en la celda B
+                    const colCenterOffset = Math.max(0.01, ((colWidthPx - finalW) / 2) / colWidthPx);
+                    const rowCenterOffset = Math.max(0.01, ((totalBlockHeightPx - finalH) / 2) / totalBlockHeightPx);
                     
                     worksheet.addImage(imageId, {
                         tl: { col: 1.0 + colCenterOffset, row: (rowStart - 1.0) + rowCenterOffset },
                         ext: { width: finalW, height: finalH },
-                        editAs: 'oneCell' // Estándar de anclaje universal para visores móviles (Apple Files/QuickLook/Excel Mobile)
+                        editAs: 'oneCell'
                     });
                 } catch (imgError) {
                     console.error("Error al procesar imagen limpia para Excel:", imgError);
@@ -6373,13 +6379,19 @@ async function generateExcelFromManualItems() {
                         extension: prepPatch.extension || 'jpeg'
                     });
                     
-                    const pMaxBox = Math.min(50, Math.max(25, (singleRowHeight * numRows * 1.30) - 8));
-                    const pScale = Math.min(pMaxBox / prepPatch.width, pMaxBox / prepPatch.height);
+                    const patchColWidthPx = 130;
+                    const pMaxBoxW = patchColWidthPx - 16;
+                    const pMaxBoxH = totalBlockHeightPx - 16;
+                    
+                    const pScale = Math.min(pMaxBoxW / prepPatch.width, pMaxBoxH / prepPatch.height, 0.8);
                     const pFinalW = Math.max(15, Math.round(prepPatch.width * pScale));
                     const pFinalH = Math.max(15, Math.round(prepPatch.height * pScale));
                     
+                    const pColCenterOffset = Math.max(0.01, ((patchColWidthPx - pFinalW) / 2) / patchColWidthPx);
+                    const pRowCenterOffset = Math.max(0.01, ((totalBlockHeightPx - pFinalH) / 2) / totalBlockHeightPx);
+
                     worksheet.addImage(patchImageId, {
-                        tl: { col: 7.1, row: (rowStart - 1.0) + 0.05 },
+                        tl: { col: 7.0 + pColCenterOffset, row: (rowStart - 1.0) + pRowCenterOffset },
                         ext: { width: pFinalW, height: pFinalH },
                         editAs: 'oneCell'
                     });
@@ -6771,12 +6783,15 @@ function renderSupplierItemAssignments(order) {
                 foto: item.foto,
                 id_producto: item.id_producto || '',
                 tallasQty: {},
+                tallasStatus: {},
+                isMigrated: (order.estatus === 'Ingresado a Stock'),
                 items: []
             };
         }
         groupedItems[key].items.push(item);
-        const s = item.size || 'Única';
-        groupedItems[key].tallasQty[s] = (groupedItems[key].tallasQty[s] || 0) + (Number(item.qty) || 0);
+        const s = item.size || item.talla || 'Única';
+        groupedItems[key].tallasQty[s] = (groupedItems[key].tallasQty[s] || 0) + (Number(item.qty || item.cantidad) || 0);
+        groupedItems[key].tallasStatus[s] = item.estatus || order.estatus;
     });
     
     // Guardar referencia en el objeto global para confirmSupplierStockMigration
@@ -6792,15 +6807,34 @@ function renderSupplierItemAssignments(order) {
         card.className = 'bg-dark-200/40 border border-white/5 rounded-2xl p-4 sm:p-5 space-y-4';
         
         let tallasBadgesHtml = '';
+        let allGroupMigrated = true;
+
         Object.keys(group.tallasQty).forEach(sz => {
             const pendingQty = group.tallasQty[sz];
-            tallasBadgesHtml += `
-                <div class="flex items-center gap-1.5 bg-black/40 border border-white/10 p-1.5 rounded-lg my-0.5">
-                    <span class="text-gray-300 text-xs font-mono font-bold">${sz}:</span>
-                    <input type="number" id="supplier-qty-input-${idx}-${sz}" data-size="${sz}" data-pending="${pendingQty}" value="${pendingQty}" min="0" max="${pendingQty}" class="w-14 bg-dark-100 border border-white/10 text-emerald-400 font-bold text-xs rounded px-1.5 py-0.5 text-center focus:border-emerald-400 focus:outline-none">
-                    <span class="text-[10px] text-gray-400 font-mono">/ ${pendingQty} pend.</span>
-                </div>
-            `;
+            const szStatus = group.tallasStatus[sz];
+            const isSizeMigrated = group.isMigrated || (szStatus === 'Ingresado a Stock');
+            
+            if (!isSizeMigrated) {
+                allGroupMigrated = false;
+            }
+
+            if (isSizeMigrated) {
+                tallasBadgesHtml += `
+                    <div class="flex items-center gap-1.5 bg-emerald-950/30 border border-emerald-500/30 p-1.5 rounded-lg my-0.5 opacity-90" title="Registro ya Ingresado a Stock (No modificable)">
+                        <span class="text-emerald-400 text-xs font-mono font-bold">${sz}:</span>
+                        <input type="number" id="supplier-qty-input-${idx}-${sz}" data-size="${sz}" data-pending="${pendingQty}" value="${pendingQty}" disabled class="w-14 bg-dark-200/90 border border-white/10 text-gray-400 font-bold text-xs rounded px-1.5 py-0.5 text-center cursor-not-allowed">
+                        <span class="text-[9px] text-emerald-400 font-bold font-mono">✓ Ingresado</span>
+                    </div>
+                `;
+            } else {
+                tallasBadgesHtml += `
+                    <div class="flex items-center gap-1.5 bg-black/40 border border-white/10 p-1.5 rounded-lg my-0.5">
+                        <span class="text-gray-300 text-xs font-mono font-bold">${sz}:</span>
+                        <input type="number" id="supplier-qty-input-${idx}-${sz}" data-size="${sz}" data-pending="${pendingQty}" value="${pendingQty}" min="0" max="${pendingQty}" class="w-14 bg-dark-100 border border-white/10 text-emerald-400 font-bold text-xs rounded px-1.5 py-0.5 text-center focus:border-emerald-400 focus:outline-none">
+                        <span class="text-[9px] text-gray-400 font-mono">/ ${pendingQty} pend.</span>
+                    </div>
+                `;
+            }
         });
         
         // Crear opciones para el select de catálogo
@@ -6814,6 +6848,11 @@ function renderSupplierItemAssignments(order) {
             selectOptionsHtml += `<option value="${pId}" ${isSelected ? 'selected' : ''}>${displayLabel}</option>`;
         });
         
+        const isSelectDisabled = allGroupMigrated ? 'disabled' : '';
+        const selectClass = allGroupMigrated 
+            ? 'w-full bg-dark-200/60 border border-white/10 rounded-lg px-3 py-2 text-xs text-gray-400 cursor-not-allowed opacity-75' 
+            : 'w-full bg-dark-100 border border-white/10 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-navy-400 text-white cursor-pointer';
+
         card.innerHTML = `
             <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
                 <!-- Columna Izquierda: Datos solicitados al Proveedor -->
@@ -6823,7 +6862,10 @@ function renderSupplierItemAssignments(order) {
                             <span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-mono font-bold text-[11px] border border-emerald-500/30">Foto #${group.no_foto}</span>
                             Solicitado a Proveedor
                         </span>
-                        <span class="text-[9px] text-emerald-400 font-bold">Modifica si llegaron menos</span>
+                        ${allGroupMigrated 
+                            ? `<span class="text-[9px] text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">✓ Ingresado a Stock</span>` 
+                            : `<span class="text-[9px] text-emerald-400 font-bold">Modifica si llegaron menos</span>`
+                        }
                     </div>
                     <div class="flex items-start gap-3">
                         <div class="w-14 h-14 flex-shrink-0 bg-dark-100 border border-white/10 rounded-lg overflow-hidden p-0.5 mt-1">
@@ -6839,13 +6881,17 @@ function renderSupplierItemAssignments(order) {
                 <!-- Columna Derecha: Selección e Previsualización del Catálogo -->
                 <div class="md:col-span-6 space-y-3">
                     <div>
-                        <label class="block text-[10px] font-bold text-navy-400 uppercase tracking-wider mb-1">Conectar con Producto del Catálogo (Stock)</label>
+                        <label class="block text-[10px] font-bold text-navy-400 uppercase tracking-wider mb-1 flex items-center justify-between">
+                            <span>Conectar con Producto del Catálogo (Stock)</span>
+                            ${allGroupMigrated ? `<span class="text-emerald-400 text-[9px] font-mono font-bold">✓ VINCULADO E INGRESADO</span>` : ''}
+                        </label>
                         <div class="space-y-1.5">
+                            ${!allGroupMigrated ? `
                             <div class="relative">
                                 <input type="text" id="supplier-item-search-${idx}" oninput="window.filterSupplierCatalogSelect(${idx}, this.value)" placeholder="🔍 Filtrar por nombre, tipo o versión (ej. Tigres, Local, Jugador)..." class="w-full bg-dark-100/90 border border-white/10 rounded-lg pl-8 pr-3 py-2 text-xs focus:outline-none focus:border-navy-400 text-white placeholder-gray-500 transition-colors">
                                 <svg class="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-2.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                            </div>
-                            <select id="supplier-item-select-${idx}" data-group-key="${groupKey}" onchange="window.handleSupplierProductSelectChange(${idx}, this.value)" class="w-full bg-dark-100 border border-white/10 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-navy-400 text-white cursor-pointer">
+                            </div>` : ''}
+                            <select id="supplier-item-select-${idx}" data-group-key="${groupKey}" ${isSelectDisabled} onchange="window.handleSupplierProductSelectChange(${idx}, this.value)" class="${selectClass}">
                                 ${selectOptionsHtml}
                             </select>
                         </div>
@@ -7021,6 +7067,10 @@ async function confirmSupplierStockMigration() {
             Object.keys(group.tallasQty).forEach(sz => {
                 const pendingQty = Number(group.tallasQty[sz]) || 0;
                 const inputEl = document.getElementById(`supplier-qty-input-${idx}-${sz}`);
+                
+                // Si el input está deshabilitado, ya fue ingresado a stock anteriormente -> Omitir
+                if (inputEl && inputEl.disabled) return;
+
                 const val = Number(inputEl?.value);
                 const receivedQty = (isNaN(val) || val < 0) ? pendingQty : Math.min(pendingQty, val);
                 
