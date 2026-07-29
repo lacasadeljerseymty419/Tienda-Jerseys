@@ -541,10 +541,61 @@
                         <div>
                             <label for="create-personalizacion" class="block text-[10px] sm:text-xs font-semibold text-gray-400 mb-1.5 sm:mb-2 uppercase tracking-wider">Personalización</label>
                             <select id="create-personalizacion" required class="w-full bg-dark-200/50 border border-white/10 rounded-xl px-3 py-2.5 sm:px-4 sm:py-3 text-xs sm:text-sm focus:outline-none focus:border-navy-400 focus:ring-1 focus:ring-navy-400 transition-all appearance-none cursor-pointer text-white">
-                                <option value="No">No</option>
+                                <option value="No" selected>No</option>
                                 <option value="Sí">Sí</option>
                                 <option value="Opcional">Opcional</option>
                             </select>
+                        </div>
+                    </div>
+
+                    <!-- Sección de Tipografías (Básica y Oficial) para Crear Jersey -->
+                    <div id="create-oficial-wrapper" class="hidden space-y-4 bg-black/30 p-3.5 sm:p-4 rounded-xl border border-amber-500/20">
+                        <!-- OPCIÓN 1: Tipografía Básica -->
+                        <div class="space-y-2">
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" id="create-chk-basica" class="w-4 h-4 text-amber-500 rounded border-white/20 bg-dark-200 focus:ring-amber-500">
+                                <span class="text-xs font-bold text-amber-400">✏️ Habilitar Tipografía Básica (Texto Libre)</span>
+                            </label>
+                            <div id="create-basica-section" class="hidden grid grid-cols-2 gap-3 pt-2 border-t border-white/5 pl-6">
+                                <div>
+                                    <label for="create-basica-precio-menudeo" class="block text-[10px] font-bold text-gray-400 mb-1 uppercase tracking-wider">Precio Menudeo ($)</label>
+                                    <input type="number" id="create-basica-precio-menudeo" min="0" placeholder="Ej. 50" value="0" class="w-full bg-dark-200/60 border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400">
+                                </div>
+                                <div>
+                                    <label for="create-basica-precio-mayoreo" class="block text-[10px] font-bold text-gray-400 mb-1 uppercase tracking-wider">Precio Mayoreo ($)</label>
+                                    <input type="number" id="create-basica-precio-mayoreo" min="0" placeholder="Ej. 30" value="0" class="w-full bg-dark-200/60 border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- OPCIÓN 2: Tipografía Oficial -->
+                        <div class="space-y-2 pt-2 border-t border-white/10">
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" id="create-chk-oficial" class="w-4 h-4 text-amber-500 rounded border-white/20 bg-dark-200 focus:ring-amber-500">
+                                <span class="text-xs font-bold text-amber-400">👑 Habilitar Tipografía / Personalización Oficial</span>
+                            </label>
+                            <div id="create-oficial-section" class="hidden space-y-3 pt-2 border-t border-white/5 pl-6">
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label for="create-oficial-precio-menudeo" class="block text-[10px] font-bold text-gray-400 mb-1 uppercase tracking-wider">Precio Menudeo ($)</label>
+                                        <input type="number" id="create-oficial-precio-menudeo" min="0" placeholder="Ej. 100" value="0" class="w-full bg-dark-200/60 border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400">
+                                    </div>
+                                    <div>
+                                        <label for="create-oficial-precio-mayoreo" class="block text-[10px] font-bold text-gray-400 mb-1 uppercase tracking-wider">Precio Mayoreo ($)</label>
+                                        <input type="number" id="create-oficial-precio-mayoreo" min="0" placeholder="Ej. 70" value="0" class="w-full bg-dark-200/60 border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400">
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <input type="text" id="create-oficial-nombre" placeholder="Nombre (ej. GIGNAC)" class="w-1/2 bg-dark-200/60 border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400 uppercase">
+                                    <input type="text" id="create-oficial-numero" placeholder="Número (ej. 10)" class="w-1/4 bg-dark-200/60 border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400 uppercase">
+                                    <button type="button" id="btn-add-create-oficial" class="w-1/4 bg-amber-600 hover:bg-amber-500 text-white font-bold px-3 py-2 rounded-lg text-xs transition-all flex items-center justify-center gap-1 shadow">
+                                        + Añadir
+                                    </button>
+                                </div>
+                                <div id="create-oficial-container" class="flex flex-wrap gap-2 pt-1">
+                                    <!-- Chips de opciones oficiales agregadas -->
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -751,6 +802,57 @@
                                     <option value="Sí">Sí</option>
                                     <option value="Opcional">Opcional</option>
                                 </select>
+                            </div>
+                        </div>
+
+                        <!-- Sección de Tipografías (Básica y Oficial) para Editar Jersey -->
+                        <div id="update-oficial-wrapper" class="hidden space-y-4 bg-black/30 p-3.5 sm:p-4 rounded-xl border border-amber-500/20">
+                            <!-- OPCIÓN 1: Tipografía Básica -->
+                            <div class="space-y-2">
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" id="update-chk-basica" class="w-4 h-4 text-amber-500 rounded border-white/20 bg-dark-200 focus:ring-amber-500">
+                                    <span class="text-xs font-bold text-amber-400">✏️ Habilitar Tipografía Básica (Texto Libre)</span>
+                                </label>
+                                <div id="update-basica-section" class="hidden grid grid-cols-2 gap-3 pt-2 border-t border-white/5 pl-6">
+                                    <div>
+                                        <label for="update-basica-precio-menudeo" class="block text-[10px] font-bold text-gray-400 mb-1 uppercase tracking-wider">Precio Menudeo ($)</label>
+                                        <input type="number" id="update-basica-precio-menudeo" min="0" placeholder="Ej. 50" value="0" class="w-full bg-dark-200/60 border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400">
+                                    </div>
+                                    <div>
+                                        <label for="update-basica-precio-mayoreo" class="block text-[10px] font-bold text-gray-400 mb-1 uppercase tracking-wider">Precio Mayoreo ($)</label>
+                                        <input type="number" id="update-basica-precio-mayoreo" min="0" placeholder="Ej. 30" value="0" class="w-full bg-dark-200/60 border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- OPCIÓN 2: Tipografía Oficial -->
+                            <div class="space-y-2 pt-2 border-t border-white/10">
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" id="update-chk-oficial" class="w-4 h-4 text-amber-500 rounded border-white/20 bg-dark-200 focus:ring-amber-500">
+                                    <span class="text-xs font-bold text-amber-400">👑 Habilitar Tipografía / Personalización Oficial</span>
+                                </label>
+                                <div id="update-oficial-section" class="hidden space-y-3 pt-2 border-t border-white/5 pl-6">
+                                    <div class="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label for="update-oficial-precio-menudeo" class="block text-[10px] font-bold text-gray-400 mb-1 uppercase tracking-wider">Precio Menudeo ($)</label>
+                                            <input type="number" id="update-oficial-precio-menudeo" min="0" placeholder="Ej. 100" value="0" class="w-full bg-dark-200/60 border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400">
+                                        </div>
+                                        <div>
+                                            <label for="update-oficial-precio-mayoreo" class="block text-[10px] font-bold text-gray-400 mb-1 uppercase tracking-wider">Precio Mayoreo ($)</label>
+                                            <input type="number" id="update-oficial-precio-mayoreo" min="0" placeholder="Ej. 70" value="0" class="w-full bg-dark-200/60 border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400">
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <input type="text" id="update-oficial-nombre" placeholder="Nombre (ej. GIGNAC)" class="w-1/2 bg-dark-200/60 border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400 uppercase">
+                                        <input type="text" id="update-oficial-numero" placeholder="Número (ej. 10)" class="w-1/4 bg-dark-200/60 border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400 uppercase">
+                                        <button type="button" id="btn-add-update-oficial" class="w-1/4 bg-amber-600 hover:bg-amber-500 text-white font-bold px-3 py-2 rounded-lg text-xs transition-all flex items-center justify-center gap-1 shadow">
+                                            + Añadir
+                                        </button>
+                                    </div>
+                                    <div id="update-oficial-container" class="flex flex-wrap gap-2 pt-1">
+                                        <!-- Chips de opciones oficiales agregadas -->
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
@@ -1442,6 +1544,16 @@
                         <span id="pedido-personalizacion-regla" class="text-[11px] text-amber-500 mt-1 block font-medium hidden"></span>
                     </div>
 
+                    <!-- Selector de Opciones Oficiales Disponibles para este Jersey -->
+                    <div id="pedido-oficial-container" class="hidden">
+                        <label for="pedido-personalizacion-oficial" class="block text-xs font-bold text-amber-400 mb-1.5 uppercase tracking-wider flex items-center gap-1.5">
+                            <span>✨ Jugador / Tipografía Oficial Disponible</span>
+                        </label>
+                        <select id="pedido-personalizacion-oficial" class="w-full bg-dark-200/80 border border-amber-500/30 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-amber-400 text-white cursor-pointer">
+                            <!-- Opciones de jugadores/dorsales oficiales -->
+                        </select>
+                    </div>
+
                     <div id="pedido-custom-text-container" class="hidden">
                         <label for="pedido-custom-text" class="block text-xs font-semibold text-gray-400 mb-1.5 uppercase tracking-wider">Nombre y Número Personalizado</label>
                         <input type="text" id="pedido-custom-text" placeholder="Ej: GIGNAC #10" class="w-full bg-dark-200/50 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-navy-400 focus:ring-1 focus:ring-navy-400 text-white uppercase">
@@ -1816,9 +1928,9 @@
     </div>
 
     <!-- Configuración Global API -->
-    <script src="./js/config.js?v=1.1.2"></script>
+    <script src="./js/config.js?v=1.1.5"></script>
     <!-- Módulo Principal JS -->
-    <script src="./js/app2.js?v=2.9.8"></script>
+    <script src="./js/app2.js?v=3.1.3"></script>
 </body>
 </html>
 

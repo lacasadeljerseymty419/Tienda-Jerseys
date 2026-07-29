@@ -1,4 +1,4 @@
-const API_URL = window.API_URL || "https://script.google.com/macros/s/AKfycbwFJOc0jVAcOPbfJN8hgf59I-MoE9_JCbVQCDyBRHXRThVnMUcIinKmnACc4hu_P5H0bg/exec";
+const API_URL = window.API_URL || "https://script.google.com/macros/s/AKfycbw97tnD6AOYXNkttgCnQRtg2WpikVw_cXdIYnKdc3lFIdeQ8PrbL1RRGdqMM7KD82ucQg/exec";
 
 // --- MONKEY PATCH FETCH PARA INYECCIÓN Y VALIDACIÓN DE TOKENS ---
 (function() {
@@ -859,6 +859,9 @@ async function initApp() {
     if (DOM.admin.closeInvModal) DOM.admin.closeInvModal.addEventListener('click', closeInventoryModal);
     if (DOM.admin.formAddTalla) DOM.admin.formAddTalla.addEventListener('submit', handleAddNewTalla);
     if (DOM.admin.formUpdatePrecios) DOM.admin.formUpdatePrecios.addEventListener('submit', handleUpdatePrecios);
+    
+    // Inicializar listeners de Personalizaciones Oficiales
+    initOficialPersonalizacionEvents();
     
     // Filtros y paginación
     ['filterSearch', 'filterTipo', 'filterVersion', 'filterGenero', 'filterActivo'].forEach(id => {
@@ -1850,10 +1853,76 @@ function openInventoryModal(producto) {
     if (DOM.admin.updatePrecioMayoreo) DOM.admin.updatePrecioMayoreo.value = producto.precio_mayoreo || 0;
     if (DOM.admin.updatePrecioMayoreoSuper) DOM.admin.updatePrecioMayoreoSuper.value = producto.precio_mayoreo_super || 0;
     if (DOM.admin.updateFotoUrl) DOM.admin.updateFotoUrl.value = producto.foto || producto.imagen || '';
+    
     if (DOM.admin.updateFotoPreviewContainer) {
-        const initialUrls = (producto.foto || producto.imagen) ? (producto.foto || producto.imagen).split(',') : [];
-        renderImagePreviews(DOM.admin.updateFotoPreviewContainer, initialUrls);
+        const fotoStr = producto.foto || producto.imagen || '';
+        const initialUrls = fotoStr ? fotoStr.split(',').map(s => s.trim()).filter(Boolean) : [];
+        if (initialUrls.length > 0) {
+            DOM.admin.updateFotoPreviewContainer.classList.remove('hidden');
+            renderImagePreviews(DOM.admin.updateFotoPreviewContainer, initialUrls);
+        } else {
+            DOM.admin.updateFotoPreviewContainer.classList.add('hidden');
+            DOM.admin.updateFotoPreviewContainer.innerHTML = '';
+        }
     }
+
+    // Cargar personalizaciones básicas y oficiales asociadas al producto
+    let rawOficial = producto.personalizaciones_oficiales;
+    let pConfig = {
+        basica_activa: false, basica_precio_menudeo: 0, basica_precio_mayoreo: 0,
+        oficial_activa: false, oficial_precio_menudeo: 0, oficial_precio_mayoreo: 0,
+        opciones: []
+    };
+
+    if (rawOficial && typeof rawOficial === 'object' && !Array.isArray(rawOficial)) {
+        pConfig.basica_activa = !!rawOficial.basica_activa;
+        pConfig.basica_precio_menudeo = parseFloat(rawOficial.basica_precio_menudeo || 0);
+        pConfig.basica_precio_mayoreo = parseFloat(rawOficial.basica_precio_mayoreo || 0);
+        pConfig.oficial_activa = !!rawOficial.oficial_activa;
+        pConfig.oficial_precio_menudeo = parseFloat(rawOficial.oficial_precio_menudeo || rawOficial.precio || 0);
+        pConfig.oficial_precio_mayoreo = parseFloat(rawOficial.oficial_precio_mayoreo || 0);
+        pConfig.opciones = Array.isArray(rawOficial.opciones) ? [...rawOficial.opciones] : [];
+    } else if (Array.isArray(rawOficial)) {
+        pConfig.oficial_activa = rawOficial.length > 0;
+        pConfig.opciones = [...rawOficial];
+    }
+
+    updateOficialList = pConfig.opciones;
+
+    const updateWrapper = document.getElementById('update-oficial-wrapper');
+    const updateSel = document.getElementById('update-personalizacion');
+    const persVal = producto.personalizacion || 'No';
+    if (updateSel) updateSel.value = persVal;
+
+    if (persVal === 'Opcional' || persVal === 'Sí') {
+        if (updateWrapper) updateWrapper.classList.remove('hidden');
+    } else {
+        if (updateWrapper) updateWrapper.classList.add('hidden');
+    }
+
+    // Tipografía Básica UI
+    const chkUpdateBasica = document.getElementById('update-chk-basica');
+    const sectionUpdateBasica = document.getElementById('update-basica-section');
+    if (chkUpdateBasica) chkUpdateBasica.checked = pConfig.basica_activa;
+    if (sectionUpdateBasica) {
+        if (pConfig.basica_activa) sectionUpdateBasica.classList.remove('hidden');
+        else sectionUpdateBasica.classList.add('hidden');
+    }
+    if (document.getElementById('update-basica-precio-menudeo')) document.getElementById('update-basica-precio-menudeo').value = pConfig.basica_precio_menudeo;
+    if (document.getElementById('update-basica-precio-mayoreo')) document.getElementById('update-basica-precio-mayoreo').value = pConfig.basica_precio_mayoreo;
+
+    // Tipografía Oficial UI
+    const chkUpdateOficial = document.getElementById('update-chk-oficial');
+    const sectionUpdateOficial = document.getElementById('update-oficial-section');
+    if (chkUpdateOficial) chkUpdateOficial.checked = pConfig.oficial_activa;
+    if (sectionUpdateOficial) {
+        if (pConfig.oficial_activa) sectionUpdateOficial.classList.remove('hidden');
+        else sectionUpdateOficial.classList.add('hidden');
+    }
+    if (document.getElementById('update-oficial-precio-menudeo')) document.getElementById('update-oficial-precio-menudeo').value = pConfig.oficial_precio_menudeo;
+    if (document.getElementById('update-oficial-precio-mayoreo')) document.getElementById('update-oficial-precio-mayoreo').value = pConfig.oficial_precio_mayoreo;
+
+    renderUpdateOficialChips();
 
     updateNewTallaSelect(producto);
     
@@ -2094,7 +2163,16 @@ async function handleUpdatePrecios(e) {
         precio_Menudeo: pMenudeo,
         precio_mayoreo: pMayoreo,
         precio_mayoreo_super: pMayoreoSuper,
-        foto: fotoUrl
+        foto: fotoUrl,
+        personalizaciones_oficiales: {
+            basica_activa: !!(document.getElementById('update-chk-basica') && document.getElementById('update-chk-basica').checked),
+            basica_precio_menudeo: parseFloat(document.getElementById('update-basica-precio-menudeo')?.value) || 0,
+            basica_precio_mayoreo: parseFloat(document.getElementById('update-basica-precio-mayoreo')?.value) || 0,
+            oficial_activa: !!(document.getElementById('update-chk-oficial') && document.getElementById('update-chk-oficial').checked),
+            oficial_precio_menudeo: parseFloat(document.getElementById('update-oficial-precio-menudeo')?.value) || 0,
+            oficial_precio_mayoreo: parseFloat(document.getElementById('update-oficial-precio-mayoreo')?.value) || 0,
+            opciones: updateOficialList
+        }
     };
 
     btnSubmit.disabled = true;
@@ -2163,6 +2241,166 @@ async function handleUpdatePrecios(e) {
     }
 }
 
+// ==========================================
+// GESTIÓN DE PERSONALIZACIONES OFICIALES (CREAR / EDITAR JERSEY)
+// ==========================================
+let createOficialList = [];
+let updateOficialList = [];
+
+function initOficialPersonalizacionEvents() {
+    const createSel = document.getElementById('create-personalizacion');
+    const createWrapper = document.getElementById('create-oficial-wrapper');
+    const createChkBasica = document.getElementById('create-chk-basica');
+    const createSectionBasica = document.getElementById('create-basica-section');
+    const createChkOficial = document.getElementById('create-chk-oficial');
+    const createSectionOficial = document.getElementById('create-oficial-section');
+    const btnAddCreate = document.getElementById('btn-add-create-oficial');
+
+    if (createSel && createWrapper) {
+        createSel.addEventListener('change', () => {
+            const val = createSel.value;
+            if (val === 'Opcional' || val === 'Sí') {
+                createWrapper.classList.remove('hidden');
+            } else {
+                createWrapper.classList.add('hidden');
+                if (createChkBasica) createChkBasica.checked = false;
+                if (createSectionBasica) createSectionBasica.classList.add('hidden');
+                if (createChkOficial) createChkOficial.checked = false;
+                if (createSectionOficial) createSectionOficial.classList.add('hidden');
+            }
+        });
+    }
+
+    if (createChkBasica && createSectionBasica) {
+        createChkBasica.addEventListener('change', () => {
+            if (createChkBasica.checked) {
+                createSectionBasica.classList.remove('hidden');
+            } else {
+                createSectionBasica.classList.add('hidden');
+            }
+        });
+    }
+
+    if (createChkOficial && createSectionOficial) {
+        createChkOficial.addEventListener('change', () => {
+            if (createChkOficial.checked) {
+                createSectionOficial.classList.remove('hidden');
+            } else {
+                createSectionOficial.classList.add('hidden');
+            }
+        });
+    }
+
+    if (btnAddCreate) {
+        btnAddCreate.addEventListener('click', () => {
+            const nomEl = document.getElementById('create-oficial-nombre');
+            const numEl = document.getElementById('create-oficial-numero');
+            const nom = nomEl ? nomEl.value.trim().toUpperCase() : '';
+            const num = numEl ? numEl.value.trim().toUpperCase() : '';
+            if (nom || num) {
+                createOficialList.push({ nombre: nom, numero: num });
+                if (nomEl) nomEl.value = '';
+                if (numEl) numEl.value = '';
+                renderCreateOficialChips();
+            }
+        });
+    }
+
+    const updateSel = document.getElementById('update-personalizacion');
+    const updateWrapper = document.getElementById('update-oficial-wrapper');
+    const updateChkBasica = document.getElementById('update-chk-basica');
+    const updateSectionBasica = document.getElementById('update-basica-section');
+    const updateChkOficial = document.getElementById('update-chk-oficial');
+    const updateSectionOficial = document.getElementById('update-oficial-section');
+    const btnAddUpdate = document.getElementById('btn-add-update-oficial');
+
+    if (updateSel && updateWrapper) {
+        updateSel.addEventListener('change', () => {
+            const val = updateSel.value;
+            if (val === 'Opcional' || val === 'Sí') {
+                updateWrapper.classList.remove('hidden');
+            } else {
+                updateWrapper.classList.add('hidden');
+                if (updateChkBasica) updateChkBasica.checked = false;
+                if (updateSectionBasica) updateSectionBasica.classList.add('hidden');
+                if (updateChkOficial) updateChkOficial.checked = false;
+                if (updateSectionOficial) updateSectionOficial.classList.add('hidden');
+            }
+        });
+    }
+
+    if (updateChkBasica && updateSectionBasica) {
+        updateChkBasica.addEventListener('change', () => {
+            if (updateChkBasica.checked) {
+                updateSectionBasica.classList.remove('hidden');
+            } else {
+                updateSectionBasica.classList.add('hidden');
+            }
+        });
+    }
+
+    if (updateChkOficial && updateSectionOficial) {
+        updateChkOficial.addEventListener('change', () => {
+            if (updateChkOficial.checked) {
+                updateSectionOficial.classList.remove('hidden');
+            } else {
+                updateSectionOficial.classList.add('hidden');
+            }
+        });
+    }
+
+    if (btnAddUpdate) {
+        btnAddUpdate.addEventListener('click', () => {
+            const nomEl = document.getElementById('update-oficial-nombre');
+            const numEl = document.getElementById('update-oficial-numero');
+            const nom = nomEl ? nomEl.value.trim().toUpperCase() : '';
+            const num = numEl ? numEl.value.trim().toUpperCase() : '';
+            if (nom || num) {
+                updateOficialList.push({ nombre: nom, numero: num });
+                if (nomEl) nomEl.value = '';
+                if (numEl) numEl.value = '';
+                renderUpdateOficialChips();
+            }
+        });
+    }
+}
+
+function renderCreateOficialChips() {
+    const container = document.getElementById('create-oficial-container');
+    if (!container) return;
+    container.innerHTML = '';
+    createOficialList.forEach((item, index) => {
+        const chip = document.createElement('div');
+        chip.className = 'inline-flex items-center gap-1.5 bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2.5 py-1 rounded-lg text-xs font-bold font-mono';
+        chip.innerHTML = `<span>${item.nombre} ${item.numero ? '#' + item.numero : ''}</span>
+            <button type="button" onclick="removeCreateOficialChip(${index})" class="text-amber-400 hover:text-red-400 transition-colors font-bold ml-1">✕</button>`;
+        container.appendChild(chip);
+    });
+}
+
+window.removeCreateOficialChip = function(index) {
+    createOficialList.splice(index, 1);
+    renderCreateOficialChips();
+};
+
+function renderUpdateOficialChips() {
+    const container = document.getElementById('update-oficial-container');
+    if (!container) return;
+    container.innerHTML = '';
+    updateOficialList.forEach((item, index) => {
+        const chip = document.createElement('div');
+        chip.className = 'inline-flex items-center gap-1.5 bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2.5 py-1 rounded-lg text-xs font-bold font-mono';
+        chip.innerHTML = `<span>${item.nombre} ${item.numero ? '#' + item.numero : ''}</span>
+            <button type="button" onclick="removeUpdateOficialChip(${index})" class="text-amber-400 hover:text-red-400 transition-colors font-bold ml-1">✕</button>`;
+        container.appendChild(chip);
+    });
+}
+
+window.removeUpdateOficialChip = function(index) {
+    updateOficialList.splice(index, 1);
+    renderUpdateOficialChips();
+};
+
 function openCreateModal() {
     DOM.admin.createModal.classList.remove('hidden');
     if (document.getElementById('user-filter-id')) document.getElementById('user-filter-id').value = '';
@@ -2174,6 +2412,15 @@ function openCreateModal() {
     DOM.admin.createModal.querySelector('.transform').classList.add('scale-100');
     document.body.style.overflow = 'hidden';
     
+    createOficialList = [];
+    renderCreateOficialChips();
+    const createWrapper = document.getElementById('create-oficial-wrapper');
+    const createChk = document.getElementById('create-chk-oficial');
+    const createSection = document.getElementById('create-oficial-section');
+    if (createWrapper) createWrapper.classList.add('hidden');
+    if (createChk) createChk.checked = false;
+    if (createSection) createSection.classList.add('hidden');
+
     // Si no hay tallas, agregar una por defecto
     if (DOM.admin.tallasContainer.children.length === 0) {
         addTallaField();
@@ -2193,6 +2440,8 @@ function closeCreateModal() {
         }
         DOM.admin.fotoPreviewContainer.classList.add('hidden');
         DOM.admin.tallasContainer.innerHTML = '';
+        createOficialList = [];
+        renderCreateOficialChips();
     }, 300);
 }
 
@@ -2320,6 +2569,15 @@ async function handleCreateProduct(e) {
         precio_Menudeo: parseFloat(DOM.admin.precioMenudeo.value) || 0,
         precio_mayoreo: parseFloat(DOM.admin.precioMayoreo.value) || 0,
         precio_mayoreo_super: parseFloat(DOM.admin.precioMayoreoSuper.value) || 0,
+        personalizaciones_oficiales: {
+            basica_activa: !!(document.getElementById('create-chk-basica') && document.getElementById('create-chk-basica').checked),
+            basica_precio_menudeo: parseFloat(document.getElementById('create-basica-precio-menudeo')?.value) || 0,
+            basica_precio_mayoreo: parseFloat(document.getElementById('create-basica-precio-mayoreo')?.value) || 0,
+            oficial_activa: !!(document.getElementById('create-chk-oficial') && document.getElementById('create-chk-oficial').checked),
+            oficial_precio_menudeo: parseFloat(document.getElementById('create-oficial-precio-menudeo')?.value) || 0,
+            oficial_precio_mayoreo: parseFloat(document.getElementById('create-oficial-precio-mayoreo')?.value) || 0,
+            opciones: createOficialList
+        },
         tallas: tallas
     };
 
@@ -3324,6 +3582,66 @@ function switchView(view) {
     renderLocalProducts(allProducts);
 }
 
+function updatePersonalizacionDropdown(producto) {
+    const sel = DOM.pedido.personalizacion;
+    if (!sel || !producto) return;
+    
+    let rawOficial = producto.personalizaciones_oficiales;
+    let basicaActiva = false;
+    let oficialActiva = false;
+    let basicaPriceMenudeo = 0, basicaPriceMayoreo = 0;
+    let oficialPriceMenudeo = 0, oficialPriceMayoreo = 0;
+    
+    if (rawOficial && typeof rawOficial === 'object' && !Array.isArray(rawOficial)) {
+        basicaActiva = (rawOficial.basica_activa !== undefined) ? !!rawOficial.basica_activa : true;
+        basicaPriceMenudeo = parseFloat(rawOficial.basica_precio_menudeo || 0);
+        basicaPriceMayoreo = parseFloat(rawOficial.basica_precio_mayoreo || 0);
+        
+        oficialActiva = (rawOficial.oficial_activa !== undefined) ? !!rawOficial.oficial_activa : true;
+        oficialPriceMenudeo = parseFloat(rawOficial.oficial_precio_menudeo || rawOficial.precio || 0);
+        oficialPriceMayoreo = parseFloat(rawOficial.oficial_precio_mayoreo || 0);
+    } else if (Array.isArray(rawOficial)) {
+        basicaActiva = true;
+        oficialActiva = rawOficial.length > 0;
+    } else {
+        basicaActiva = true;
+        oficialActiva = true;
+    }
+    
+    let profileToUse = localStorage.getItem('current_perfil') || 'Menudeo';
+    if (profileToUse === "Administrador") {
+        profileToUse = localStorage.getItem('current_subperfil') || 'Mayoreo';
+    }
+    const isMayoreo = esPerfilMayoreoOMas(profileToUse);
+
+    const priceBasica = isMayoreo ? basicaPriceMayoreo : basicaPriceMenudeo;
+    const priceOficial = isMayoreo ? oficialPriceMayoreo : oficialPriceMenudeo;
+
+    const persConfig = String(producto.personalizacion || 'No').trim().toLowerCase();
+    const allowsCustomization = (persConfig === 'si' || persConfig === 'sí' || persConfig === 'opcional');
+    
+    sel.innerHTML = '';
+    const optNone = document.createElement('option');
+    optNone.value = 'PERS-NONE';
+    optNone.textContent = 'Ninguna';
+    sel.appendChild(optNone);
+    
+    if (allowsCustomization) {
+        if (basicaActiva) {
+            const optBasica = document.createElement('option');
+            optBasica.value = 'PERS-BASICA';
+            optBasica.textContent = `Personalización Básica${priceBasica > 0 ? ' (+$' + priceBasica.toFixed(2) + ')' : ''}`;
+            sel.appendChild(optBasica);
+        }
+        if (oficialActiva) {
+            const optOficial = document.createElement('option');
+            optOficial.value = 'PERS-OFICIAL';
+            optOficial.textContent = `Personalización Oficial${priceOficial > 0 ? ' (+$' + priceOficial.toFixed(2) + ')' : ''}`;
+            sel.appendChild(optOficial);
+        }
+    }
+}
+
 function openPedidoModal(producto, preselectedTalla = null) {
     currentJerseyForPedido = producto;
     
@@ -3359,10 +3677,60 @@ function openPedidoModal(producto, preselectedTalla = null) {
     DOM.pedido.cantidad.max = 999;
     DOM.pedido.stockInfo.textContent = '';
     
-    // Seleccionar personalización por defecto
+    // Seleccionar personalización por defecto según la configuración del jersey
     if (DOM.pedido.personalizacion) {
-        updatePersonalizacionDropdown();
-        DOM.pedido.personalizacion.value = "PERS-NONE";
+        updatePersonalizacionDropdown(producto);
+        
+        const persConfig = String(producto.personalizacion || 'No').trim().toLowerCase();
+        const allowsCustomization = (persConfig === 'si' || persConfig === 'sí' || persConfig === 'opcional');
+        
+        if (allowsCustomization) {
+            DOM.pedido.personalizacion.disabled = false;
+            DOM.pedido.personalizacion.className = "w-full bg-dark-200/50 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-navy-400 text-white cursor-pointer transition-all";
+            DOM.pedido.personalizacion.value = "PERS-NONE";
+        } else {
+            DOM.pedido.personalizacion.disabled = true;
+            DOM.pedido.personalizacion.className = "w-full bg-dark-200/80 border border-white/10 rounded-xl px-4 py-3 text-sm text-gray-400 cursor-not-allowed opacity-60 transition-all";
+            DOM.pedido.personalizacion.value = "PERS-NONE";
+        }
+
+        // Rellenar selector de Opciones Oficiales si el jersey cuenta con ellas
+        const oficialContainer = document.getElementById('pedido-oficial-container');
+        const oficialSelect = document.getElementById('pedido-personalizacion-oficial');
+        
+        let oficialObj = producto.personalizaciones_oficiales;
+        let oficiales = [];
+        if (oficialObj && !Array.isArray(oficialObj) && typeof oficialObj === 'object') {
+            oficiales = Array.isArray(oficialObj.opciones) ? oficialObj.opciones : [];
+        } else if (Array.isArray(oficialObj)) {
+            oficiales = oficialObj;
+        }
+
+        if (oficialContainer && oficialSelect) {
+            if (oficiales.length > 0 && allowsCustomization) {
+                oficialSelect.innerHTML = '<option value="">-- Selecciona Personalización Oficial --</option>';
+                oficiales.forEach(o => {
+                    const label = `${o.nombre} ${o.numero ? '#' + o.numero : ''}`.trim();
+                    const opt = document.createElement('option');
+                    opt.value = label;
+                    opt.textContent = label;
+                    oficialSelect.appendChild(opt);
+                });
+                
+                oficialSelect.onchange = () => {
+                    const val = oficialSelect.value;
+                    const customInput = document.getElementById('pedido-custom-text');
+                    if (customInput && val) {
+                        customInput.value = val;
+                    }
+                    handlePedidoPersonalizacionChange();
+                };
+            } else {
+                oficialContainer.classList.add('hidden');
+                oficialSelect.innerHTML = '';
+            }
+        }
+
         handlePedidoPersonalizacionChange();
     }
     
@@ -3390,6 +3758,8 @@ function closePedidoModal() {
         DOM.pedido.modal.classList.add('hidden');
         DOM.pedido.form.reset();
         DOM.pedido.customTextContainer.classList.add('hidden');
+        const oficialContainer = document.getElementById('pedido-oficial-container');
+        if (oficialContainer) oficialContainer.classList.add('hidden');
         currentJerseyForPedido = null;
         if (DOM.cart.modal.classList.contains('hidden')) {
             document.body.style.overflow = '';
@@ -3398,27 +3768,67 @@ function closePedidoModal() {
 }
 
 function handlePedidoPersonalizacionChange() {
-    const val = DOM.pedido.personalizacion.value;
-    const isCustomized = val !== "PERS-NONE";
+    if (!DOM.pedido.personalizacion || !currentJerseyForPedido) return;
     
+    const val = DOM.pedido.personalizacion.value;
+    const isCustomized = (val !== "PERS-NONE");
+    
+    const oficialContainer = document.getElementById('pedido-oficial-container');
+    const oficialSelect = document.getElementById('pedido-personalizacion-oficial');
+    const customTextContainer = DOM.pedido.customTextContainer;
+    
+    let rawOficial = currentJerseyForPedido.personalizaciones_oficiales;
+    let basicaPriceMenudeo = 0, basicaPriceMayoreo = 0;
+    let oficialPriceMenudeo = 0, oficialPriceMayoreo = 0;
+    let opcionesOficiales = [];
+    
+    if (rawOficial && typeof rawOficial === 'object' && !Array.isArray(rawOficial)) {
+        basicaPriceMenudeo = parseFloat(rawOficial.basica_precio_menudeo || 0);
+        basicaPriceMayoreo = parseFloat(rawOficial.basica_precio_mayoreo || 0);
+        oficialPriceMenudeo = parseFloat(rawOficial.oficial_precio_menudeo || rawOficial.precio || 0);
+        oficialPriceMayoreo = parseFloat(rawOficial.oficial_precio_mayoreo || 0);
+        opcionesOficiales = Array.isArray(rawOficial.opciones) ? rawOficial.opciones : [];
+    } else if (Array.isArray(rawOficial)) {
+        opcionesOficiales = rawOficial;
+    }
+    
+    let profileToUse = localStorage.getItem('current_perfil') || 'Menudeo';
+    if (profileToUse === "Administrador") {
+        profileToUse = localStorage.getItem('current_subperfil') || 'Mayoreo';
+    }
+    const isMayoreo = esPerfilMayoreoOMas(profileToUse);
     let price = 0;
-    if (isCustomized) {
-        let profileToUse = localStorage.getItem('current_perfil') || 'Menudeo';
-        if (profileToUse === "Administrador") {
-            profileToUse = localStorage.getItem('current_subperfil') || 'Mayoreo';
+
+    if (val === 'PERS-NONE') {
+        if (oficialContainer) oficialContainer.classList.add('hidden');
+        if (customTextContainer) customTextContainer.classList.add('hidden');
+        price = 0;
+    } else if (val === 'PERS-BASICA') {
+        if (oficialContainer) oficialContainer.classList.add('hidden');
+        if (customTextContainer) customTextContainer.classList.remove('hidden');
+        price = isMayoreo ? basicaPriceMayoreo : basicaPriceMenudeo;
+    } else if (val === 'PERS-OFICIAL') {
+        // Oficial: SOLO mostrar el selector de jugadores, NO el campo de texto libre
+        if (customTextContainer) customTextContainer.classList.add('hidden');
+        if (DOM.pedido.customText) { DOM.pedido.customText.value = ''; DOM.pedido.customText.removeAttribute('required'); }
+        if (opcionesOficiales.length > 0 && oficialContainer) {
+            oficialContainer.classList.remove('hidden');
+        } else if (oficialContainer) {
+            oficialContainer.classList.add('hidden');
         }
-        const isMayoreo = esPerfilMayoreoOMas(profileToUse);
-        const persObj = allPersonalizaciones.find(x => String(x.id) === String(val)) || defaultPersonalizaciones.find(x => String(x.id) === String(val));
-        if (persObj) {
-            price = isMayoreo ? parseFloat(persObj.precio_mayoreo || 0) : parseFloat(persObj.precio_Menudeo || 0);
-        }
+        price = isMayoreo ? oficialPriceMayoreo : oficialPriceMenudeo;
     }
     
     if (DOM.pedido.personalizacionPrecio) {
-        if (isCustomized && price > 0) {
-            DOM.pedido.personalizacionPrecio.textContent = `Costo de personalización: +$${price.toFixed(2)}`;
+        if (!isCustomized) {
+            DOM.pedido.personalizacionPrecio.textContent = `Sin costo adicional`;
+            DOM.pedido.personalizacionPrecio.className = 'text-xs text-gray-400 mt-1.5';
+        } else if (price > 0) {
+            DOM.pedido.personalizacionPrecio.textContent = `Costo de personalización (${isMayoreo ? 'Mayoreo' : 'Menudeo'}): +$${price.toFixed(2)}`;
+            DOM.pedido.personalizacionPrecio.className = 'text-xs text-amber-400 font-semibold mt-1.5';
         } else {
             DOM.pedido.personalizacionPrecio.textContent = `Sin costo adicional`;
+            DOM.pedido.personalizacionPrecio.className = 'text-xs text-gray-400 mt-1.5';
         }
     }
     
@@ -3442,43 +3852,11 @@ function handlePedidoPersonalizacionChange() {
         }
     }
     
-    if (isCustomized) {
-        DOM.pedido.customTextContainer.classList.remove('hidden');
+    if (val === 'PERS-BASICA') {
         DOM.pedido.customText.setAttribute('required', 'true');
-        DOM.pedido.customText.focus();
     } else {
-        DOM.pedido.customTextContainer.classList.add('hidden');
-        DOM.pedido.customText.value = '';
         DOM.pedido.customText.removeAttribute('required');
     }
-}
-
-function updatePersonalizacionDropdown() {
-    if (!DOM.pedido.personalizacion) return;
-    
-    const currentVal = DOM.pedido.personalizacion.value || "PERS-NONE";
-    DOM.pedido.personalizacion.innerHTML = '';
-    
-    const optNinguna = document.createElement('option');
-    optNinguna.value = "PERS-NONE";
-    optNinguna.textContent = "Ninguna";
-    DOM.pedido.personalizacion.appendChild(optNinguna);
-    
-    let profileToUse = localStorage.getItem('current_perfil') || 'Menudeo';
-    if (profileToUse === "Administrador") {
-        profileToUse = localStorage.getItem('current_subperfil') || 'Mayoreo';
-    }
-    const isMayoreo = esPerfilMayoreoOMas(profileToUse);
-    
-    allPersonalizaciones.forEach(p => {
-        const option = document.createElement('option');
-        option.value = p.id;
-        const price = isMayoreo ? p.precio_mayoreo : p.precio_Menudeo;
-        option.textContent = `${p.nombre} (+$${price.toFixed(2)})`;
-        DOM.pedido.personalizacion.appendChild(option);
-    });
-    
-    DOM.pedido.personalizacion.value = currentVal;
 }
 
 function handlePedidoTallaChange() {
@@ -3554,7 +3932,35 @@ function handleAddToPedidoSubmit(e) {
         return;
     }
     
-    const cleanCustomText = selectedPersId === 'PERS-NONE' ? '' : customText;
+    const oficialSelect = document.getElementById('pedido-personalizacion-oficial');
+    const oficialContainer = document.getElementById('pedido-oficial-container');
+    const selectedOficialText = (oficialSelect && oficialContainer && !oficialContainer.classList.contains('hidden')) ? oficialSelect.value.trim() : '';
+    const cleanCustomText = selectedPersId === 'PERS-NONE' ? '' : (selectedOficialText || customText);
+    
+    // Obtener precio de la personalización (Básica u Oficial) según perfil
+    let finalPersPrice = 0;
+    let rawOficial = currentJerseyForPedido ? currentJerseyForPedido.personalizaciones_oficiales : null;
+    let basicaPriceMenudeo = 0, basicaPriceMayoreo = 0;
+    let oficialPriceMenudeo = 0, oficialPriceMayoreo = 0;
+    
+    if (rawOficial && typeof rawOficial === 'object' && !Array.isArray(rawOficial)) {
+        basicaPriceMenudeo = parseFloat(rawOficial.basica_precio_menudeo || 0);
+        basicaPriceMayoreo = parseFloat(rawOficial.basica_precio_mayoreo || 0);
+        oficialPriceMenudeo = parseFloat(rawOficial.oficial_precio_menudeo || rawOficial.precio || 0);
+        oficialPriceMayoreo = parseFloat(rawOficial.oficial_precio_mayoreo || 0);
+    }
+
+    let activeProfile = localStorage.getItem('current_perfil') || 'Menudeo';
+    if (activeProfile === "Administrador") {
+        activeProfile = localStorage.getItem('current_subperfil') || 'Mayoreo';
+    }
+    const isMayoreo = esPerfilMayoreoOMas(activeProfile);
+
+    if (selectedPersId === 'PERS-BASICA') {
+        finalPersPrice = isMayoreo ? basicaPriceMayoreo : basicaPriceMenudeo;
+    } else if (selectedPersId === 'PERS-OFICIAL') {
+        finalPersPrice = isMayoreo ? oficialPriceMayoreo : oficialPriceMenudeo;
+    }
     
     // Buscar si ya existe un artículo idéntico en el carrito para agruparlo
     const existingItem = cart.find(item => 
@@ -3566,6 +3972,7 @@ function handleAddToPedidoSubmit(e) {
     
     if (existingItem) {
         existingItem.cantidad += selectedQty;
+        existingItem.personalizacionPrecio = finalPersPrice;
     } else {
         cart.push({
             producto: currentJerseyForPedido,
@@ -3573,6 +3980,7 @@ function handleAddToPedidoSubmit(e) {
             cantidad: selectedQty,
             personalizacionId: selectedPersId,
             texto_personalizado: cleanCustomText,
+            personalizacionPrecio: finalPersPrice,
             id_inventario: tallaObj ? (tallaObj.id_inventario || tallaObj.IdInventario || '') : ''
         });
     }
@@ -3666,21 +4074,23 @@ function getBasePriceForProfile(producto, profile) {
     
     const isSuperMayoreoActivo = (reglasMayoreoSuper.activo !== undefined) ? Number(reglasMayoreoSuper.activo) === 1 : true;
     
+    const user = (typeof localStorage !== 'undefined' && localStorage.getItem('logged_user')) 
+        ? JSON.parse(localStorage.getItem('logged_user')) 
+        : null;
+        
+    const isClienteSuperAutorizado = user ? (Number(user.super_mayoreo_activo) === 1) : (esPerfilSuperMayoreo(profile) || profile === 'Administrador');
+    
     let applySuper = false;
-    if (isSuperMayoreoActivo) {
-        if (esPerfilSuperMayoreo(profile)) {
+    
+    // REGLA SÚPER MAYOREO EXCLUSIVA:
+    // 1. Aplica ÚNICAMENTE si SuperMayoreoActivo = 1 en la hoja Clientes.
+    // 2. Si el cliente ya tiene el perfil Súper Mayoreo vigente O si su carrito alcanza 10+ piezas de versión Jugador, TODOS los productos cambian a precio de Súper Mayoreo.
+    if (isSuperMayoreoActivo && isClienteSuperAutorizado) {
+        const totalJugador = cart.filter(i => i.producto && String(i.producto.version || '').trim().toLowerCase() === 'jugador')
+                                 .reduce((sum, i) => sum + i.cantidad, 0);
+        
+        if (esPerfilSuperMayoreo(profile) || totalJugador >= 10) {
             applySuper = true;
-        } else {
-            const totalPiezas = cart.reduce((sum, i) => sum + i.cantidad, 0);
-            if (totalPiezas >= 10) {
-                applySuper = true;
-            } else if (String(profile).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim() === 'mayoreo') {
-                const totalJugador = cart.filter(i => i.producto.version === 'Jugador').reduce((sum, i) => sum + i.cantidad, 0);
-                const totalFan = cart.filter(i => i.producto.version === 'Aficionado' || i.producto.version === 'Fan').reduce((sum, i) => sum + i.cantidad, 0);
-                
-                if (producto.version === 'Jugador' && totalJugador >= (reglasMayoreoSuper.piezas_jugador || 10)) applySuper = true;
-                if ((producto.version === 'Aficionado' || producto.version === 'Fan') && totalFan >= (reglasMayoreoSuper.piezas_fan || 15)) applySuper = true;
-            }
         }
     }
     
@@ -3692,7 +4102,6 @@ function getBasePriceForProfile(producto, profile) {
         basePrice = parseFloat(producto.precio_Menudeo || producto.precio_menudeo || 0);
     }
     
-    // Soporte para productos con esquema de precio tradicional / compatibilidad hacia atrás
     if (basePrice === 0 && producto.precio) {
         basePrice = parseFloat(producto.precio || 0);
     }
@@ -3734,7 +4143,11 @@ function renderCartItems() {
         let persPrice = 0;
         let persName = "Ninguna";
         const isMayoreo = esPerfilMayoreoOMas(clientProfile);
-        if (item.personalizacionId !== 'PERS-NONE') {
+        
+        if (item.personalizacionPrecio !== undefined && item.personalizacionPrecio !== null && Number(item.personalizacionPrecio) > 0) {
+            persPrice = parseFloat(item.personalizacionPrecio);
+            persName = item.texto_personalizado ? `Oficial (${item.texto_personalizado})` : "Oficial";
+        } else if (item.personalizacionId !== 'PERS-NONE') {
             const persObj = allPersonalizaciones.find(x => String(x.id) === String(item.personalizacionId)) || defaultPersonalizaciones.find(x => String(x.id) === String(item.personalizacionId));
             if (persObj) {
                 persPrice = isMayoreo ? parseFloat(persObj.precio_mayoreo || 0) : parseFloat(persObj.precio_Menudeo || 0);
@@ -3891,7 +4304,9 @@ async function submitOrder() {
         const basePrice = getBasePriceForProfile(item.producto, profile);
         
         let persPrice = 0;
-        if (item.personalizacionId !== 'PERS-NONE') {
+        if (item.personalizacionPrecio !== undefined && item.personalizacionPrecio !== null && Number(item.personalizacionPrecio) > 0) {
+            persPrice = parseFloat(item.personalizacionPrecio);
+        } else if (item.personalizacionId !== 'PERS-NONE') {
             const persObj = allPersonalizaciones.find(x => String(x.id) === String(item.personalizacionId)) || defaultPersonalizaciones.find(x => String(x.id) === String(item.personalizacionId));
             if (persObj) {
                 persPrice = isMayoreo ? parseFloat(persObj.precio_mayoreo || 0) : parseFloat(persObj.precio_Menudeo || 0);
@@ -3957,6 +4372,7 @@ async function submitOrder() {
                 user.perfil = data.actualizacion_perfil.perfil;
                 user.super_mayoreo_exp = data.actualizacion_perfil.super_mayoreo_exp;
                 user.super_mayoreo_acum = data.actualizacion_perfil.super_mayoreo_acum;
+                user.super_mayoreo_activo = data.actualizacion_perfil.super_mayoreo_activo;
                 localStorage.setItem('logged_user', JSON.stringify(user));
                 localStorage.setItem('current_perfil', user.perfil);
                 updateBrandTextColor();
@@ -3972,7 +4388,10 @@ async function submitOrder() {
                 
                 let persPrice = 0;
                 let persName = "Ninguna";
-                if (item.personalizacionId !== 'PERS-NONE') {
+                if (item.personalizacionPrecio !== undefined && item.personalizacionPrecio !== null && Number(item.personalizacionPrecio) > 0) {
+                    persPrice = parseFloat(item.personalizacionPrecio);
+                    persName = item.texto_personalizado ? `Oficial (${item.texto_personalizado})` : "Oficial";
+                } else if (item.personalizacionId !== 'PERS-NONE') {
                     const persObj = allPersonalizaciones.find(x => String(x.id) === String(item.personalizacionId)) || defaultPersonalizaciones.find(x => String(x.id) === String(item.personalizacionId));
                     if (persObj) {
                         persPrice = isMayoreo ? parseFloat(persObj.precio_mayoreo || 0) : parseFloat(persObj.precio_Menudeo || 0);
@@ -7154,6 +7573,7 @@ async function confirmSupplierStockMigration() {
     }
 }
 window.confirmSupplierStockMigration = confirmSupplierStockMigration;
+
 
 
 
