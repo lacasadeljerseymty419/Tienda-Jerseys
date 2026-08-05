@@ -1,10 +1,14 @@
 const API_URL = window.API_URL || "https://script.google.com/macros/s/AKfycbw97tnD6AOYXNkttgCnQRtg2WpikVw_cXdIYnKdc3lFIdeQ8PrbL1RRGdqMM7KD82ucQg/exec";
 
 // --- MONKEY PATCH FETCH PARA INYECCIÓN Y VALIDACIÓN DE TOKENS ---
+let isSessionExpiring = false;
+
 (function() {
     const originalFetch = window.fetch;
-    window.fetch = async function(url, options) {
-        if (typeof url === 'string' && url.includes('script.google.com') && options && options.body && typeof options.body === 'string') {
+    window.fetch = async function(url, options = {}) {
+        const isGoogleScript = typeof url === 'string' && url.includes('script.google.com');
+        
+        if (isGoogleScript && options && options.body && typeof options.body === 'string') {
             try {
                 const data = JSON.parse(options.body);
                 if (data && typeof data === 'object' && !data.token) {
@@ -16,38 +20,60 @@ const API_URL = window.API_URL || "https://script.google.com/macros/s/AKfycbw97t
             }
         }
         
-        const response = await originalFetch(url, options);
-        
-        if (typeof url === 'string' && url.includes('script.google.com') && response.ok) {
-            try {
-                const clone = response.clone();
-                const json = await clone.json();
-                if (json && json.session_invalid) {
-                    localStorage.removeItem('logged_user');
-                    localStorage.removeItem('current_perfil');
-                    localStorage.removeItem('session_token');
-                    
-                    Swal.fire({
-                        icon: 'warning',
-                        title: 'Sesión Expirada',
-                        text: json.message || 'Tu sesión ha expirado o no es válida. Por favor, inicia sesión de nuevo.',
-                        background: '#151515', color: '#fff',
-                        confirmButtonColor: '#1d4ed8'
-                    }).then(() => {
-                        window.location.reload();
-                    });
-                    
-                    return new Response(JSON.stringify({ status: "error", message: "Sesión inválida" }), {
-                        status: 401,
-                        headers: { 'Content-Type': 'application/json' }
-                    });
+        try {
+            const response = await originalFetch(url, options);
+            
+            if (isGoogleScript && response.ok) {
+                try {
+                    const clone = response.clone();
+                    const json = await clone.json();
+                    if (json && json.session_invalid) {
+                        if (!isSessionExpiring) {
+                            isSessionExpiring = true;
+                            localStorage.removeItem('logged_user');
+                            localStorage.removeItem('current_perfil');
+                            localStorage.removeItem('current_subperfil');
+                            localStorage.removeItem('session_token');
+                            
+                            Swal.fire({
+                                icon: 'warning',
+                                title: 'Sesión Expirada',
+                                text: json.message || 'Tu sesión ha expirado o no es válida. Por favor, inicia sesión de nuevo.',
+                                background: '#151515', color: '#fff',
+                                confirmButtonColor: '#1d4ed8',
+                                allowOutsideClick: false,
+                                allowEscapeKey: false
+                            }).then(() => {
+                                isSessionExpiring = false;
+                                window.location.reload();
+                            });
+                        }
+                        
+                        return new Response(JSON.stringify({ status: "error", message: "Sesión inválida" }), {
+                            status: 401,
+                            headers: { 'Content-Type': 'application/json' }
+                        });
+                    }
+                } catch (e) {
+                    // Ignorar si no es JSON válido
                 }
-            } catch (e) {
-                // Ignorar si no es JSON válido o no clonable
             }
+            
+            return response;
+        } catch (err) {
+            if (isGoogleScript) {
+                console.warn("Reintentando petición a Google Script tras error de conexión/redirección...", err);
+                await new Promise(r => setTimeout(r, 600));
+                try {
+                    const retryOptions = { ...options };
+                    delete retryOptions.signal;
+                    return await originalFetch(url, retryOptions);
+                } catch (retryErr) {
+                    throw retryErr;
+                }
+            }
+            throw err;
         }
-        
-        return response;
     };
 })();
 
@@ -106,18 +132,27 @@ async function search(filtros = { nombre: "", tipo: "", version: "", genero: "" 
 }
 
 async function login_client(usuario, password) {
-    try {
-        const response = await fetch(API_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify({ action: "login_client", usuario, password })
-        });
-        
-        if (!response.ok) throw new Error(`Error HTTP: ${response.status}`);
-        return await response.json();
-    } catch (error) {
-        console.error("Error en login:", error);
-        return { status: "error", message: "Error de conexión: " + error.message };
+    let attempts = 0;
+    const maxAttempts = 3;
+    
+    while (attempts < maxAttempts) {
+        attempts++;
+        try {
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({ action: "login_client", usuario, password })
+            });
+            
+            if (!response.ok) throw new Error(`Error HTTP: ${response.status}`);
+            return await response.json();
+        } catch (error) {
+            console.warn(`Intento de login ${attempts}/${maxAttempts} falló:`, error);
+            if (attempts >= maxAttempts) {
+                return { status: "error", message: "No se pudo establecer conexión con la API (" + (error.message || "Failed to fetch") + "). Por favor, reintenta en un momento." };
+            }
+            await new Promise(resolve => setTimeout(resolve, 800));
+        }
     }
 }
 async function uploadImageToDrive(base64Data, fileName) {
@@ -194,16 +229,26 @@ const DOM = {
     mobileHeaderLogoBadge: document.getElementById('mobile-header-logo-badge'),
     adminSubperfilSelect: document.getElementById('admin-subperfil-select'),
     btnOpenCart: document.getElementById('btn-open-cart'),
+    btnAdminOrdersNav: document.getElementById('btn-admin-orders-nav'),
     cartCount: document.getElementById('cart-count'),
     actions: {
         logout: document.querySelectorAll('.action-logout'),
         navCatalogo: document.querySelectorAll('.action-nav-catalogo'),
         navJerseysView: document.querySelectorAll('.action-nav-jerseys-view'),
+        navMisPedidosView: document.querySelectorAll('.action-nav-mis-pedidos-view'),
         openCreate: document.querySelectorAll('.action-open-create'),
         openList: document.querySelectorAll('.action-open-list'),
         openClients: document.querySelectorAll('.action-open-clients'),
         openOrders: document.querySelectorAll('.action-open-orders'),
         openExcelOrders: document.querySelectorAll('.action-open-excel-orders')
+    },
+    local419: {
+        wrapper: document.getElementById('local419-menu-wrapper'),
+        mobileSection: document.getElementById('mobile-local419-section'),
+        actionsPos: document.querySelectorAll('.action-local419-pos'),
+        actionsOrdenar: document.querySelectorAll('.action-local419-ordenar'),
+        actionsMisPedidos: document.querySelectorAll('.action-local419-mis-pedidos'),
+        actionsInventario: document.querySelectorAll('.action-local419-inventario')
     },
     mobileMenu: {
         toggleBtn: document.getElementById('btn-mobile-menu-toggle'),
@@ -583,44 +628,61 @@ function updateBrandTextColor() {
     }
 }
 
-// --- Control de Sesión por Inactividad ---
-let inactivityTimer = null;
+// --- Control de Sesión por Inactividad (Basado en Date.now() y visibilitychange) ---
+let lastActivityTime = Date.now();
 const INACTIVITY_LIMIT_MS = 30 * 60 * 1000; // 30 minutos
 
-function resetInactivityTimer() {
-    if (inactivityTimer) clearTimeout(inactivityTimer);
+function updateLastActivity() {
+    lastActivityTime = Date.now();
+}
+
+function checkInactivityExpiration() {
+    if (!localStorage.getItem('logged_user') || isSessionExpiring) return false;
     
-    // Solo inicia el contador si hay un usuario logueado
-    if (localStorage.getItem('logged_user')) {
-        inactivityTimer = setTimeout(() => {
-            // Se agotó el tiempo
-            localStorage.removeItem('logged_user');
-            localStorage.removeItem('current_perfil');
-            localStorage.removeItem('current_subperfil');
-            localStorage.removeItem('session_token');
-            
-            Swal.fire({
-                icon: 'warning',
-                title: 'Sesión Expirada',
-                text: 'Tu sesión se ha cerrado por inactividad. Por favor, inicia sesión de nuevo.',
-                background: '#151515', color: '#fff',
-                confirmButtonColor: '#1d4ed8',
-                allowOutsideClick: false,
-                allowEscapeKey: false
-            }).then(() => {
-                window.location.reload();
-            });
-        }, INACTIVITY_LIMIT_MS);
+    const elapsed = Date.now() - lastActivityTime;
+    if (elapsed >= INACTIVITY_LIMIT_MS) {
+        isSessionExpiring = true;
+        localStorage.removeItem('logged_user');
+        localStorage.removeItem('current_perfil');
+        localStorage.removeItem('current_subperfil');
+        localStorage.removeItem('session_token');
+        
+        Swal.fire({
+            icon: 'warning',
+            title: 'Sesión Expirada',
+            text: 'Tu sesión se ha cerrado por inactividad. Por favor, inicia sesión de nuevo.',
+            background: '#151515', color: '#fff',
+            confirmButtonColor: '#1d4ed8',
+            allowOutsideClick: false,
+            allowEscapeKey: false
+        }).then(() => {
+            isSessionExpiring = false;
+            window.location.reload();
+        });
+        return true;
     }
+    return false;
 }
 
 function startInactivityMonitor() {
     const events = ['mousemove', 'keydown', 'scroll', 'click', 'touchstart'];
     events.forEach(event => {
-        document.addEventListener(event, resetInactivityTimer, { passive: true });
+        document.addEventListener(event, updateLastActivity, { passive: true });
     });
-    // Iniciar el timer por primera vez
-    resetInactivityTimer();
+    
+    // Verificar periódicamente cada 30 segundos si la app está en primer plano
+    setInterval(() => {
+        checkInactivityExpiration();
+    }, 30000);
+    
+    // Verificar INMEDIATAMENTE cuando el usuario regresa a la pestaña/app en celular
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+            checkInactivityExpiration();
+        }
+    });
+    
+    updateLastActivity();
 }
 
 document.addEventListener('DOMContentLoaded', initApp);
@@ -661,6 +723,14 @@ async function initApp() {
             if (DOM.perfil.btnMiPerfilMobile) DOM.perfil.btnMiPerfilMobile.classList.add('hidden');
             if (DOM.admin.adminMenúuWrapper) DOM.admin.adminMenúuWrapper.classList.remove('hidden');
             if (DOM.mobileMenu.adminSection) DOM.mobileMenu.adminSection.classList.remove('hidden');
+            if (DOM.local419 && DOM.local419.wrapper) DOM.local419.wrapper.classList.remove('hidden');
+            if (DOM.local419 && DOM.local419.mobileSection) DOM.local419.mobileSection.classList.remove('hidden');
+            if (DOM.btnAdminOrdersNav) DOM.btnAdminOrdersNav.classList.remove('hidden');
+            
+            // Para Administrador: Ocultar los botones sueltos "Ordenar" y "Mis Pedidos" (movidos a Local 419)
+            if (DOM.actions.navJerseysView) DOM.actions.navJerseysView.forEach(btn => btn.classList.add('hidden'));
+            if (DOM.actions.navMisPedidosView) DOM.actions.navMisPedidosView.forEach(btn => btn.classList.add('hidden'));
+
             const savedSub = localStorage.getItem('current_subperfil') || 'Mayoreo';
             if (DOM.adminSubperfilSelect) {
                 DOM.adminSubperfilSelect.classList.remove('hidden');
@@ -674,7 +744,14 @@ async function initApp() {
             if (DOM.perfil.btnMiPerfilMobile) DOM.perfil.btnMiPerfilMobile.classList.remove('hidden');
             if (DOM.admin.adminMenúuWrapper) DOM.admin.adminMenúuWrapper.classList.add('hidden');
             if (DOM.mobileMenu.adminSection) DOM.mobileMenu.adminSection.classList.add('hidden');
+            if (DOM.local419 && DOM.local419.wrapper) DOM.local419.wrapper.classList.add('hidden');
+            if (DOM.local419 && DOM.local419.mobileSection) DOM.local419.mobileSection.classList.add('hidden');
+            if (DOM.btnAdminOrdersNav) DOM.btnAdminOrdersNav.classList.add('hidden');
             if (DOM.adminSubperfilSelect) DOM.adminSubperfilSelect.classList.add('hidden');
+            
+            // Para Clientes normales: Mostrar los botones sueltos "Ordenar" y "Mis Pedidos"
+            if (DOM.actions.navJerseysView) DOM.actions.navJerseysView.forEach(btn => btn.classList.remove('hidden'));
+            if (DOM.actions.navMisPedidosView) DOM.actions.navMisPedidosView.forEach(btn => btn.classList.remove('hidden'));
             
             // Refrescar perfil del usuario en segundo plano
             fetch(API_URL, {
@@ -717,6 +794,38 @@ async function initApp() {
     if (DOM.actions.navJerseysView) DOM.actions.navJerseysView.forEach(btn => btn.addEventListener('click', () => { switchView('jerseys-pedido'); closemobileMenu(); }));
     if (DOM.btnOpenCart) {
         DOM.btnOpenCart.addEventListener('click', openCartModal);
+    }
+    
+    // Listeners para Menú Local 419
+    if (DOM.local419 && DOM.local419.actionsPos) {
+        DOM.local419.actionsPos.forEach(btn => btn.addEventListener('click', () => {
+            switchView('jerseys-pedido');
+            closemobileMenu();
+        }));
+    }
+    if (DOM.local419 && DOM.local419.actionsOrdenar) {
+        DOM.local419.actionsOrdenar.forEach(btn => btn.addEventListener('click', () => {
+            switchView('jerseys-pedido');
+            closemobileMenu();
+        }));
+    }
+    if (DOM.local419 && DOM.local419.actionsMisPedidos) {
+        DOM.local419.actionsMisPedidos.forEach(btn => btn.addEventListener('click', () => {
+            if (typeof openUserOrdenesModal === 'function') {
+                openUserOrdenesModal();
+            } else if (typeof openOrdenesModal === 'function') {
+                openOrdenesModal();
+            }
+            closemobileMenu();
+        }));
+    }
+    if (DOM.local419 && DOM.local419.actionsInventario) {
+        DOM.local419.actionsInventario.forEach(btn => btn.addEventListener('click', () => {
+            if (typeof openInventario419View === 'function') {
+                openInventario419View();
+            }
+            closemobileMenu();
+        }));
     }
 
     function handleSubperfilChange(e) {
@@ -1397,8 +1506,8 @@ async function handleLoginSubmit(e) {
             localStorage.removeItem('jerseys_configs_v18');
             localStorage.removeItem('jerseys_personalizations_v10');
             
-            // Al hacer login exitoso, reiniciamos el contador de inactividad
-            resetInactivityTimer();
+            // Al hacer login exitoso, reiniciamos la marca de tiempo de inactividad
+            updateLastActivity();
             
             // Recargar configuraciones frescas de la API e inventario en paralelo
             await Promise.all([
@@ -2656,11 +2765,10 @@ async function handleCreateProduct(e) {
 
 async function fetchInitialProducts(force = false) {
     const CACHE_KEY = 'jerseys_products_cache_v5';
-    const CACHE_TTL = 5 * 60 * 1000; // 5 minutos
     
     if (force) {
         localStorage.removeItem(CACHE_KEY);
-        renderSkeletons(8);
+        renderSkeletons(6);
     }
     
     let cachedProducts = null;
@@ -2668,22 +2776,22 @@ async function fetchInitialProducts(force = false) {
         const cachedStr = localStorage.getItem(CACHE_KEY);
         if (cachedStr) {
             const cachedObj = JSON.parse(cachedStr);
-            if (cachedObj && cachedObj.timestamp && (Date.now() - cachedObj.timestamp < CACHE_TTL)) {
+            if (cachedObj && Array.isArray(cachedObj.data) && cachedObj.data.length > 0) {
                 cachedProducts = cachedObj.data;
             }
         }
     } catch (e) {}
     
     if (cachedProducts && !force) {
-        // Cargar instantáneamente del caché
+        // Cargar instantáneamente del caché (0ms delay) sin pantalla gris
         allProducts = cachedProducts;
         renderProductsWithFilters();
         
         // Revalidar en segundo plano silenciosamente
         revalidateProductsBackground(CACHE_KEY);
     } else {
-        // Cargar de la API de forma síncrona mostrando animación de carga
-        renderSkeletons(8);
+        // Cargar de la API de forma síncrona mostrando animación de carga únicamente en la primera visita absoluta
+        renderSkeletons(6);
         await loadProductsFromApi(CACHE_KEY);
     }
 }
@@ -2811,6 +2919,8 @@ function handleLocalSearch() {
     }, 300);
 }
 
+let currentRenderToken = 0;
+
 function renderLocalProducts(productos) {
     DOM.grid.innerHTML = '';
     DOM.resultsCount.classList.remove('hidden');
@@ -2825,7 +2935,30 @@ function renderLocalProducts(productos) {
     DOM.emptyState.classList.add('hidden');
     isFirstLoad = false;
     DOM.resultsCount.textContent = `${productos.length} producto${productos.length !== 1 ? 's' : ''}`;
-    productos.forEach(producto => DOM.grid.appendChild(createProductCard(producto)));
+
+    const token = ++currentRenderToken;
+    const CHUNK_SIZE = 20; // 20 tarjetas por lote para renderizado instantáneo <16ms
+    let index = 0;
+
+    function renderNextChunk() {
+        if (token !== currentRenderToken) return; // Detener si se inició una nueva renderización
+        
+        const fragment = document.createDocumentFragment();
+        const end = Math.min(index + CHUNK_SIZE, productos.length);
+        
+        for (let i = index; i < end; i++) {
+            fragment.appendChild(createProductCard(productos[i]));
+        }
+        
+        DOM.grid.appendChild(fragment);
+        index = end;
+        
+        if (index < productos.length) {
+            requestAnimationFrame(renderNextChunk);
+        }
+    }
+
+    renderNextChunk();
 }
 
 function createProductCard(producto) {
@@ -2963,7 +3096,7 @@ function createProductCard(producto) {
 
     article.innerHTML = `
         <div class="product-image-container relative w-full aspect-[4/5] rounded-lg sm:rounded-xl overflow-hidden mb-2 sm:mb-4 bg-dark z-10 cursor-pointer">
-            <img src="${imgUrl}" alt="${producto.nombre || 'Jersey'}" class="product-card-img w-full h-full object-cover object-center group-hover:scale-110 transition-transform duration-700 ease-out ${(isAgotado || isProximamente) ? 'grayscale opacity-60' : ''}" loading="lazy">
+            <img src="${imgUrl}" alt="${producto.nombre || 'Jersey'}" class="product-card-img w-full h-full object-cover object-center group-hover:scale-110 transition-transform duration-700 ease-out ${(isAgotado || isProximamente) ? 'grayscale opacity-60' : ''}" loading="lazy" decoding="async">
             <div class="absolute inset-0 bg-gradient-to-t from-dark-100/90 via-dark-100/20 to-transparent opacity-60 group-hover:opacity-40 transition-opacity duration-500"></div>
             ${imageOverlayHtml}
             ${carouselControlsHtml}
@@ -3564,19 +3697,28 @@ async function handleToggleClientStatus(id) {
 
 function switchView(view) {
     currentView = view;
+    const loggedUserStr = localStorage.getItem('logged_user');
+    let isAdmin = false;
+    try {
+        if (loggedUserStr) {
+            const u = JSON.parse(loggedUserStr);
+            isAdmin = (u && u.perfil === "Administrador");
+        }
+    } catch (e) {}
+
     if (view === 'mis-jerseys') {
         if (DOM.actions && DOM.actions.navCatalogo) {
             DOM.actions.navCatalogo.forEach(btn => btn.className = "action-nav-catalogo w-full text-left px-4 py-2 text-sm text-white bg-navy-500/20 rounded-lg transition-colors flex items-center gap-2");
         }
         if (DOM.actions && DOM.actions.navJerseysView) {
-            DOM.actions.navJerseysView.forEach(btn => btn.className = "action-nav-jerseys-view text-xs sm:text-sm font-semibold text-gray-400 hover:text-white transition-colors flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg hover:bg-white/5");
+            DOM.actions.navJerseysView.forEach(btn => btn.className = `action-nav-jerseys-view text-xs sm:text-sm font-semibold text-gray-400 hover:text-white transition-colors flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg hover:bg-white/5 ${isAdmin ? 'hidden' : ''}`);
         }
     } else if (view === 'jerseys-pedido') {
         if (DOM.actions && DOM.actions.navCatalogo) {
             DOM.actions.navCatalogo.forEach(btn => btn.className = "action-nav-catalogo w-full text-left px-4 py-2 text-sm text-gray-300 hover:text-white hover:bg-navy-500/20 rounded-lg transition-colors flex items-center gap-2");
         }
         if (DOM.actions && DOM.actions.navJerseysView) {
-            DOM.actions.navJerseysView.forEach(btn => btn.className = "action-nav-jerseys-view text-xs sm:text-sm font-semibold text-white transition-colors flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg bg-white/5 border border-white/10");
+            DOM.actions.navJerseysView.forEach(btn => btn.className = `action-nav-jerseys-view text-xs sm:text-sm font-semibold text-white transition-colors flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg bg-white/5 border border-white/10 ${isAdmin ? 'hidden' : ''}`);
         }
     }
     renderLocalProducts(allProducts);
@@ -4958,6 +5100,36 @@ window.openOrderDetailsModal = function(id_orden) {
         statusSelect.value = orden.estatus;
     }
     
+    // Configurar footer de acciones (Traspasar a Local 419)
+    const footerContainer = document.getElementById('admin-order-details-footer');
+    if (footerContainer) {
+        const isDisponibleParaRecoger = (orden.estatus && String(orden.estatus).toLowerCase().includes('disponible') && String(orden.estatus).toLowerCase().includes('recoger'));
+        const isTraspasado = orden.estatus === 'Traspasado a Local 419';
+        
+        if (isDisponibleParaRecoger) {
+            footerContainer.innerHTML = `
+                <div class="text-xs text-amber-400 font-medium flex items-center gap-1.5">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    Orden lista para traspasar existencias a Local 419
+                </div>
+                <button onclick="traspasarOrdenALocal419('${orden.id_orden}')" class="w-full sm:w-auto px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs sm:text-sm transition-all duration-300 shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
+                    Traspasar a inventario de local
+                </button>`;
+            footerContainer.classList.remove('hidden');
+        } else if (isTraspasado) {
+            footerContainer.innerHTML = `
+                <div class="w-full text-center text-xs text-emerald-400 font-bold bg-emerald-500/10 border border-emerald-500/20 py-2 px-3 rounded-xl flex items-center justify-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                    Esta orden ya fue traspasada al inventario de Local 419
+                </div>`;
+            footerContainer.classList.remove('hidden');
+        } else {
+            footerContainer.innerHTML = '';
+            footerContainer.classList.add('hidden');
+        }
+    }
+    
     const modal = document.getElementById('admin-order-details-modal');
     modal.classList.remove('hidden');
     if (document.getElementById('user-filter-id')) document.getElementById('user-filter-id').value = '';
@@ -4979,6 +5151,86 @@ window.openOrderDetailsModal = function(id_orden) {
         };
     }
 }
+
+window.traspasarOrdenALocal419 = async function(id_orden) {
+    const result = await Swal.fire({
+        title: '¿Traspasar a Inventario Local 419?',
+        text: `Se transferirán todas las piezas y tallas del pedido ${id_orden} directamente a las tablas Playeras419 e Inventario_Tallas419.`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#f59e0b',
+        cancelButtonColor: '#3f3f46',
+        confirmButtonText: 'Sí, traspasar ahora',
+        cancelButtonText: 'Cancelar',
+        background: '#151515',
+        color: '#ffffff',
+        customClass: { popup: 'border border-amber-500/30 rounded-2xl' }
+    });
+
+    if (!result.isConfirmed) return;
+
+    Swal.fire({
+        title: 'Procesando traspaso...',
+        text: 'Actualizando existencias en Local 419',
+        allowOutsideClick: false,
+        background: '#151515',
+        color: '#ffffff',
+        didOpen: () => { Swal.showLoading(); }
+    });
+
+    try {
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({
+                action: 'traspasar_orden_a_419',
+                id_orden: id_orden,
+                token: localStorage.getItem('session_token') || ''
+            })
+        });
+
+        const data = await response.json();
+
+        if (data.status === 'success') {
+            Swal.fire({
+                icon: 'success',
+                title: 'Traspaso Completado',
+                text: data.message || `La orden ${id_orden} ha sido traspasada con éxito al inventario de Local 419.`,
+                background: '#151515',
+                color: '#ffffff',
+                confirmButtonColor: '#f59e0b'
+            });
+
+            // Cerrar modal de detalles y refrescar órdenes
+            const modal = document.getElementById('admin-order-details-modal');
+            if (modal) {
+                modal.classList.add('opacity-0');
+                setTimeout(() => modal.classList.add('hidden'), 300);
+            }
+            if (typeof fetchOrdenes === 'function') fetchOrdenes();
+            if (typeof fetchProducts419 === 'function') fetchProducts419(true);
+        } else {
+            Swal.fire({
+                icon: 'error',
+                title: 'Error en el Traspaso',
+                text: data.message || 'No se pudo completar el traspaso al inventario del Local 419.',
+                background: '#151515',
+                color: '#ffffff',
+                confirmButtonColor: '#ef4444'
+            });
+        }
+    } catch (err) {
+        console.error('Error al traspasar orden:', err);
+        Swal.fire({
+            icon: 'error',
+            title: 'Error de Red',
+            text: 'Ocurrió un fallo al comunicarse con el servidor.',
+            background: '#151515',
+            color: '#ffffff',
+            confirmButtonColor: '#ef4444'
+        });
+    }
+};
 
 window.deleteOrderItem = async function(id_orden, id_detalle) {
     const orden = currentOrdenes.find(o => o.id_orden === id_orden) || allFetchedOrdenes.find(o => o.id_orden === id_orden);
@@ -5218,16 +5470,22 @@ setTimeout(() => {
     }));
 
     document.getElementById('close-user-ordenes-modal')?.addEventListener('click', () => {
-        document.getElementById('user-ordenes-modal').classList.add('hidden');
+        const m = document.getElementById('user-ordenes-modal');
+        if (m) m.classList.add('hidden');
+        document.body.style.overflow = '';
     });
 
     document.getElementById('close-user-order-details-modal')?.addEventListener('click', () => {
-        document.getElementById('user-order-details-modal').classList.add('hidden');
+        const m = document.getElementById('user-order-details-modal');
+        if (m) m.classList.add('hidden');
     });
     
     // Si queremos cerrar con click fuera
     document.getElementById('user-ordenes-modal')?.addEventListener('click', (e) => {
-        if (e.target.id === 'user-ordenes-modal') e.target.classList.add('hidden');
+        if (e.target.id === 'user-ordenes-modal') {
+            e.target.classList.add('hidden');
+            document.body.style.overflow = '';
+        }
     });
     document.getElementById('user-order-details-modal')?.addEventListener('click', (e) => {
         if (e.target.id === 'user-order-details-modal') e.target.classList.add('hidden');
@@ -5501,6 +5759,7 @@ async function openUserOrdenesModal() {
     const list = document.getElementById('user-ordenes-list');
     
     modal.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
     if (document.getElementById('user-filter-id')) document.getElementById('user-filter-id').value = '';
     if (document.getElementById('user-filter-status')) document.getElementById('user-filter-status').value = '';
     // pecar opacity in setTimeout para la transición
@@ -7573,6 +7832,351 @@ async function confirmSupplierStockMigration() {
     }
 }
 window.confirmSupplierStockMigration = confirmSupplierStockMigration;
+
+// ==========================================
+// MÓDULO DE INVENTARIO INDEPENDIENTE LOCAL 419
+// ==========================================
+let allProducts419 = [];
+let isLocal419Loading = false;
+
+async function fetchProducts419(force = false) {
+    if (isLocal419Loading && !force) return;
+    isLocal419Loading = true;
+    
+    const tbody = document.getElementById('local419-inventario-tbody');
+    if (tbody) {
+        tbody.innerHTML = `<tr><td colspan="4" class="text-center py-8 text-amber-400 font-semibold animate-pulse">Cargando inventario de Local 419 (Playeras419 & Inventario_Tallas419)...</td></tr>`;
+    }
+
+    try {
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({
+                action: 'search',
+                origen: '419',
+                filtros: { nombre: "", tipo: "", version: "", genero: "" }
+            })
+        });
+
+        const data = await response.json();
+        let productsData = [];
+
+        if (Array.isArray(data)) {
+            productsData = data;
+        } else if (data && data.status === 'success') {
+            productsData = data.data || data.productos || [];
+        }
+
+        allProducts419 = productsData;
+        renderInventario419Table(allProducts419);
+    } catch (err) {
+        console.error('Error al cargar inventario de Local 419:', err);
+        if (tbody) {
+            tbody.innerHTML = `<tr><td colspan="4" class="text-center py-6 text-red-400 font-semibold">Error al cargar existencias del Local 419. Por favor intenta de nuevo.</td></tr>`;
+        }
+    } finally {
+        isLocal419Loading = false;
+    }
+}
+window.fetchProducts419 = fetchProducts419;
+
+function renderInventario419Grid(products) {
+    const gridContainer = document.getElementById('local419-inventario-grid');
+    if (!gridContainer) return;
+
+    const searchTerm = (document.getElementById('inv419-search-input')?.value || '').toLowerCase().trim();
+    const filtered = (products || []).filter(p => {
+        if (!searchTerm) return true;
+        const targetStr = `${p.equipo || ''} ${p.nombre || ''} ${p.tipo || ''} ${p.version || ''} ${p.genero || ''} ${p.id || ''}`.toLowerCase();
+        return targetStr.includes(searchTerm);
+    });
+
+    if (filtered.length === 0) {
+        gridContainer.innerHTML = `<div class="col-span-full text-center py-12 text-gray-500 italic">No se encontraron productos registrados en el inventario del Local 419.</div>`;
+        return;
+    }
+
+    gridContainer.innerHTML = filtered.map(prod => {
+        const imgUrl = getFirstImage(prod.foto || prod.imagen) || 'https://images.unsplash.com/photo-1577212017184-807dd6acefd6?auto=format&fit=crop&q=80&w=400';
+        const equipoNombre = (prod.nombre || prod.equipo || 'JERSEY DESCONOCIDO').toUpperCase();
+        const tipo = (prod.tipo || 'DESCONOCIDO').toUpperCase();
+        const version = (prod.version || 'REGULAR').toUpperCase();
+        const genero = (prod.genero || 'HOMBRE').toUpperCase();
+        const precio = Number(prod.precio_menudeo || prod.precio || 0);
+
+        // Extraer arreglo de tallas del producto
+        const tallasArray = Array.isArray(prod.tallas) ? prod.tallas : [];
+        let sizeBoxesHtml = '';
+
+        if (tallasArray.length > 0) {
+            sizeBoxesHtml = tallasArray.map(tObj => {
+                const sz = (tObj.talla || '').toUpperCase();
+                const cant = Number(tObj.stock || 0);
+                const hasStock = cant > 0;
+                
+                const boxStyle = hasStock
+                    ? 'bg-[#222226] text-white border-white/10 hover:border-amber-400'
+                    : 'bg-white/5 text-gray-500 border-white/5 opacity-60';
+
+                const badgeBg = hasStock ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300';
+
+                return `
+                <div class="relative group/size cursor-pointer" onclick="editLocal419SizeStockPrompt('${prod.id}', '${sz}', ${cant})" title="Editar stock de talla ${sz}">
+                    <div class="w-10 h-10 sm:w-11 sm:h-11 rounded-xl border flex items-center justify-center font-bold text-xs ${boxStyle} transition-all shadow-sm">
+                        ${sz}
+                    </div>
+                    <span class="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1 rounded-full ${badgeBg} text-[10px] font-extrabold flex items-center justify-center shadow-md border border-dark-100">
+                        ${cant}
+                    </span>
+                </div>`;
+            }).join('');
+        }
+
+        const addTallaBtn = `
+        <div class="relative cursor-pointer" onclick="addNewLocal419SizePrompt('${prod.id}', '${genero.replace(/'/g, "\\'")}')" title="Agregar Talla">
+            <div class="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center text-sm font-bold transition-all shadow-sm">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"></path></svg>
+            </div>
+        </div>`;
+
+        return `
+        <div class="bg-[#141416] border border-white/10 rounded-2xl p-3 sm:p-4 flex flex-col justify-between hover:border-amber-500/40 transition-all duration-300 shadow-xl shadow-black/40 group relative">
+            <div>
+                <!-- Imagen con relación de aspecto estilo catálogo -->
+                <div class="relative w-full aspect-[4/5] rounded-xl overflow-hidden mb-3 bg-dark-300 border border-white/5">
+                    <img src="${imgUrl}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" alt="${equipoNombre}">
+                    <div class="absolute inset-0 bg-gradient-to-t from-dark/60 via-transparent to-transparent opacity-60"></div>
+                </div>
+
+                <!-- Título del Jersey -->
+                <h3 class="font-bold text-white text-sm sm:text-base leading-snug uppercase mb-2 line-clamp-2 min-h-[2.5rem]">
+                    ${equipoNombre}
+                </h3>
+                
+                <!-- ID de Referencia -->
+                <div class="text-[10px] text-gray-500 font-mono mb-2">ID: ${prod.id}</div>
+
+                <!-- Insignias de detalles -->
+                <div class="flex flex-wrap gap-1.5 mb-3">
+                    <span class="px-2 py-0.5 rounded-md bg-white/5 text-gray-300 text-[10px] font-bold tracking-wider uppercase border border-white/10">${tipo}</span>
+                    <span class="px-2 py-0.5 rounded-md bg-white/5 text-gray-300 text-[10px] font-bold tracking-wider uppercase border border-white/10">${version}</span>
+                    <span class="px-2 py-0.5 rounded-md bg-blue-900/30 text-blue-400 text-[10px] font-bold tracking-wider uppercase border border-blue-500/20">${genero}</span>
+                </div>
+
+                <!-- Precio -->
+                <div class="bg-dark-300/80 rounded-xl px-3 py-2 border border-white/5 flex items-center justify-between mb-3.5">
+                    <span class="text-xs text-gray-400 font-medium">Precio:</span>
+                    <span class="text-sm font-bold text-blue-400">$${precio.toFixed(2)}</span>
+                </div>
+            </div>
+
+            <!-- Sección de Tallas y Existencias Local 419 -->
+            <div class="pt-3 border-t border-white/5">
+                <div class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Existencias 419:</div>
+                <div class="flex flex-wrap gap-2 items-center">
+                    ${sizeBoxesHtml}
+                    ${addTallaBtn}
+                </div>
+            </div>
+        </div>`;
+    }).join('');
+}
+window.renderInventario419Grid = renderInventario419Grid;
+window.renderInventario419Table = renderInventario419Grid; // Compatibilidad alias
+
+async function updateLocal419SizeStock(id_playera, talla, nuevaCantidad) {
+    const cantNum = parseInt(nuevaCantidad, 10);
+    if (isNaN(cantNum) || cantNum < 0) return;
+
+    try {
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({
+                action: 'update_stock_talla',
+                origen: '419',
+                id_playera: id_playera,
+                talla: talla,
+                cantidad: cantNum,
+                token: localStorage.getItem('session_token') || ''
+            })
+        });
+
+        const data = await response.json();
+        if (data.status === 'success') {
+            const prod = allProducts419.find(p => String(p.id) === String(id_playera));
+            if (prod) {
+                if (Array.isArray(prod.tallas)) {
+                    const item = prod.tallas.find(x => String(x.talla).trim().toUpperCase() === String(talla).trim().toUpperCase());
+                    if (item) item.stock = cantNum;
+                    else prod.tallas.push({ talla: talla, stock: cantNum, id_inventario: '' });
+                }
+                if (prod.tallas_stock) {
+                    prod.tallas_stock[talla] = cantNum;
+                }
+            }
+            const toast = Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 1500, background: '#151515', color: '#fff' });
+            toast.fire({ icon: 'success', title: `Stock 419 (${talla}): ${cantNum} pzas` });
+        } else {
+            throw new Error(data.message || 'No se pudo actualizar el stock en Local 419');
+        }
+    } catch (err) {
+        console.error('Error al actualizar stock 419:', err);
+        Swal.fire({ icon: 'error', title: 'Error al actualizar', text: err.message, background: '#151515', color: '#fff' });
+    }
+}
+window.updateLocal419SizeStock = updateLocal419SizeStock;
+
+async function editLocal419SizeStockPrompt(id_playera, talla, cantActual) {
+    const { value: nuevaCant } = await Swal.fire({
+        title: `Editar Stock Talla ${talla} (Local 419)`,
+        input: 'number',
+        inputLabel: 'Ingresa la nueva cantidad en existencia:',
+        inputValue: cantActual,
+        inputAttributes: { min: '0', step: '1' },
+        showCancelButton: true,
+        confirmButtonText: 'Actualizar Stock',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#2563eb',
+        cancelButtonColor: '#3f3f46',
+        background: '#151515', color: '#fff'
+    });
+
+    if (nuevaCant !== undefined && nuevaCant !== null && nuevaCant !== "") {
+        await updateLocal419SizeStock(id_playera, talla, nuevaCant);
+        fetchProducts419(true);
+    }
+}
+window.editLocal419SizeStockPrompt = editLocal419SizeStockPrompt;
+
+async function addNewLocal419SizePrompt(id_playera, genero) {
+    const listTallas = (typeof getTallasForGender === 'function') ? getTallasForGender(genero) : ['S', 'M', 'L', 'XL', 'XXL', '2XL', '3XL', '14', '16', '18', '20', '22', '24', '26', '28'];
+    const optionsHtml = listTallas.map(t => `<option value="${t}">${t}</option>`).join('');
+
+    const { value: formValues } = await Swal.fire({
+        title: 'Agregar Talla al Local 419',
+        html: `
+            <div class="flex flex-col gap-3 text-left">
+                <div>
+                    <label class="text-xs text-gray-400 font-semibold mb-1 block">Selecciona la Talla:</label>
+                    <select id="swal-talla-select" class="w-full bg-dark-100 border border-white/10 rounded-lg p-2 text-sm text-white focus:outline-none focus:border-amber-400">${optionsHtml}</select>
+                </div>
+                <div>
+                    <label class="text-xs text-gray-400 font-semibold mb-1 block">Cantidad Inicial en Local 419:</label>
+                    <input id="swal-cant-input" type="number" min="0" value="1" class="w-full bg-dark-100 border border-white/10 rounded-lg p-2 text-sm text-white focus:outline-none focus:border-amber-400">
+                </div>
+            </div>
+        `,
+        focusConfirm: false,
+        showCancelButton: true,
+        confirmButtonText: 'Guardar Talla',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#f59e0b',
+        cancelButtonColor: '#3f3f46',
+        background: '#151515', color: '#fff',
+        preConfirm: () => {
+            return {
+                talla: document.getElementById('swal-talla-select').value,
+                cantidad: document.getElementById('swal-cant-input').value
+            };
+        }
+    });
+
+    if (formValues && formValues.talla) {
+        await updateLocal419SizeStock(id_playera, formValues.talla, formValues.cantidad);
+        fetchProducts419(true);
+    }
+}
+window.addNewLocal419SizePrompt = addNewLocal419SizePrompt;
+
+function openInventario419View() {
+    const modal = document.getElementById('local419-inventario-modal');
+    if (!modal) return;
+
+    document.body.style.overflow = 'hidden';
+    modal.classList.remove('hidden');
+    void modal.offsetWidth;
+    modal.classList.remove('opacity-0');
+
+    fetchProducts419();
+}
+window.openInventario419View = openInventario419View;
+
+function closeInventario419View() {
+    const modal = document.getElementById('local419-inventario-modal');
+    if (modal) {
+        modal.classList.add('opacity-0');
+        setTimeout(() => {
+            modal.classList.add('hidden');
+            document.body.style.overflow = '';
+        }, 300);
+    } else {
+        document.body.style.overflow = '';
+    }
+}
+window.closeInventario419View = closeInventario419View;
+
+// Event Listeners Delegados para las Opciones de Local 419
+document.addEventListener('click', (e) => {
+    const posBtn = e.target.closest('.action-local419-pos');
+    if (posBtn) {
+        closeInventario419View();
+        if (typeof switchView === 'function') switchView('jerseys-pedido');
+        if (typeof closemobileMenu === 'function') closemobileMenu();
+        return;
+    }
+
+    const ordenarBtn = e.target.closest('.action-local419-ordenar');
+    if (ordenarBtn) {
+        closeInventario419View();
+        if (typeof switchView === 'function') switchView('jerseys-pedido');
+        if (typeof closemobileMenu === 'function') closemobileMenu();
+        return;
+    }
+
+    const misPedidosBtn = e.target.closest('.action-local419-mis-pedidos');
+    if (misPedidosBtn) {
+        closeInventario419View();
+        if (typeof openUserOrdenesModal === 'function') openUserOrdenesModal();
+        else if (typeof openOrdenesModal === 'function') openOrdenesModal();
+        if (typeof closemobileMenu === 'function') closemobileMenu();
+        return;
+    }
+
+    const inventarioBtn = e.target.closest('.action-local419-inventario');
+    if (inventarioBtn) {
+        if (typeof openInventario419View === 'function') openInventario419View();
+        if (typeof closemobileMenu === 'function') closemobileMenu();
+        return;
+    }
+});
+
+// Event Listeners para la Vista de Inventario 419
+document.addEventListener('DOMContentLoaded', () => {
+    const closeBtn = document.getElementById('close-local419-inventario-modal');
+    if (closeBtn) {
+        closeBtn.onclick = () => closeInventario419View();
+    }
+
+    const btnLocal419Menu = document.getElementById('btn-local419-menu');
+    if (btnLocal419Menu) {
+        btnLocal419Menu.onclick = (e) => {
+            e.preventDefault();
+            openInventario419View();
+        };
+    }
+
+    const refreshBtn = document.getElementById('btn-refresh-inv419');
+    if (refreshBtn) {
+        refreshBtn.onclick = () => fetchProducts419(true);
+    }
+
+    const searchInput = document.getElementById('inv419-search-input');
+    if (searchInput) {
+        searchInput.oninput = () => renderInventario419Grid(allProducts419);
+    }
+});
 
 
 
