@@ -1010,6 +1010,9 @@ async function initApp() {
     if (DOM.admin.formAddTalla) DOM.admin.formAddTalla.addEventListener('submit', handleAddNewTalla);
     if (DOM.admin.formUpdatePrecios) DOM.admin.formUpdatePrecios.addEventListener('submit', handleUpdatePrecios);
     
+    const btnSaveTallas = document.getElementById('btn-submit-save-tallas');
+    if (btnSaveTallas) btnSaveTallas.addEventListener('click', handleSaveBatchTallas);
+    
     // Inicializar listeners de Personalizaciones Oficiales
     initOficialPersonalizacionEvents();
     
@@ -2104,97 +2107,51 @@ function renderInventorySizes(producto) {
         return;
     }
     
-    producto.tallas.forEach(t => {
-        const stockActual = t.stock !== undefined ? t.stock : t.inventario;
+    producto.tallas.forEach((t, idx) => {
+        const stockActual = t.stock !== undefined ? t.stock : (t.inventario || 0);
+        const isNewTag = t.isNew || (t.id_inventario && String(t.id_inventario).startsWith('TEMP_'));
         const div = document.createElement('div');
-        div.className = 'flex items-center gap-3 bg-dark-200/20 p-2 rounded-lg border border-white/5';
+        div.className = 'flex items-center justify-between gap-3 bg-dark-200/20 p-2.5 rounded-xl border border-white/5';
         div.innerHTML = `
-            <div class="w-12 h-10 bg-dark-200/50 rounded flex items-center justify-center font-bold text-white text-sm">${t.talla}</div>
-            <div class="flex-grow">
-                <div class="text-xs text-gray-400 hidden">ID: <span class="font-mono text-gray-500">${t.id_inventario || 'N/A'}</span></div>
+            <div class="flex items-center gap-3">
+                <div class="w-12 h-10 bg-dark-200/50 border border-white/5 rounded-lg flex items-center justify-center font-bold text-white text-sm relative">
+                    ${t.talla}
+                    ${isNewTag ? '<span class="absolute -top-1.5 -right-1.5 bg-amber-500 text-black text-[7px] font-extrabold px-1 rounded-full shadow">NUEVA</span>' : ''}
+                </div>
+                <div>
+                    <div class="text-xs text-gray-200 font-semibold">${producto.nombre || ''}</div>
+                    <div class="text-[10px] text-gray-500">Categoría: ${t.categoria || producto.genero || 'Adultos'}</div>
+                </div>
             </div>
             <div class="flex items-center gap-2">
-                <input type="number" min="0" value="${stockActual}" class="w-20 bg-dark-200 border border-white/10 rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:border-navy-400 focus:ring-1 focus:ring-navy-400 text-white input-update-stock" data-id="${t.id_inventario}">
-                <button type="button" class="px-3 py-1.5 rounded-lg bg-navy-500/20 text-navy-400 hover:bg-navy-500 hover:text-white transition-colors text-xs font-semibold btn-update-stock" data-id="${t.id_inventario}">
-                    Actualizar
-                </button>
+                <label class="text-[11px] text-gray-400 font-medium uppercase tracking-wider">Stock:</label>
+                <input type="number" min="0" value="${stockActual}" class="w-24 bg-dark-200/80 border border-white/10 rounded-lg px-2.5 py-1.5 text-sm text-center focus:outline-none focus:border-navy-400 focus:ring-1 focus:ring-navy-400 text-white font-semibold input-stock-local-val" data-idx="${idx}">
             </div>
         `;
         DOM.admin.invTallasList.appendChild(div);
     });
     
-    // Eventos para actualizar stock
-    document.querySelectorAll('.btn-update-stock').forEach(btn => {
-        btn.addEventListener('click', handleUpdateStock);
+    // Escuchar cambios locales en las cantidades de existencias
+    document.querySelectorAll('.input-stock-local-val').forEach(input => {
+        input.addEventListener('input', (e) => {
+            const idx = parseInt(e.target.getAttribute('data-idx'));
+            const val = parseInt(e.target.value);
+            if (!isNaN(idx) && currentJerseyToManage && currentJerseyToManage.tallas && currentJerseyToManage.tallas[idx]) {
+                currentJerseyToManage.tallas[idx].stock = isNaN(val) || val < 0 ? 0 : val;
+            }
+        });
     });
 }
 
-async function handleUpdateStock(e) {
-    const btn = e.currentTarget;
-    const idInv = btn.getAttribute('data-id');
-    const input = document.querySelector(`.input-update-stock[data-id="${idInv}"]`);
-    const nuevoStock = parseInt(input.value);
-    
-    if (isNaN(nuevoStock) || nuevoStock < 0 || !idInv) return;
-    
-    const originalText = btn.innerText;
-    btn.innerText = '...';
-    btn.disabled = true;
-    input.disabled = true;
-    
-    try {
-        const response = await fetch(API_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify({
-                action: 'update_stock',
-                id_inventario: idInv,
-                nuevo_stock: nuevoStock
-            })
-        });
-        
-        const data = await response.json();
-        if (data.status === 'success') {
-            btn.classList.replace('bg-navy-500/20', 'bg-green-500/20');
-            btn.classList.replace('text-navy-400', 'text-green-400');
-            btn.innerText = '✓';
-            
-            // Actualizar localmente
-            if(currentJerseyToManage) {
-                const t = currentJerseyToManage.tallas.find(x => x.id_inventario === idInv);
-                if(t) t.stock = nuevoStock;
-                // Refrescar tabla si es visible
-                renderAdminTable(); 
-                // Refrescar el catálogo de fondo para reflejar el nuevo stock en las cards
-                handleLocalSearch();
-            }
-            
-            setTimeout(() => {
-                btn.classList.replace('bg-green-500/20', 'bg-navy-500/20');
-                btn.classList.replace('text-green-400', 'text-navy-400');
-                btn.innerText = originalText;
-            }, 2000);
-        } else {
-            throw new Error(data.message || 'Error desconocido');
-        }
-    } catch (error) {
-        Swal.fire({icon: 'error', title: 'Error', text: error.message, background: '#151515', color: '#fff'});
-        btn.innerText = originalText;
-    } finally {
-        btn.disabled = false;
-        input.disabled = false;
-    }
-}
-
-async function handleAddNewTalla(e) {
+function handleAddNewTalla(e) {
     e.preventDefault();
     if (!currentJerseyToManage) return;
     
-    const btnSubmit = document.getElementById('btn-submit-new-talla');
-    const originalContent = btnSubmit.innerHTML;
-    
     const tallaVal = DOM.admin.newTallaVal.value.trim();
-    const stockVal = parseInt(DOM.admin.newStockVal.value) || 0;
+    const stockVal = parseInt(DOM.admin.newStockVal.value);
+    
+    if (!tallaVal) return;
+    const finalStock = isNaN(stockVal) || stockVal < 0 ? 0 : stockVal;
 
     // Validar duplicados (máximo de 2 veces la misma talla)
     const existingCount = (currentJerseyToManage.tallas || []).filter(t => t.talla.trim().toUpperCase() === tallaVal.toUpperCase()).length;
@@ -2210,72 +2167,116 @@ async function handleAddNewTalla(e) {
         });
         return;
     }
-    
-    const payload = {
-        action: "create",
-        id: currentJerseyToManage.id,
+
+    if (!currentJerseyToManage.tallas) currentJerseyToManage.tallas = [];
+
+    // Agregar talla a la lista local en memoria sin enviar petición al backend todavía
+    currentJerseyToManage.tallas.push({
+        id_inventario: 'TEMP_' + Date.now(),
         id_producto: currentJerseyToManage.id,
-        nombre: currentJerseyToManage.nombre,
-        tipo: currentJerseyToManage.tipo,
-        version: currentJerseyToManage.version,
-        genero: currentJerseyToManage.genero,
-        personalizacion: currentJerseyToManage.personalizacion,
-        foto: currentJerseyToManage.foto || currentJerseyToManage.imagen,
-        precio_Menudeo: parseFloat(currentJerseyToManage.precio_Menudeo || currentJerseyToManage.precio_menudeo) || 0,
-        precio_menudeo: parseFloat(currentJerseyToManage.precio_Menudeo || currentJerseyToManage.precio_menudeo) || 0,
-        precio_mayoreo: parseFloat(currentJerseyToManage.precio_mayoreo) || 0,
-        precio_mayoreo_super: parseFloat(currentJerseyToManage.precio_mayoreo_super) || 0,
-        tallas: [
-            {
-                talla: tallaVal,
-                id_producto: currentJerseyToManage.id,
-                categoria: currentJerseyToManage.genero,
-                stock: stockVal
-            }
-        ]
-    };
+        talla: tallaVal,
+        categoria: currentJerseyToManage.genero || 'Adultos',
+        stock: finalStock,
+        isNew: true
+    });
+
+    // Resetear campos del formulario
+    DOM.admin.formAddTalla.reset();
+
+    // Actualizar vista local de tallas inmediatamente
+    renderInventorySizes(currentJerseyToManage);
+    updateNewTallaSelect(currentJerseyToManage);
+
+    // Notificación informativa
+    const Toast = Swal.mixin({
+        toast: true,
+        position: 'bottom-end',
+        showConfirmButton: false,
+        timer: 2500,
+        background: '#141416',
+        color: '#fff'
+    });
+    Toast.fire({
+        icon: 'info',
+        title: `Talla ${tallaVal} agregada al listado. Presiona "Actualizar Datos" para guardar.`
+    });
+}
+
+async function handleSaveBatchTallas() {
+    if (!currentJerseyToManage) return;
+
+    const btnSubmit = document.getElementById('btn-submit-save-tallas');
+    if (!btnSubmit) return;
+    const originalContent = btnSubmit.innerHTML;
 
     btnSubmit.disabled = true;
-    btnSubmit.innerHTML = 'Cargando...';
+    btnSubmit.innerHTML = `
+        <svg class="animate-spin h-4 w-4 text-white mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+        <span>Guardando Datos...</span>
+    `;
 
     try {
+        const payload = {
+            action: "save_batch_tallas",
+            token: localStorage.getItem('session_token') || '',
+            id_playera: currentJerseyToManage.id,
+            genero: currentJerseyToManage.genero,
+            tallas: (currentJerseyToManage.tallas || []).map(t => ({
+                id_inventario: t.id_inventario,
+                talla: t.talla,
+                stock: t.stock !== undefined ? t.stock : (t.inventario || 0),
+                categoria: t.categoria || currentJerseyToManage.genero || 'Adultos'
+            }))
+        };
+
         const response = await fetch(API_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'text/plain;charset=utf-8' },
             body: JSON.stringify(payload)
         });
-        
+
         const data = await response.json();
-        
+
         if (data.status === 'success') {
             Swal.fire({
                 icon: 'success',
-                title: 'Talla Añadida',
-                text: `La talla ${tallaVal} ha sido agregada a la playera.`,
+                title: '¡Datos Actualizados!',
+                text: 'Se han guardado todas las tallas y existencias correctamente.',
                 background: '#151515', color: '#fff',
                 timer: 2000,
-                showConfirmButton: false
+                showConfirmButton: false,
+                customClass: { popup: 'border border-white/10 rounded-2xl' }
             });
-            DOM.admin.formAddTalla.reset();
-            // Refrescar data en segundo plano (esto actualizará allProducts y el listado si está abierto)
+
+            // Refrescar inventario principal en fondo
             await fetchInitialProducts();
-            // Buscar la playera actualizada para refrescar el modal de inventario
+
+            // Sincronizar referencia local del producto
             const updatedProduct = allProducts.find(p => p.id === currentJerseyToManage.id);
             if (updatedProduct) {
                 currentJerseyToManage = updatedProduct;
                 renderInventorySizes(updatedProduct);
                 updateNewTallaSelect(updatedProduct);
+                renderAdminTable();
             }
         } else {
-            throw new Error(data.message || 'Error desconocido');
+            throw new Error(data.message || 'Error al guardar los datos.');
         }
     } catch (error) {
-        Swal.fire({icon: 'error', title: 'Error', text: error.message, background: '#151515', color: '#fff'});
+        Swal.fire({
+            icon: 'error',
+            title: 'Error de Guardado',
+            text: error.message,
+            background: '#151515',
+            color: '#fff',
+            confirmButtonColor: '#ef4444'
+        });
     } finally {
         btnSubmit.disabled = false;
         btnSubmit.innerHTML = originalContent;
     }
 }
+window.handleSaveBatchTallas = handleSaveBatchTallas;
 
 async function handleUpdatePrecios(e) {
     e.preventDefault();

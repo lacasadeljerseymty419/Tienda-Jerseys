@@ -986,9 +986,20 @@
 
                 <!-- Listado de Tallas Existentes -->
                 <div class="pt-6 border-t border-white/5">
-                    <h3 class="text-sm font-semibold text-gray-300 mb-3 uppercase tracking-wider">Tallas Actuales</h3>
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="text-sm font-semibold text-gray-300 uppercase tracking-wider">Tallas Actuales</h3>
+                        <span class="text-[10px] text-gray-400 font-medium">Modifica existencias o añade tallas y presiona "Actualizar Datos"</span>
+                    </div>
                     <div id="inv-tallas-list" class="space-y-2">
                         <!-- Tallas se inyectan aquí -->
+                    </div>
+                    
+                    <!-- Botón para Guardar / Actualizar todas las Tallas en Lote -->
+                    <div class="flex justify-end pt-4 mt-4 border-t border-white/5">
+                        <button type="button" id="btn-submit-save-tallas" class="px-6 py-2.5 rounded-xl bg-navy-500 hover:bg-navy-400 text-white font-bold transition-all duration-300 shadow-lg hover:shadow-navy-500/30 text-sm flex items-center justify-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                            <span>Actualizar Datos</span>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -2064,9 +2075,9 @@
     </div>
 
     <!-- Configuración Global API -->
-    <script src="./js/config.js?v=1.1.9"></script>
+    <script src="./js/config.js?v=1.2.0"></script>
     <!-- Módulo Principal JS -->
-    <script src="./js/app2.js?v=4.0.5"></script>
+    <script src="./js/app2.js?v=4.1.0"></script>
 </body>
 </html>
 
