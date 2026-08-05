@@ -83,6 +83,42 @@ function getFirstImage(fotoField) {
     return parts[0].trim();
 }
 
+function getOptimizedImageUrl(rawUrl, width = 500) {
+    if (!rawUrl || typeof rawUrl !== 'string') return 'https://images.unsplash.com/photo-1577212017184-807dd6acefd6?auto=format&fit=crop&q=80&w=600';
+    
+    let url = rawUrl.trim();
+    if (!url) return 'https://images.unsplash.com/photo-1577212017184-807dd6acefd6?auto=format&fit=crop&q=80&w=600';
+    
+    // Si la URL contiene comas, tomar solo la primera imagen
+    if (url.includes(',')) {
+        url = url.split(',')[0].trim();
+    }
+
+    // Transformación para Google Drive Thumbnail API (WebP / JPEG comprimido por CDN de Google)
+    let driveId = '';
+    const matchId = url.match(/id=([a-zA-Z0-9_-]+)/) || url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+    if (matchId && matchId[1]) {
+        driveId = matchId[1];
+        return `https://drive.google.com/thumbnail?id=${driveId}&sz=w${width}`;
+    }
+
+    // Transformación para Google UserContent (lh3.googleusercontent.com)
+    if (url.includes('googleusercontent.com')) {
+        const clean = url.split('=')[0];
+        return `${clean}=w${width}-rw`;
+    }
+
+    // Transformación para Unsplash
+    if (url.includes('images.unsplash.com')) {
+        if (url.includes('w=')) {
+            return url.replace(/w=\d+/, `w=${width}`).replace(/q=\d+/, 'q=75');
+        }
+        return `${url}&w=${width}&q=75&auto=format`;
+    }
+
+    return url;
+}
+
 async function get_configs() {
     try {
         const response = await fetch(API_URL, {
@@ -685,6 +721,59 @@ function startInactivityMonitor() {
     updateLastActivity();
 }
 
+function updateUserLoginUI(loggedUser) {
+    if (!loggedUser) return;
+    
+    if (DOM.login && DOM.login.overlay) DOM.login.overlay.classList.add('hidden');
+    const userNameText = loggedUser.nombre_completo || loggedUser.usuario || 'Usuario';
+    if (DOM.navUserName) DOM.navUserName.textContent = userNameText;
+    if (DOM.mobileMenu && DOM.mobileMenu.userName) DOM.mobileMenu.userName.textContent = userNameText;
+    updateUserLogoInitial(userNameText, loggedUser.foto);
+    if (DOM.navUserBadge) DOM.navUserBadge.classList.remove('hidden');
+    const navLogoutBtn = document.getElementById('nav-logout-btn');
+    if (navLogoutBtn) {
+        navLogoutBtn.classList.remove('hidden');
+        navLogoutBtn.classList.add('sm:flex');
+    }
+    
+    if (loggedUser.perfil === "Administrador") {
+        if (DOM.perfil && DOM.perfil.btnMiPerfilDesktop) DOM.perfil.btnMiPerfilDesktop.classList.add('hidden');
+        if (DOM.perfil && DOM.perfil.btnMiPerfilMobile) DOM.perfil.btnMiPerfilMobile.classList.add('hidden');
+        if (DOM.admin && DOM.admin.adminMenúuWrapper) DOM.admin.adminMenúuWrapper.classList.remove('hidden');
+        if (DOM.mobileMenu && DOM.mobileMenu.adminSection) DOM.mobileMenu.adminSection.classList.remove('hidden');
+        if (DOM.local419 && DOM.local419.wrapper) DOM.local419.wrapper.classList.remove('hidden');
+        if (DOM.local419 && DOM.local419.mobileSection) DOM.local419.mobileSection.classList.remove('hidden');
+        if (DOM.btnAdminOrdersNav) DOM.btnAdminOrdersNav.classList.remove('hidden');
+        
+        // Para Administrador: Ocultar los botones sueltos "Ordenar" y "Mis Pedidos" (movidos a Local 419)
+        if (DOM.actions && DOM.actions.navJerseysView) DOM.actions.navJerseysView.forEach(btn => btn.classList.add('hidden'));
+        if (DOM.actions && DOM.actions.navMisPedidosView) DOM.actions.navMisPedidosView.forEach(btn => btn.classList.add('hidden'));
+
+        const savedSub = localStorage.getItem('current_subperfil') || 'Mayoreo';
+        if (DOM.adminSubperfilSelect) {
+            DOM.adminSubperfilSelect.classList.remove('hidden');
+            DOM.adminSubperfilSelect.value = savedSub;
+        }
+        if (DOM.mobileMenu && DOM.mobileMenu.adminSubperfilSelect) {
+            DOM.mobileMenu.adminSubperfilSelect.value = savedSub;
+        }
+    } else {
+        if (DOM.perfil && DOM.perfil.btnMiPerfilDesktop) DOM.perfil.btnMiPerfilDesktop.classList.remove('hidden');
+        if (DOM.perfil && DOM.perfil.btnMiPerfilMobile) DOM.perfil.btnMiPerfilMobile.classList.remove('hidden');
+        if (DOM.admin && DOM.admin.adminMenúuWrapper) DOM.admin.adminMenúuWrapper.classList.add('hidden');
+        if (DOM.mobileMenu && DOM.mobileMenu.adminSection) DOM.mobileMenu.adminSection.classList.add('hidden');
+        if (DOM.local419 && DOM.local419.wrapper) DOM.local419.wrapper.classList.add('hidden');
+        if (DOM.local419 && DOM.local419.mobileSection) DOM.local419.mobileSection.classList.add('hidden');
+        if (DOM.btnAdminOrdersNav) DOM.btnAdminOrdersNav.classList.add('hidden');
+        if (DOM.adminSubperfilSelect) DOM.adminSubperfilSelect.classList.add('hidden');
+        
+        // Para Clientes normales: Mostrar los botones sueltos "Ordenar" y "Mis Pedidos"
+        if (DOM.actions && DOM.actions.navJerseysView) DOM.actions.navJerseysView.forEach(btn => btn.classList.remove('hidden'));
+        if (DOM.actions && DOM.actions.navMisPedidosView) DOM.actions.navMisPedidosView.forEach(btn => btn.classList.remove('hidden'));
+    }
+}
+window.updateUserLoginUI = updateUserLoginUI;
+
 document.addEventListener('DOMContentLoaded', initApp);
 
 async function initApp() {
@@ -707,72 +796,24 @@ async function initApp() {
         DOM.login.overlay.classList.remove('hidden');
         DOM.login.form.addEventListener('submit', handleLoginSubmit);
     } else {
-        DOM.login.overlay.classList.add('hidden');
-        const userNameText = loggedUser.nombre_completo || loggedUser.usuario || 'Usuario';
-        DOM.navUserName.textContent = userNameText;
-        if (DOM.mobileMenu.userName) DOM.mobileMenu.userName.textContent = userNameText;
-        updateUserLogoInitial(userNameText, loggedUser.foto);
-        DOM.navUserBadge.classList.remove('hidden');
-        const navLogoutBtn = document.getElementById('nav-logout-btn');
-        if (navLogoutBtn) {
-            navLogoutBtn.classList.remove('hidden');
-            navLogoutBtn.classList.add('sm:flex');
-        }
-        if (loggedUser.perfil === "Administrador") {
-            if (DOM.perfil.btnMiPerfilDesktop) DOM.perfil.btnMiPerfilDesktop.classList.add('hidden');
-            if (DOM.perfil.btnMiPerfilMobile) DOM.perfil.btnMiPerfilMobile.classList.add('hidden');
-            if (DOM.admin.adminMenúuWrapper) DOM.admin.adminMenúuWrapper.classList.remove('hidden');
-            if (DOM.mobileMenu.adminSection) DOM.mobileMenu.adminSection.classList.remove('hidden');
-            if (DOM.local419 && DOM.local419.wrapper) DOM.local419.wrapper.classList.remove('hidden');
-            if (DOM.local419 && DOM.local419.mobileSection) DOM.local419.mobileSection.classList.remove('hidden');
-            if (DOM.btnAdminOrdersNav) DOM.btnAdminOrdersNav.classList.remove('hidden');
-            
-            // Para Administrador: Ocultar los botones sueltos "Ordenar" y "Mis Pedidos" (movidos a Local 419)
-            if (DOM.actions.navJerseysView) DOM.actions.navJerseysView.forEach(btn => btn.classList.add('hidden'));
-            if (DOM.actions.navMisPedidosView) DOM.actions.navMisPedidosView.forEach(btn => btn.classList.add('hidden'));
-
-            const savedSub = localStorage.getItem('current_subperfil') || 'Mayoreo';
-            if (DOM.adminSubperfilSelect) {
-                DOM.adminSubperfilSelect.classList.remove('hidden');
-                DOM.adminSubperfilSelect.value = savedSub;
+        updateUserLoginUI(loggedUser);
+        
+        // Refrescar perfil del usuario en segundo plano
+        fetch(API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({ action: "get_client_profile", token: localStorage.getItem('session_token') || '' })
+        }).then(r => r.json()).then(resData => {
+            if (resData && resData.status === 'success' && resData.data) {
+                const user = resData.data;
+                localStorage.setItem('logged_user', JSON.stringify(user));
+                localStorage.setItem('current_perfil', user.perfil || 'Menudeo');
+                
+                updateUserLoginUI(user);
+                updateBrandTextColor();
+                applyProfileView();
             }
-            if (DOM.mobileMenu.adminSubperfilSelect) {
-                DOM.mobileMenu.adminSubperfilSelect.value = savedSub;
-            }
-        } else {
-            if (DOM.perfil.btnMiPerfilDesktop) DOM.perfil.btnMiPerfilDesktop.classList.remove('hidden');
-            if (DOM.perfil.btnMiPerfilMobile) DOM.perfil.btnMiPerfilMobile.classList.remove('hidden');
-            if (DOM.admin.adminMenúuWrapper) DOM.admin.adminMenúuWrapper.classList.add('hidden');
-            if (DOM.mobileMenu.adminSection) DOM.mobileMenu.adminSection.classList.add('hidden');
-            if (DOM.local419 && DOM.local419.wrapper) DOM.local419.wrapper.classList.add('hidden');
-            if (DOM.local419 && DOM.local419.mobileSection) DOM.local419.mobileSection.classList.add('hidden');
-            if (DOM.btnAdminOrdersNav) DOM.btnAdminOrdersNav.classList.add('hidden');
-            if (DOM.adminSubperfilSelect) DOM.adminSubperfilSelect.classList.add('hidden');
-            
-            // Para Clientes normales: Mostrar los botones sueltos "Ordenar" y "Mis Pedidos"
-            if (DOM.actions.navJerseysView) DOM.actions.navJerseysView.forEach(btn => btn.classList.remove('hidden'));
-            if (DOM.actions.navMisPedidosView) DOM.actions.navMisPedidosView.forEach(btn => btn.classList.remove('hidden'));
-            
-            // Refrescar perfil del usuario en segundo plano
-            fetch(API_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                body: JSON.stringify({ action: "get_client_profile", token: localStorage.getItem('session_token') || '' })
-            }).then(r => r.json()).then(resData => {
-                if (resData && resData.status === 'success' && resData.data) {
-                    const user = resData.data;
-                    localStorage.setItem('logged_user', JSON.stringify(user));
-                    localStorage.setItem('current_perfil', user.perfil || 'Menudeo');
-                    
-                    const userNameText = user.nombre_completo || user.usuario || 'Usuario';
-                    DOM.navUserName.textContent = userNameText;
-                    if (DOM.mobileMenu.userName) DOM.mobileMenu.userName.textContent = userNameText;
-                    updateUserLogoInitial(userNameText, user.foto);
-                    updateBrandTextColor();
-                    applyProfileView();
-                }
-            }).catch(err => console.warn("Error al refrescar perfil en segundo plano:", err));
-        }
+        }).catch(err => console.warn("Error al refrescar perfil en segundo plano:", err));
     }
 
     renderSkeletons(6);
@@ -1581,27 +1622,7 @@ async function handleLoginSubmit(e) {
                 });
             }
             
-            if (res.data.perfil === "Administrador") {
-                if (DOM.perfil.btnMiPerfilDesktop) DOM.perfil.btnMiPerfilDesktop.classList.add('hidden');
-                if (DOM.perfil.btnMiPerfilMobile) DOM.perfil.btnMiPerfilMobile.classList.add('hidden');
-                if (DOM.admin && DOM.admin.adminMenúuWrapper) DOM.admin.adminMenúuWrapper.classList.remove('hidden');
-                if (DOM.mobileMenu && DOM.mobileMenu.adminSection) DOM.mobileMenu.adminSection.classList.remove('hidden');
-                const savedSub = localStorage.getItem('current_subperfil') || 'Mayoreo';
-                if (DOM.adminSubperfilSelect) {
-                    DOM.adminSubperfilSelect.classList.remove('hidden');
-                    DOM.adminSubperfilSelect.value = savedSub;
-                }
-                if (DOM.mobileMenu && DOM.mobileMenu.adminSubperfilSelect) {
-                    DOM.mobileMenu.adminSubperfilSelect.value = savedSub;
-                }
-            } else {
-                if (DOM.perfil.btnMiPerfilDesktop) DOM.perfil.btnMiPerfilDesktop.classList.remove('hidden');
-                if (DOM.perfil.btnMiPerfilMobile) DOM.perfil.btnMiPerfilMobile.classList.remove('hidden');
-                if (DOM.admin && DOM.admin.adminMenúuWrapper) DOM.admin.adminMenúuWrapper.classList.add('hidden');
-                if (DOM.mobileMenu && DOM.mobileMenu.adminSection) DOM.mobileMenu.adminSection.classList.add('hidden');
-                if (DOM.adminSubperfilSelect) DOM.adminSubperfilSelect.classList.add('hidden');
-            }
-            
+            updateUserLoginUI(res.data);
             applyProfileView();
         } else {
             Swal.fire({
@@ -1634,9 +1655,25 @@ async function handleLoginSubmit(e) {
 }
 
 function applyProfileView() {
-    // Volver a renderizar catálogo de productos según perfil
+    // Si allProducts está vacío pero hay productos en la caché local, cargarlos de inmediato
+    if (!allProducts || allProducts.length === 0) {
+        try {
+            const cachedStr = localStorage.getItem('jerseys_products_cache_v5');
+            if (cachedStr) {
+                const cachedObj = JSON.parse(cachedStr);
+                if (cachedObj && Array.isArray(cachedObj.data) && cachedObj.data.length > 0) {
+                    allProducts = cachedObj.data;
+                }
+            }
+        } catch(e) {}
+    }
+
+    // Volver a renderizar catálogo de productos según el nuevo perfil
     if (allProducts && allProducts.length > 0) {
-        renderLocalProducts(allProducts);
+        renderProductsWithFilters();
+    } else {
+        renderSkeletons(6);
+        if (typeof fetchInitialProducts === 'function') fetchInitialProducts();
     }
     
     // Actualizar precios de personalización del modal
@@ -2852,6 +2889,11 @@ async function revalidateProductsBackground(cacheKey) {
 }
 
 function renderProductsWithFilters() {
+    if (!allProducts || allProducts.length === 0) {
+        renderSkeletons(6);
+        return;
+    }
+
     // Filtrar únicamente los productos activos (Activo = 1 o vacío) para la vista pública de catálogo
     const activeProductsOnly = (allProducts || []).filter(p => p.activo === undefined || p.activo === null || p.activo === "" || Number(p.activo) === 1);
 
@@ -2968,7 +3010,8 @@ function createProductCard(producto) {
     const images = (producto.foto || producto.imagen || '').split(',').map(u => u.trim()).filter(Boolean);
     let currentImgIdx = 0;
     
-    const imgUrl = images[currentImgIdx] || 'https://images.unsplash.com/photo-1577212017184-807dd6acefd6?auto=format&fit=crop&q=80&w=600';
+    const rawImg = images[currentImgIdx] || 'https://images.unsplash.com/photo-1577212017184-807dd6acefd6?auto=format&fit=crop&q=80&w=600';
+    const imgUrl = getOptimizedImageUrl(rawImg, 500);
     
     let tagsHtml = '<div class="flex flex-wrap gap-1 sm:gap-2 mb-1.5 sm:mb-3 z-10 relative">';
     if (producto.version) tagsHtml += `<span class="px-1.5 py-0.5 sm:px-2.5 sm:py-1 text-[8px] sm:text-[10px] font-bold uppercase tracking-wider bg-white/5 text-gray-400 rounded-md border border-white/10 backdrop-blur-sm">${producto.version}</span>`;
@@ -3144,7 +3187,7 @@ function createProductCard(producto) {
     
     const updateImage = (newIdx) => {
         currentImgIdx = newIdx;
-        imgEl.src = images[currentImgIdx];
+        imgEl.src = getOptimizedImageUrl(images[currentImgIdx], 500);
         dots.forEach((dot, idx) => {
             if (idx === currentImgIdx) {
                 dot.className = 'carousel-dot w-1.5 h-1.5 rounded-full bg-white transition-all duration-300';
@@ -4303,7 +4346,8 @@ function renderCartItems() {
         subtotal += basePrice * item.cantidad;
         personalizacionesTotal += persPrice * item.cantidad;
         
-        const imgUrl = getFirstImage(prod.foto || prod.imagen) || 'https://images.unsplash.com/photo-1577212017184-807dd6acefd6?auto=format&fit=crop&q=80&w=100';
+        const rawImg = getFirstImage(prod.foto || prod.imagen) || 'https://images.unsplash.com/photo-1577212017184-807dd6acefd6?auto=format&fit=crop&q=80&w=100';
+        const imgUrl = getOptimizedImageUrl(rawImg, 150);
         
         const itemDiv = document.createElement('div');
         itemDiv.className = 'flex items-center gap-3 bg-dark-200/20 p-2.5 rounded-xl border border-white/5 group';
@@ -7843,9 +7887,29 @@ async function fetchProducts419(force = false) {
     if (isLocal419Loading && !force) return;
     isLocal419Loading = true;
     
-    const tbody = document.getElementById('local419-inventario-tbody');
-    if (tbody) {
-        tbody.innerHTML = `<tr><td colspan="4" class="text-center py-8 text-amber-400 font-semibold animate-pulse">Cargando inventario de Local 419 (Playeras419 & Inventario_Tallas419)...</td></tr>`;
+    const gridContainer = document.getElementById('local419-inventario-grid');
+    if (gridContainer) {
+        gridContainer.innerHTML = Array(8).fill(0).map(() => `
+            <div class="bg-[#141416] rounded-2xl p-4 border border-white/5 animate-pulse flex flex-col justify-between h-[440px]">
+                <div class="w-full h-56 bg-white/5 rounded-xl mb-4 relative overflow-hidden flex items-center justify-center">
+                    <div class="w-8 h-8 border-2 border-amber-400 border-t-transparent rounded-full animate-spin"></div>
+                </div>
+                <div class="space-y-3">
+                    <div class="h-4 bg-white/10 rounded-md w-3/4"></div>
+                    <div class="flex gap-2">
+                        <div class="h-3 bg-white/5 rounded-md w-12"></div>
+                        <div class="h-3 bg-white/5 rounded-md w-12"></div>
+                        <div class="h-3 bg-white/5 rounded-md w-12"></div>
+                    </div>
+                    <div class="h-6 bg-amber-500/10 border border-amber-500/20 rounded-lg w-28"></div>
+                    <div class="pt-2 flex gap-1.5">
+                        <div class="w-10 h-10 bg-white/5 rounded-lg border border-white/5"></div>
+                        <div class="w-10 h-10 bg-white/5 rounded-lg border border-white/5"></div>
+                        <div class="w-10 h-10 bg-white/5 rounded-lg border border-white/5"></div>
+                    </div>
+                </div>
+            </div>
+        `).join('');
     }
 
     try {
@@ -7869,11 +7933,19 @@ async function fetchProducts419(force = false) {
         }
 
         allProducts419 = productsData;
-        renderInventario419Table(allProducts419);
+        renderInventario419Grid(allProducts419);
     } catch (err) {
         console.error('Error al cargar inventario de Local 419:', err);
-        if (tbody) {
-            tbody.innerHTML = `<tr><td colspan="4" class="text-center py-6 text-red-400 font-semibold">Error al cargar existencias del Local 419. Por favor intenta de nuevo.</td></tr>`;
+        if (gridContainer) {
+            gridContainer.innerHTML = `
+                <div class="col-span-full text-center py-12 bg-[#141416] rounded-2xl border border-red-500/20 p-6">
+                    <i class="fa-solid fa-triangle-exclamation text-3xl text-red-400 mb-3"></i>
+                    <p class="text-gray-300 font-semibold text-base mb-4">Error al cargar existencias del Local 419.</p>
+                    <button onclick="fetchProducts419(true)" class="px-5 py-2 bg-amber-500 hover:bg-amber-600 text-black font-bold rounded-xl transition-all shadow-lg shadow-amber-500/20 text-xs">
+                        <i class="fa-solid fa-rotate-right mr-2"></i> Reintentar Carga
+                    </button>
+                </div>
+            `;
         }
     } finally {
         isLocal419Loading = false;
@@ -7898,7 +7970,8 @@ function renderInventario419Grid(products) {
     }
 
     gridContainer.innerHTML = filtered.map(prod => {
-        const imgUrl = getFirstImage(prod.foto || prod.imagen) || 'https://images.unsplash.com/photo-1577212017184-807dd6acefd6?auto=format&fit=crop&q=80&w=400';
+        const rawImg = getFirstImage(prod.foto || prod.imagen) || 'https://images.unsplash.com/photo-1577212017184-807dd6acefd6?auto=format&fit=crop&q=80&w=400';
+        const imgUrl = getOptimizedImageUrl(rawImg, 400);
         const equipoNombre = (prod.nombre || prod.equipo || 'JERSEY DESCONOCIDO').toUpperCase();
         const tipo = (prod.tipo || 'DESCONOCIDO').toUpperCase();
         const version = (prod.version || 'REGULAR').toUpperCase();
