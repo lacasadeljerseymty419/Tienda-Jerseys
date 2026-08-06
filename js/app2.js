@@ -2725,6 +2725,7 @@ async function handleCreateProduct(e) {
             oficial_precio_mayoreo: parseFloat(document.getElementById('create-oficial-precio-mayoreo')?.value) || 0,
             opciones: createOficialList
         },
+        fecha_registro: new Date().toISOString(),
         tallas: tallas
     };
 
