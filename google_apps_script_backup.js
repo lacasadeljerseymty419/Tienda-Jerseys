@@ -1163,14 +1163,15 @@ function doPost(e) {
 
         const idsOrdenesValidas = {};
         const tieneFiltros = (filtros.id_orden || filtros.id_cliente) ? true : false;
-        if (tieneFiltros) {
-          for (let o = 1; o < datosOrdenes.length; o++) {
-            const idOrden = datosOrdenes[o][0];
-            const idCliente = String(datosOrdenes[o][1]).trim();
-            if (filtros.id_orden && idOrden !== filtros.id_orden) continue;
-            if (filtros.id_cliente && idCliente !== String(filtros.id_cliente).trim()) continue;
-            idsOrdenesValidas[idOrden] = true;
-          }
+        
+        // Scan de órdenes (inverso para priorizar más recientes)
+        for (let o = datosOrdenes.length - 1; o >= 1; o--) {
+          const idOrden = String(datosOrdenes[o][0] || "").trim();
+          const idCliente = String(datosOrdenes[o][1] || "").trim();
+          if (!idOrden) continue;
+          if (filtros.id_orden && idOrden !== String(filtros.id_orden).trim()) continue;
+          if (filtros.id_cliente && idCliente !== String(filtros.id_cliente).trim()) continue;
+          idsOrdenesValidas[idOrden] = true;
         }
 
         const mapaDetalles = {};
@@ -1180,14 +1181,14 @@ function doPost(e) {
             continue;
           }
           
-          const idOrdDet = datosDetalle[d][1];
+          const idOrdDet = String(datosDetalle[d][1] || "").trim();
           if (tieneFiltros && !idsOrdenesValidas[idOrdDet]) {
             continue;
           }
           
           if (!mapaDetalles[idOrdDet]) mapaDetalles[idOrdDet] = [];
           
-          let valPlayera = String(datosDetalle[d][2]).trim();
+          let valPlayera = String(datosDetalle[d][2] || "").trim();
           if (valPlayera.toUpperCase().startsWith("INV-")) {
             valPlayera = mapaInventarioAPlayera[valPlayera] || valPlayera;
           }
@@ -1214,15 +1215,14 @@ function doPost(e) {
         }
 
         const resultadoOrdenes = [];
-        for (let o = 1; o < datosOrdenes.length; o++) {
+        for (let o = datosOrdenes.length - 1; o >= 1; o--) {
           const idOrden = String(datosOrdenes[o][0] || "").trim();
           if (!idOrden) continue;
           
           const idCliente = String(datosOrdenes[o][1] || "").trim();
-          const objetoCliente = mapaClientes[idCliente] || { "nombre": "Cliente Desconocido", "telefono": "" };
+          if (tieneFiltros && !idsOrdenesValidas[idOrden]) continue;
 
-          if (filtros.id_orden && idOrden !== String(filtros.id_orden).trim()) continue;
-          if (filtros.id_cliente && idCliente !== String(filtros.id_cliente).trim()) continue;
+          const objetoCliente = mapaClientes[idCliente] || { "nombre": "Cliente Desconocido", "telefono": "" };
 
           const rawFecha = datosOrdenes[o][2];
           let fechaStr = "";
@@ -1668,15 +1668,7 @@ function doPost(e) {
         }
 
         if (rowCliTarget !== -1) {
-          const valExpRaw = hojaClientes.getRange(rowCliTarget, colIdxExp).getValue();
-          let baseDate = new Date();
-          if (valExpRaw) {
-            const dExp = new Date(valExpRaw);
-            if (!isNaN(dExp.getTime()) && dExp.getTime() > baseDate.getTime()) {
-              baseDate = dExp;
-            }
-          }
-          const fechaExpISO = new Date(baseDate.getTime() + (6 * 24 * 60 * 60 * 1000)).toISOString();
+          const fechaExpISO = new Date(new Date().getTime() + (6 * 24 * 60 * 60 * 1000)).toISOString();
           hojaClientes.getRange(rowCliTarget, colIdxPerfil).setValue("Súper Mayoreo");
           hojaClientes.getRange(rowCliTarget, colIdxSuperActivo).setValue(1);
           hojaClientes.getRange(rowCliTarget, colIdxExp).setValue(fechaExpISO);
@@ -2410,15 +2402,8 @@ function procesarSuperMayoreoAlCambiarEstatus(ss, id_orden, nuevo_estatus) {
     const reglasSuper = obtenerReglasMayoreoSuper(ss);
     const metaPiezas = Number(reglasSuper.piezas_jugador || 12);
 
-    const valExpRaw = hojaClientes.getRange(rowCliTarget, colIdxExp).getValue();
-    let baseDate = new Date();
-    if (valExpRaw) {
-      const dExp = new Date(valExpRaw);
-      if (!isNaN(dExp.getTime()) && dExp.getTime() > baseDate.getTime()) {
-        baseDate = dExp; // Opción B: Sumar +6 días a la fecha de expiración previa si aún no vence
-      }
-    }
-    const fechaExpISO = new Date(baseDate.getTime() + (6 * 24 * 60 * 60 * 1000)).toISOString();
+    // 📅 Fecha de expiración: Fecha Actual + 6 días (para todas las renovaciones y activaciones)
+    const fechaExpISO = new Date(new Date().getTime() + (6 * 24 * 60 * 60 * 1000)).toISOString();
 
     // 🔴 MANEJO DE CANCELACIONES
     if (esEstatusCancelado && yaProcesado) {

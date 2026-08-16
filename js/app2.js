@@ -1789,29 +1789,6 @@ function mostrarAlertaSegunReglasSuperMayoreo(userData) {
                 </div>
             `,
             background: '#151515', color: '#ffffff', confirmButtonColor: '#d97706', confirmButtonText: '¡Excelente!'
-        }).then(async (result) => {
-            if (result.isConfirmed && (faltan <= 0 || acum >= metaLimit)) {
-                try {
-                    const response = await fetch(API_URL, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                        body: JSON.stringify({ action: "renew_super_mayoreo_cycle", id_cliente: userData.id_cliente })
-                    });
-                    const res = await response.json();
-                    if (res && res.status === 'success') {
-                        userData.super_mayoreo_acum = 0;
-                        userData.super_mayoreo_exp = res.super_mayoreo_exp;
-                        userData.super_mayoreo_activo = 1;
-                        userData.perfil = "Súper Mayoreo";
-                        localStorage.setItem('logged_user', JSON.stringify(userData));
-                        localStorage.setItem('current_perfil', 'Súper Mayoreo');
-                        if (typeof updateBrandTextColor === 'function') updateBrandTextColor();
-                        console.log("🌟 [Ciclo Súper Mayoreo Reiniciado] Acumulado 0, Expiración +6 días.");
-                    }
-                } catch (eRenew) {
-                    console.error("Error al reiniciar ciclo de súper mayoreo:", eRenew);
-                }
-            }
         });
         return;
     }
@@ -6228,9 +6205,8 @@ async function fetchUserOrdenes(force = false) {
     const loggedUserStr = localStorage.getItem('logged_user');
     if (!loggedUserStr) return null;
     const loggedUser = JSON.parse(loggedUserStr);
-    
-    // Reuse admin fetch if it exists, otherwise do our own
-    // Para simplificar, obtenemos todas las órdenes de este cliente.
+    const cacheKey = 'cache_user_ordenes_' + String(loggedUser.id_cliente).trim();
+
     if (allFetchedOrdenes && allFetchedOrdenes.length > 0 && !force) {
         return allFetchedOrdenes.filter(o => String(o.id_cliente).trim() === String(loggedUser.id_cliente).trim());
     }
@@ -6243,15 +6219,19 @@ async function fetchUserOrdenes(force = false) {
         });
         const data = await response.json();
         if (data.status === "success") {
-            allFetchedOrdenes = data.data || [];
-            return allFetchedOrdenes.filter(o => String(o.id_cliente).trim() === String(loggedUser.id_cliente).trim());
+            const fetchedList = data.data || [];
+            allFetchedOrdenes = fetchedList;
+            const clientOrders = fetchedList.filter(o => String(o.id_cliente).trim() === String(loggedUser.id_cliente).trim());
+            try {
+                localStorage.setItem(cacheKey, JSON.stringify(clientOrders));
+            } catch (eCache) {}
+            return clientOrders;
         } else {
             console.error('Error fetching orders:', data.message);
             return [];
         }
     } catch (e) {
         console.error('Error in fetchUserOrdenes:', e);
-        Swal.fire({ icon: 'error', title: 'Error de conexión', text: 'No se pudieron obtener tus pedidos. Por favor, inténtalo de nuevo.', background: '#151515', color: '#fff' });
         return [];
     }
 }
@@ -6262,6 +6242,8 @@ async function openUserOrdenesModal() {
         Swal.fire({ icon: 'warning', title: 'No Autenticado', text: 'Inicia sesión para ver tus pedidos.', background: '#151515', color: '#fff' });
         return;
     }
+    const loggedUser = JSON.parse(loggedUserStr);
+    const cacheKey = 'cache_user_ordenes_' + String(loggedUser.id_cliente).trim();
     
     // Cerrar Menú móvil si está abierto
     if (typeof DOM !== 'undefined' && DOM.mobileMenu) {
@@ -6277,17 +6259,37 @@ async function openUserOrdenesModal() {
     document.body.style.overflow = 'hidden';
     if (document.getElementById('user-filter-id')) document.getElementById('user-filter-id').value = '';
     if (document.getElementById('user-filter-status')) document.getElementById('user-filter-status').value = '';
-    // pecar opacity in setTimeout para la transición
     setTimeout(() => { modal.classList.remove('opacity-0'); }, 10);
     
-    loading.classList.remove('hidden');
-    empty.classList.add('hidden');
-    if (list) list.innerHTML = '';
+    let hasInstantCache = false;
+    try {
+        const cachedRaw = localStorage.getItem(cacheKey);
+        if (cachedRaw) {
+            const cachedOrders = JSON.parse(cachedRaw);
+            if (Array.isArray(cachedOrders) && cachedOrders.length > 0) {
+                allUserOrdenesFetched = cachedOrders;
+                hasInstantCache = true;
+                loading.classList.add('hidden');
+                empty.classList.add('hidden');
+                renderUserOrdenesList();
+            }
+        }
+    } catch (eC) {}
+
+    if (!hasInstantCache) {
+        loading.classList.remove('hidden');
+        empty.classList.add('hidden');
+        if (list) list.innerHTML = '';
+    }
     
-    allUserOrdenesFetched = await fetchUserOrdenes(true);
-    
-    loading.classList.add('hidden');
-    renderUserOrdenesList();
+    // Sincronización en segundo plano (Stale-While-Revalidate)
+    fetchUserOrdenes(true).then((freshOrders) => {
+        if (freshOrders && Array.isArray(freshOrders)) {
+            allUserOrdenesFetched = freshOrders;
+            loading.classList.add('hidden');
+            renderUserOrdenesList();
+        }
+    });
 }
 
 function renderUserOrdenesList() {
