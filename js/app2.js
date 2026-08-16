@@ -1758,8 +1758,8 @@ function mostrarAlertaSegunReglasSuperMayoreo(userData) {
         return;
     }
 
-    // 🟢 Escenario B: VIP = 1, Global = 1, Cliente SuperMayoreoActivo = 1 O Perfil "Súper Mayoreo" -> Notificar perfil asignado, fecha de caducidad y progreso acumulado
-    if (isSuperActivoGlobal && isVipUser && (clientSuperActivoCol === 1 || esPerfilSuperMayoreo(userData.perfil))) {
+    // 🟢 Escenario B: VIP = 1, Global = 1, Cliente SuperMayoreoActivo = 1 Y con Fecha de Expiración Válida -> Notificar perfil asignado
+    if (isSuperActivoGlobal && isVipUser && clientSuperActivoCol === 1 && hasValidExp) {
         localStorage.setItem('current_perfil', 'Súper Mayoreo');
         const acum = Number(userData.super_mayoreo_acum || 0);
         const faltan = Math.max(0, metaLimit - acum);
