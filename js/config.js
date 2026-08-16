@@ -1,3 +1,2 @@
 // Configuración Global - URL de la API de Google Apps Script
-window.API_URL = "https://script.google.com/macros/s/AKfycbyiUBB9PjOM33h9PLff7g9MzcmAQ6wNHnoTKZhSJbqPFPgpKGOpLfzDhLZUVAS_kE0/exec";
-
+window.API_URL = "https://script.google.com/macros/s/AKfycbxY7kNhyK5NbfTMgPMSCwkBFCwvSgO-yX1WjIHVl6uu3MNEyChsNfFFfLJoSWFogqu6wQ/exec";

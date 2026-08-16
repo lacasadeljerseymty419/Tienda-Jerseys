@@ -606,9 +606,43 @@ function abrirWhatsAppAutomatico(waUrl) {
     }
 }
 
+function isLoggedUserVip() {
+    try {
+        const loggedUserStr = localStorage.getItem('logged_user');
+        if (loggedUserStr) {
+            const loggedUser = JSON.parse(loggedUserStr);
+            const vipVal = loggedUser ? (loggedUser.vip !== undefined ? loggedUser.vip : (loggedUser.VIP !== undefined ? loggedUser.VIP : null)) : null;
+            if (vipVal !== null && vipVal !== undefined) {
+                const str = String(vipVal).toLowerCase().trim();
+                return str === "1" || str === "1.0" || str === "si" || str === "sí" || str === "true" || Number(vipVal) === 1;
+            }
+        }
+    } catch (e) {}
+    return false;
+}
+
 function esPerfilSuperMayoreo(profile) {
-    if (!profile) return false;
-    const norm = String(profile).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+    const isSuperMayoreoActivoGlobal = (reglasMayoreoSuper.activo !== undefined) ? Number(reglasMayoreoSuper.activo) === 1 : true;
+    if (!isSuperMayoreoActivoGlobal) return false;
+
+    // Requiere que el cliente sea VIP = 1
+    if (!isLoggedUserVip()) return false;
+
+    // Si el usuario tiene super_mayoreo_activo = 1 en sus datos cargados
+    try {
+        const loggedUserStr = localStorage.getItem('logged_user');
+        if (loggedUserStr) {
+            const loggedUser = JSON.parse(loggedUserStr);
+            if (loggedUser && (loggedUser.perfil === "Administrador" || loggedUser.usuario === "admin")) return false;
+            const clientSuperActivoCol = (loggedUser.super_mayoreo_activo !== undefined && loggedUser.super_mayoreo_activo !== null && loggedUser.super_mayoreo_activo !== "") ? Number(loggedUser.super_mayoreo_activo) : 0;
+            if (clientSuperActivoCol === 1) return true;
+        }
+    } catch (e) {}
+
+    // O que su perfil asignado sea "Súper Mayoreo"
+    const p = profile || localStorage.getItem('current_perfil');
+    if (!p) return false;
+    const norm = String(p).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
     return norm === 'super mayoreo' || norm === 'mayoreo super';
 }
 
@@ -623,7 +657,19 @@ function updateBrandTextColor() {
     
     const isSuperMayoreoActivo = (reglasMayoreoSuper.activo !== undefined) ? Number(reglasMayoreoSuper.activo) === 1 : true;
     
-    const activeProfile = localStorage.getItem('current_perfil') || 'Menudeo';
+    const loggedUserStr = localStorage.getItem('logged_user');
+    let loggedUser = null;
+    try { if (loggedUserStr) loggedUser = JSON.parse(loggedUserStr); } catch (e) {}
+    const isAdminUser = loggedUser && (loggedUser.perfil === "Administrador" || loggedUser.usuario === "admin");
+    
+    let activeProfile = localStorage.getItem('current_perfil') || 'Menudeo';
+    if (isAdminUser) {
+        activeProfile = "Administrador";
+    } else if (!isSuperMayoreoActivo) {
+        activeProfile = "Mayoreo";
+        localStorage.setItem('current_perfil', 'Mayoreo');
+    }
+    
     let profile = activeProfile;
     if (activeProfile === "Administrador") {
         profile = localStorage.getItem('current_subperfil') || 'Mayoreo';
@@ -668,10 +714,8 @@ function updateBrandTextColor() {
     }
     
     // Forzar actualización de iniciales de usuario también
-    const loggedUserStr = localStorage.getItem('logged_user');
-    if (loggedUserStr) {
-        const u = JSON.parse(loggedUserStr);
-        updateUserLogoInitial(u.nombre_completo || u.usuario || 'Usuario', u.foto);
+    if (loggedUser) {
+        updateUserLogoInitial(loggedUser.nombre_completo || loggedUser.usuario || 'Usuario', loggedUser.foto);
     }
 }
 
@@ -741,7 +785,20 @@ function updateUserLoginUI(loggedUser) {
     if (DOM.mobileMenu && DOM.mobileMenu.userName) DOM.mobileMenu.userName.textContent = userNameText;
 
     // Actualizar insignias de tipo de perfil en nav desktop y menú móvil
-    const userPerfil = loggedUser.perfil || 'Cliente';
+    const isSuperMayoreoActivoGlobal = (reglasMayoreoSuper.activo !== undefined) ? Number(reglasMayoreoSuper.activo) === 1 : true;
+    let userPerfil = loggedUser.perfil || 'Cliente';
+    const isAdminUser = userPerfil === 'Administrador' || loggedUser.usuario === 'admin';
+
+    if (!isAdminUser && !isSuperMayoreoActivoGlobal) {
+        userPerfil = 'Mayoreo';
+        loggedUser.perfil = 'Mayoreo';
+        loggedUser.super_mayoreo_exp = '';
+        loggedUser.super_mayoreo_acum = '';
+        loggedUser.super_mayoreo_activo = 0;
+        localStorage.setItem('logged_user', JSON.stringify(loggedUser));
+        localStorage.setItem('current_perfil', 'Mayoreo');
+    }
+
     const profileTag = document.getElementById('nav-user-profile-badge');
     const mobileProfileTag = document.getElementById('mobile-nav-user-profile-badge');
     
@@ -849,6 +906,14 @@ async function initApp() {
                 updateUserLoginUI(user);
                 updateBrandTextColor();
                 applyProfileView();
+                if (window.filteredProducts && window.filteredProducts.length > 0) {
+                    renderProducts(window.filteredProducts);
+                }
+                
+                // Mostrar alerta informativa según reglas
+                if (typeof mostrarAlertaSegunReglasSuperMayoreo === 'function') {
+                    mostrarAlertaSegunReglasSuperMayoreo(user);
+                }
             }
         }).catch(err => console.warn("Error al refrescar perfil en segundo plano:", err));
     }
@@ -1438,7 +1503,10 @@ async function loadCatalogs() {
         const perfiles = candidate.perfiles || [];
         const categorias = candidate.categorias || [];
         const personalizaciones = candidate.personalizaciones || candidate.personalizacion || [];
-        const reglas_mayoreo_super = candidate.reglas_mayoreo_super || null;
+        let reglas_mayoreo_super = candidate.reglas_mayoreo_super || null;
+        if (!reglas_mayoreo_super && candidate.Piezas_Jugador_Mayoreo_Super !== undefined) {
+            reglas_mayoreo_super = { piezas_jugador: Number(candidate.Piezas_Jugador_Mayoreo_Super) || 10, piezas_fan: 15, activo: 1 };
+        }
         const reglas_talla_extra = candidate.reglas_talla_extra || null;
         const estatus_ordenes = candidate.estatus_ordenes || candidate.estatus_Ordenes || candidate.estatus || null;
         const tallas_hombre = candidate.tallas_hombre || [];
@@ -1617,52 +1685,8 @@ async function handleLoginSubmit(e) {
                 navLogoutBtn.classList.add('sm:flex');
             }
             
-            // 🌟 Alerta premium de Súper Mayoreo
-            if (esPerfilSuperMayoreo(res.data.perfil)) {
-                let fechaVigencia = 'Vencimiento no configurado';
-                if (res.data.super_mayoreo_exp) {
-                    try {
-                        const d = new Date(res.data.super_mayoreo_exp);
-                        fechaVigencia = d.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' });
-                    } catch (e) {}
-                }
-                
-                const acum = Number(res.data.super_mayoreo_acum || 0);
-                const faltan = Math.max(0, 10 - acum);
-                
-                let requirementHtml = '';
-                if (faltan > 0) {
-                    requirementHtml = `🔁 <strong>Para conservar tu precio:</strong> Llevas acumuladas <strong class="text-emerald-400">${acum}</strong> playeras en tu ciclo actual. Te faltan <strong class="text-amber-400 font-mono">${faltan}</strong> playeras más antes de la fecha de vencimiento para renovar tus beneficios por otros 6 días.`;
-                } else {
-                    requirementHtml = `✨ <strong>¡Meta de renovación cumplida!</strong> Llevas acumuladas <strong class="text-emerald-400">${acum}</strong> playeras. Ya tienes asegurado tu beneficio de Súper Mayoreo para el siguiente ciclo.`;
-                }
-                
-                Swal.fire({
-                    icon: 'info',
-                    title: `🌟 ¡Bienvenido, ${userNameText}!`,
-                    html: `
-                        <div class="text-left space-y-2.5 text-xs text-gray-300">
-                            <p>Tienes activo el perfil de <strong class="text-amber-400">Súper Mayoreo</strong> con precios preferenciales exclusivos.</p>
-                            <p>📅 <strong>Vigencia:</strong> hasta el <span class="text-white font-mono underline">${fechaVigencia}</span>.</p>
-                            <p>${requirementHtml}</p>
-                        </div>
-                    `,
-                    background: '#151515',
-                    color: '#ffffff',
-                    confirmButtonColor: '#d97706',
-                    confirmButtonText: '¡Excelente!'
-                });
-            } else if (res.data.perfil !== "Administrador") {
-                Swal.fire({
-                    title: '¡Acceso Correcto!',
-                    text: `Bienvenido de nuevo, ${userNameText}.`,
-                    icon: 'success',
-                    background: '#151515',
-                    color: '#ffffff',
-                    timer: 2000,
-                    showConfirmButton: false
-                });
-            }
+            // 🌟 Alertas de Súper Mayoreo según Reglas Maestras
+            mostrarAlertaSegunReglasSuperMayoreo(res.data);
             
             updateUserLoginUI(res.data);
             applyProfileView();
@@ -1677,22 +1701,168 @@ async function handleLoginSubmit(e) {
             });
         }
     } catch (err) {
-        console.error(err);
+        console.error("Error en login:", err);
         Swal.fire({
             title: 'Error de Conexión',
-            html: `<div class="text-left text-xs space-y-1 text-gray-300">
-                <p>Ocurrió un problema al intentar iniciar sesión.</p>
-                <p class="text-red-400 font-mono">Detalle: ${err.message || String(err)}</p>
-                ${err.stack ? `<pre class="bg-black/40 p-2 rounded text-[10px] overflow-x-auto text-gray-400 max-h-24 select-text">${err.stack.split('\n').slice(0, 2).join('\n')}</pre>` : ''}
-            </div>`,
+            text: 'No se pudo conectar con el servidor. Intenta de nuevo.',
             icon: 'error',
             background: '#151515',
             color: '#ffffff',
-            confirmButtonColor: '#ef4444'
+            confirmButtonColor: '#1d4ed8'
         });
     } finally {
-        btn.innerHTML = originalText;
         btn.disabled = false;
+        btn.innerHTML = originalText;
+    }
+}
+
+function mostrarAlertaSegunReglasSuperMayoreo(userData) {
+    if (!userData || userData.perfil === "Administrador" || userData.usuario === "admin") return;
+    const userNameText = userData.nombre_completo || userData.usuario || 'Usuario';
+    
+    // Evaluaciones ultra-robustas
+    const isSuperActivoGlobal = (reglasMayoreoSuper && reglasMayoreoSuper.activo !== undefined && reglasMayoreoSuper.activo !== null) ? (Number(reglasMayoreoSuper.activo) === 1 || String(reglasMayoreoSuper.activo) === "1" || String(reglasMayoreoSuper.activo).toLowerCase() === "true") : true;
+    const clientSuperActivoCol = (userData.super_mayoreo_activo !== undefined && userData.super_mayoreo_activo !== null && userData.super_mayoreo_activo !== "") ? Number(userData.super_mayoreo_activo) : 0;
+    
+    const vipRaw = userData.vip !== undefined ? userData.vip : (userData.VIP !== undefined ? userData.VIP : (userData.es_vip !== undefined ? userData.es_vip : (userData.is_vip !== undefined ? userData.is_vip : null)));
+    const vipVal = String(vipRaw !== null && vipRaw !== undefined ? vipRaw : "").toLowerCase().trim();
+    const isVipUser = (
+        vipVal === "1" || vipVal === "1.0" || vipVal === "si" || vipVal === "sí" || vipVal === "true" || vipVal === "vip" || vipVal === "v" || vipVal === "x" || 
+        Number(vipRaw) === 1 || vipRaw === true || clientSuperActivoCol === 1 || esPerfilSuperMayoreo(userData.perfil)
+    );
+    
+    console.log("🌟 [Súper Mayoreo Login Check]", {
+        usuario: userData.usuario,
+        vipRaw: userData.vip,
+        isVipUser: isVipUser,
+        clientSuperActivoCol: clientSuperActivoCol,
+        perfil: userData.perfil,
+        isSuperActivoGlobal: isSuperActivoGlobal
+    });
+    
+    const hasValidExp = Boolean(userData.super_mayoreo_exp && String(userData.super_mayoreo_exp).trim() !== "" && String(userData.super_mayoreo_exp).trim() !== "null");
+    const metaLimit = Number(userData.meta_piezas || reglasMayoreoSuper.piezas_jugador || 100);
+
+    let fechaVigenciaStr = '';
+    if (hasValidExp) {
+        try {
+            const d = new Date(userData.super_mayoreo_exp);
+            if (!isNaN(d.getTime())) {
+                fechaVigenciaStr = d.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' });
+            }
+        } catch (e) {}
+    }
+
+    // 🟡 Escenario A: VIP = 1 pero SuperMayoreoActivo (Configuraciones) = 0 -> Tienda deshabilitada globalmente (Silencioso sin notificación)
+    if (isVipUser && !isSuperActivoGlobal) {
+        return;
+    }
+
+    // 🟢 Escenario B: VIP = 1, Global = 1, Cliente SuperMayoreoActivo = 1 O Perfil "Súper Mayoreo" -> Notificar perfil asignado, fecha de caducidad y progreso acumulado
+    if (isSuperActivoGlobal && isVipUser && (clientSuperActivoCol === 1 || esPerfilSuperMayoreo(userData.perfil))) {
+        localStorage.setItem('current_perfil', 'Súper Mayoreo');
+        const acum = Number(userData.super_mayoreo_acum || 0);
+        const faltan = Math.max(0, metaLimit - acum);
+        
+        let displayFecha = fechaVigenciaStr;
+        if (!displayFecha) {
+            const dCalc = new Date();
+            dCalc.setDate(dCalc.getDate() + 6);
+            displayFecha = dCalc.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        }
+        
+        let requirementHtml = '';
+        if (faltan > 0) {
+            requirementHtml = `🔁 <strong>Para renovar tu precio:</strong> Llevas acumuladas <strong class="text-emerald-400">${acum}</strong> playeras versión Jugador en tu ciclo actual. Te faltan <strong class="text-amber-400 font-mono">${faltan}</strong> playeras más antes de la fecha de vencimiento para extender tus beneficios por otros 6 días.`;
+        } else {
+            requirementHtml = `✨ <strong>¡Meta de renovación cumplida!</strong> Llevas acumuladas <strong class="text-emerald-400">${acum}</strong> playeras. Ya tienes asegurada la renovación de tu beneficio por otros 6 días.`;
+        }
+        
+        Swal.fire({
+            icon: 'info',
+            title: `🌟 ¡Bienvenido a Súper Mayoreo, ${userNameText}!`,
+            html: `
+                <div class="text-left space-y-2.5 text-xs text-gray-300">
+                    <p>Tienes asignado el perfil de <strong class="text-amber-400 font-bold">Súper Mayoreo</strong> con precios preferenciales exclusivos en toda la tienda.</p>
+                    <p>📅 <strong>Fecha de Caducidad / Vencimiento:</strong> <span class="text-white font-mono underline font-bold">${displayFecha}</span></p>
+                    <p>${requirementHtml}</p>
+                </div>
+            `,
+            background: '#151515', color: '#ffffff', confirmButtonColor: '#d97706', confirmButtonText: '¡Excelente!'
+        }).then(async (result) => {
+            if (result.isConfirmed && (faltan <= 0 || acum >= metaLimit)) {
+                try {
+                    const response = await fetch(API_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                        body: JSON.stringify({ action: "renew_super_mayoreo_cycle", id_cliente: userData.id_cliente })
+                    });
+                    const res = await response.json();
+                    if (res && res.status === 'success') {
+                        userData.super_mayoreo_acum = 0;
+                        userData.super_mayoreo_exp = res.super_mayoreo_exp;
+                        userData.super_mayoreo_activo = 1;
+                        userData.perfil = "Súper Mayoreo";
+                        localStorage.setItem('logged_user', JSON.stringify(userData));
+                        localStorage.setItem('current_perfil', 'Súper Mayoreo');
+                        if (typeof updateBrandTextColor === 'function') updateBrandTextColor();
+                        console.log("🌟 [Ciclo Súper Mayoreo Reiniciado] Acumulado 0, Expiración +6 días.");
+                    }
+                } catch (eRenew) {
+                    console.error("Error al reiniciar ciclo de súper mayoreo:", eRenew);
+                }
+            }
+        });
+        return;
+    }
+
+    // 🌟 Escenario C: VIP = 1, Global = 1, Cliente SuperMayoreoActivo = 0 -> Notificar que tiene disponible la opción de activar el modo súper mayoreo
+    if (isSuperActivoGlobal && isVipUser && clientSuperActivoCol === 0) {
+        Swal.fire({
+            icon: 'info',
+            title: `🌟 ¡Bienvenido VIP, ${userNameText}!`,
+            html: `
+                <div class="text-left space-y-3 text-xs text-gray-300">
+                    <p>Cuentas con beneficio de cliente <strong class="text-amber-400 font-bold">VIP</strong> y tienes disponible la opción de activar el <strong class="text-amber-400 font-bold">Modo Súper Mayoreo</strong>.</p>
+                    <div class="bg-amber-500/10 border border-amber-500/30 p-3 rounded-xl space-y-1.5 text-amber-200">
+                        <p class="font-bold text-amber-400 flex items-center gap-1"><span>🎯 ¿Qué necesitas para activarlo?</span></p>
+                        <p>Realizar una compra igual o mayor a <strong class="text-white font-mono text-sm font-extrabold">${metaLimit} playeras versión Jugador</strong>.</p>
+                    </div>
+                    <div class="bg-dark-200/50 p-3 rounded-xl space-y-1.5 border border-white/10">
+                        <p class="font-bold text-white flex items-center gap-1"><span>🚀 ¿Cómo funciona?</span></p>
+                        <p>Al pasar tu orden a estatus <strong class="text-emerald-400">Disponible o Enviado</strong>, tu perfil cambiará automáticamente a <strong class="text-amber-400 font-bold">Súper Mayoreo por 6 días</strong>, permitiéndote acceder a precios preferenciales exclusivos en todas tus compras y renovar la vigencia acumulando nuevas playeras.</p>
+                    </div>
+                </div>
+            `,
+            background: '#151515', color: '#ffffff', confirmButtonColor: '#d97706', confirmButtonText: '¡Entendido!'
+        });
+        return;
+    } else if (isVipUser && (userData.es_beneficio_perdido || userData.beneficio_perdido)) {
+        // 🔴 Regla Escenario 4 (Fase C): Expiró sin cumplir la meta -> Notificar pérdida
+        Swal.fire({
+            icon: 'warning',
+            title: `⏰ Beneficio Expirado`,
+            html: `
+                <div class="text-left space-y-2 text-xs text-gray-300">
+                    <p>Hola <strong class="text-white">${userNameText}</strong>, la vigencia de tu perfil de Súper Mayoreo ha expirado por no haber alcanzado la meta acumulada en el ciclo.</p>
+                    <p>✨ Como cliente <strong class="text-amber-400">VIP</strong>, puedes volver a desbloquear 6 días de Súper Mayoreo realizando un nuevo pedido de <strong class="text-white font-mono">${metaLimit}</strong> o más playeras versión Jugador.</p>
+                </div>
+            `,
+            background: '#151515',
+            color: '#ffffff',
+            confirmButtonColor: '#d97706',
+            confirmButtonText: 'Entendido'
+        });
+    } else if (userData.perfil !== "Administrador") {
+        Swal.fire({
+            title: '¡Acceso Correcto!',
+            text: `Bienvenido de nuevo, ${userNameText}.`,
+            icon: 'success',
+            background: '#151515',
+            color: '#ffffff',
+            timer: 2000,
+            showConfirmButton: false
+        });
     }
 }
 
@@ -3868,6 +4038,30 @@ function updatePersonalizacionDropdown(producto) {
     }
 }
 
+function getProductId(prod) {
+    if (!prod) return '';
+    return String(prod.id || prod.ID || prod.id_producto || prod.nombre || '').trim();
+}
+
+function findTallaObj(tallas, targetTalla) {
+    if (!tallas || !Array.isArray(tallas)) return null;
+    const target = String(targetTalla || '').trim().toUpperCase();
+    if (!target) return null;
+    return tallas.find(t => {
+        const sz = String(t.talla !== undefined ? t.talla : (t.Talla !== undefined ? t.Talla : (t.size !== undefined ? t.size : (t.Size !== undefined ? t.Size : '')))).trim().toUpperCase();
+        return sz === target;
+    }) || null;
+}
+
+function getTallaStock(tallaObj) {
+    if (!tallaObj) return 999;
+    if (tallaObj.stock !== undefined && tallaObj.stock !== null && tallaObj.stock !== '') return Number(tallaObj.stock);
+    if (tallaObj.Stock !== undefined && tallaObj.Stock !== null && tallaObj.Stock !== '') return Number(tallaObj.Stock);
+    if (tallaObj.inventario !== undefined && tallaObj.inventario !== null && tallaObj.inventario !== '') return Number(tallaObj.inventario);
+    if (tallaObj.Inventario !== undefined && tallaObj.Inventario !== null && tallaObj.Inventario !== '') return Number(tallaObj.Inventario);
+    return 999;
+}
+
 function openPedidoModal(producto, preselectedTalla = null) {
     currentJerseyForPedido = producto;
     
@@ -3884,16 +4078,22 @@ function openPedidoModal(producto, preselectedTalla = null) {
     // Limpiar y poblar select de tallas con stock disponible
     DOM.pedido.talla.innerHTML = '<option value="" disabled selected>Selecciona talla...</option>';
     let hasAvailableSizes = false;
+    let matchingPreselectedOption = null;
     
     if (producto.tallas && Array.isArray(producto.tallas)) {
         producto.tallas.forEach(t => {
-            const stockVal = t.stock !== undefined ? t.stock : t.inventario;
-            if (stockVal > 0) {
+            const stockVal = getTallaStock(t);
+            const sizeName = String(t.talla !== undefined ? t.talla : (t.Talla !== undefined ? t.Talla : '')).trim();
+            if (stockVal > 0 && sizeName) {
                 hasAvailableSizes = true;
                 const option = document.createElement('option');
-                option.value = t.talla;
-                option.textContent = t.talla;
+                option.value = sizeName;
+                option.textContent = sizeName;
                 DOM.pedido.talla.appendChild(option);
+                
+                if (preselectedTalla && String(sizeName).trim().toUpperCase() === String(preselectedTalla).trim().toUpperCase()) {
+                    matchingPreselectedOption = sizeName;
+                }
             }
         });
     }
@@ -3960,8 +4160,8 @@ function openPedidoModal(producto, preselectedTalla = null) {
         handlePedidoPersonalizacionChange();
     }
     
-    if (preselectedTalla) {
-        DOM.pedido.talla.value = preselectedTalla;
+    if (matchingPreselectedOption) {
+        DOM.pedido.talla.value = matchingPreselectedOption;
         handlePedidoTallaChange();
     }
     
@@ -4088,7 +4288,7 @@ function handlePedidoPersonalizacionChange() {
 function handlePedidoTallaChange() {
     if (!currentJerseyForPedido) return;
     const selectedTalla = DOM.pedido.talla.value;
-    const tallaObj = currentJerseyForPedido.tallas.find(t => t.talla === selectedTalla);
+    const tallaObj = findTallaObj(currentJerseyForPedido.tallas, selectedTalla);
     
     // ⚡ Notificación y desglose de Talla Extra (ej: 4XL, 5XL, 6XL)
     const extraBadge = document.getElementById('pedido-talla-extra-badge');
@@ -4123,13 +4323,13 @@ function handlePedidoTallaChange() {
     }
     
     if (tallaObj) {
-        const stockVal = tallaObj.stock !== undefined ? tallaObj.stock : tallaObj.inventario;
-        const existingItem = cart.find(item => item.producto.id === currentJerseyForPedido.id && item.talla === selectedTalla);
+        const stockVal = getTallaStock(tallaObj);
+        const existingItem = cart.find(item => item.producto.id === currentJerseyForPedido.id && String(item.talla).trim().toUpperCase() === String(selectedTalla).trim().toUpperCase());
         const existingQty = existingItem ? existingItem.cantidad : 0;
         const limit = Math.max(0, stockVal - existingQty);
         
         DOM.pedido.cantidad.max = limit;
-        if (limit === 0) {
+        if (limit === 0 && stockVal > 0) {
             DOM.pedido.cantidad.value = 0;
             DOM.pedido.stockInfo.textContent = 'Agotado en carrito';
             DOM.pedido.stockInfo.classList.add('text-red-500');
@@ -4147,29 +4347,31 @@ function handlePedidoTallaChange() {
 }
 
 function handleAddToPedidoSubmit(e) {
-    e.preventDefault();
+    if (e && typeof e.preventDefault === 'function') e.preventDefault();
     if (!currentJerseyForPedido) return;
     
-    const selectedTalla = DOM.pedido.talla.value;
-    const selectedQty = parseInt(DOM.pedido.cantidad.value) || 1;
-    const selectedPersId = DOM.pedido.personalizacion.value;
-    const customText = DOM.pedido.customText.value.trim().toUpperCase();
+    const selectedTalla = DOM.pedido.talla ? DOM.pedido.talla.value : '';
+    const selectedQty = parseInt(DOM.pedido.cantidad ? DOM.pedido.cantidad.value : 1) || 1;
+    const selectedPersId = DOM.pedido.personalizacion ? DOM.pedido.personalizacion.value : 'PERS-NONE';
+    const customText = (DOM.pedido.customText && DOM.pedido.customText.value) ? DOM.pedido.customText.value.trim().toUpperCase() : '';
     
     if (!selectedTalla) {
         Swal.fire({ icon: 'warning', title: 'Talla requerida', text: 'Por favor selecciona una talla.', background: '#151515', color: '#fff' });
         return;
     }
     
-    // Validar stock disponible
-    const tallaObj = currentJerseyForPedido.tallas.find(t => t.talla === selectedTalla);
-    const stockVal = tallaObj ? (tallaObj.stock !== undefined ? tallaObj.stock : tallaObj.inventario) : 0;
+    const currentProdId = getProductId(currentJerseyForPedido);
+    
+    // Validar stock disponible de forma ultra-robusta
+    const tallaObj = findTallaObj(currentJerseyForPedido.tallas, selectedTalla);
+    const stockVal = getTallaStock(tallaObj);
     
     // Validar acumulando lo que ya está en el carrito para esta talla de este jersey
     const existingQty = cart
-        .filter(item => item.producto.id === currentJerseyForPedido.id && item.talla === selectedTalla)
-        .reduce((sum, item) => sum + item.cantidad, 0);
+        .filter(item => getProductId(item.producto) === currentProdId && String(item.talla).trim().toUpperCase() === String(selectedTalla).trim().toUpperCase())
+        .reduce((sum, item) => sum + (Number(item.cantidad) || 0), 0);
         
-    if (selectedQty + existingQty > stockVal) {
+    if (selectedQty + existingQty > stockVal && stockVal < 999) {
         if (existingQty > 0) {
             Swal.fire({
                 icon: 'error',
@@ -4222,10 +4424,10 @@ function handleAddToPedidoSubmit(e) {
     
     // Buscar si ya existe un artículo idéntico en el carrito para agruparlo
     const existingItem = cart.find(item => 
-        item.producto.id === currentJerseyForPedido.id && 
-        item.talla === selectedTalla && 
-        item.personalizacionId === selectedPersId && 
-        item.texto_personalizado === cleanCustomText
+        getProductId(item.producto) === currentProdId && 
+        String(item.talla).trim().toUpperCase() === String(selectedTalla).trim().toUpperCase() && 
+        String(item.personalizacionId || 'PERS-NONE') === String(selectedPersId || 'PERS-NONE') && 
+        String(item.texto_personalizado || '').trim() === String(cleanCustomText).trim()
     );
     
     if (existingItem) {
@@ -4249,7 +4451,7 @@ function handleAddToPedidoSubmit(e) {
     Swal.fire({
         icon: 'success',
         title: 'Agregado',
-        text: `${currentJerseyForPedido.nombre} añadido.`,
+        text: `${currentJerseyForPedido.nombre || 'Jersey'} añadido al carrito.`,
         toast: true,
         position: window.innerWidth < 640 ? 'bottom' : 'bottom-end',
         showConfirmButton: false,
@@ -4264,6 +4466,7 @@ function handleAddToPedidoSubmit(e) {
     
     closePedidoModal();
 }
+window.handleAddToPedidoSubmit = handleAddToPedidoSubmit;
 
 function updateCartBadge() {
     let totalItems = 0;
@@ -4300,7 +4503,30 @@ function openCartModal() {
     if (loggedUserStr) {
         const loggedUser = JSON.parse(loggedUserStr);
         if (DOM.cart.loggedName) DOM.cart.loggedName.textContent = loggedUser.nombre_completo || loggedUser.usuario;
-        if (DOM.cart.loggedPerfil) DOM.cart.loggedPerfil.textContent = loggedUser.perfil || 'Menudeo';
+        if (DOM.cart.loggedPerfil) {
+            const isVip = isLoggedUserVip();
+            const isSuperMayoreoActivoGlobal = (reglasMayoreoSuper.activo !== undefined) ? Number(reglasMayoreoSuper.activo) === 1 : true;
+            const clientSuperActivoCol = (loggedUser.super_mayoreo_activo !== undefined && loggedUser.super_mayoreo_activo !== null && loggedUser.super_mayoreo_activo !== "") ? Number(loggedUser.super_mayoreo_activo) : 0;
+            
+            // SÓLO MOSTRAR BADGE "SÚPER MAYOREO" SI TIENE PERFIL SÚPER MAYOREO Y SUPERMAYOREOACTIVO === 1
+            const isSuperPerfilActivo = (isSuperMayoreoActivoGlobal && clientSuperActivoCol === 1 && esPerfilSuperMayoreo(loggedUser.perfil));
+
+            let effectivePerfilDisplay = loggedUser.perfil || 'Menudeo';
+            if (isSuperPerfilActivo) {
+                effectivePerfilDisplay = 'SÚPER MAYOREO';
+            } else if (isVip) {
+                effectivePerfilDisplay = (loggedUser.perfil || 'Mayoreo') + ' (VIP)';
+            }
+
+            DOM.cart.loggedPerfil.textContent = effectivePerfilDisplay.toUpperCase();
+            if (isSuperPerfilActivo) {
+                DOM.cart.loggedPerfil.className = 'px-2.5 py-1 rounded-lg text-[10px] font-extrabold uppercase tracking-wider bg-amber-500/20 text-amber-400 border border-amber-500/30 shadow-[0_0_10px_rgba(245,158,11,0.2)]';
+            } else if (isVip) {
+                DOM.cart.loggedPerfil.className = 'px-2.5 py-1 rounded-lg text-[10px] font-extrabold uppercase tracking-wider bg-amber-500/10 text-amber-300 border border-amber-500/20';
+            } else {
+                DOM.cart.loggedPerfil.className = 'px-2.5 py-1 rounded-lg text-[10px] font-extrabold uppercase tracking-wider bg-blue-500/20 text-blue-400 border border-blue-500/30';
+            }
+        }
     }
     
     renderCartItems();
@@ -4331,23 +4557,10 @@ function getBasePriceForProfile(producto, profile, talla = null) {
     let basePrice = 0;
     
     const isSuperMayoreoActivo = (reglasMayoreoSuper.activo !== undefined) ? Number(reglasMayoreoSuper.activo) === 1 : true;
-    
     let applySuper = false;
     
     if (isSuperMayoreoActivo) {
-        const esSuperPorPerfil = esPerfilSuperMayoreo(profile) || profile === 'Administrador';
-        
-        const totalJugador = cart.filter(i => {
-            const prod = i.producto || i;
-            const versionStr = String(prod.version || prod.Version || prod.tipo || '').trim().toLowerCase();
-            return versionStr.includes('jugador');
-        }).reduce((sum, i) => sum + (Number(i.cantidad) || 0), 0);
-        
-        const limitJugador = Number(reglasMayoreoSuper.piezas_jugador || 10);
-        
-        if (esSuperPorPerfil || totalJugador >= limitJugador) {
-            applySuper = true;
-        }
+        applySuper = esPerfilSuperMayoreo(profile) || profile === 'Administrador';
     }
     
     if (applySuper && producto.precio_mayoreo_super && parseFloat(producto.precio_mayoreo_super) > 0) {
@@ -4409,24 +4622,42 @@ function renderCartItems() {
         const versionStr = String(prod.version || prod.Version || prod.tipo || '').trim().toLowerCase();
         return versionStr.includes('jugador');
     }).reduce((sum, i) => sum + (Number(i.cantidad) || 0), 0);
-    const limitJugador = Number(reglasMayoreoSuper.piezas_jugador || 10);
-    const esSuperPorVolumen = totalJugador >= limitJugador;
-    
-    const isSuperMayoreoAplicado = isSuperMayoreoActivoGlobal && (esSuperPorPerfil || esSuperPorVolumen);
+    const limitJugador = Number(reglasMayoreoSuper.piezas_jugador || 100);
+    const metaAlcanzadaProximaCompra = totalJugador >= limitJugador;
 
     // Banner de aviso Súper Mayoreo
+    const isVip = isLoggedUserVip();
+    const titleSuper = document.getElementById('cart-super-mayoreo-title');
+    const loggedUserStr = localStorage.getItem('logged_user');
+    const loggedUser = loggedUserStr ? JSON.parse(loggedUserStr) : {};
+    const clientSuperActivoCol = (loggedUser.super_mayoreo_activo !== undefined && loggedUser.super_mayoreo_activo !== null && loggedUser.super_mayoreo_activo !== "") ? Number(loggedUser.super_mayoreo_activo) : 0;
+    const esSuperMayoreoVigente = (isSuperMayoreoActivoGlobal && clientSuperActivoCol === 1 && esPerfilSuperMayoreo(clientProfile));
+
     if (bannerSuper) {
-        if (isSuperMayoreoAplicado) {
+        if (isSuperMayoreoActivoGlobal && isVip && (esSuperMayoreoVigente || metaAlcanzadaProximaCompra) && loggedUser.perfil !== "Administrador") {
             bannerSuper.classList.remove('hidden');
-            if (esSuperPorPerfil) {
-                if (reasonSuper) reasonSuper.textContent = "¡Estás accediendo a precios de Súper Mayoreo por tu perfil activo! Para hacer válido este acuerdo debes enviar tu orden y liquidarla.";
-            } else if (esSuperPorVolumen) {
-                if (reasonSuper) reasonSuper.textContent = `¡Felicidades! Acumulaste ${totalJugador} prendas Jugador (meta: ${limitJugador}) y desbloqueaste precio de Súper Mayoreo. Para hacer válido este acuerdo debes enviar tu orden y liquidarla.`;
+            if (esSuperMayoreoVigente) {
+                if (titleSuper) titleSuper.textContent = "¡Precios de Súper Mayoreo Aplicados!";
+                if (reasonSuper) reasonSuper.textContent = "¡Felicidades! Cuentas con estatus VIP y estás disfrutando de precios de Súper Mayoreo por tu vigencia activa.";
+                if (badgeSavingsSuper) {
+                    badgeSavingsSuper.classList.remove('hidden');
+                    badgeSavingsSuper.textContent = "Ahorro activo";
+                }
+            } else if (metaAlcanzadaProximaCompra) {
+                if (titleSuper) titleSuper.textContent = "🚀 ¡Meta Alcanzada en esta Orden!";
+                if (reasonSuper) reasonSuper.innerHTML = `¡Felicidades VIP! Acumulaste <strong class="text-white">${totalJugador} playeras Jugador</strong> (meta: ${limitJugador}). Al pasar esta orden a <strong>Disponible o Enviado</strong>, desbloquearás <strong>6 días de precios de Súper Mayoreo</strong> para tus próximas compras.`;
+                if (badgeSavingsSuper) {
+                    badgeSavingsSuper.classList.remove('hidden');
+                    badgeSavingsSuper.textContent = "Súper Mayoreo Próximo";
+                }
             }
         } else {
+            // Ocultar banner si no está vigente ni ha alcanzado la meta de piezas versión Jugador en este carrito
             bannerSuper.classList.add('hidden');
         }
     }
+
+    const isSuperMayoreoAplicado = esSuperMayoreoVigente;
 
     let subtotal = 0;
     let personalizacionesTotal = 0;
@@ -4725,7 +4956,7 @@ async function submitOrder() {
         }
         
         if (data.status === 'success') {
-            if (data.actualizacion_perfil) {
+            if (data.actualizacion_perfil && isLoggedUserVip()) {
                 const user = JSON.parse(localStorage.getItem('logged_user'));
                 user.perfil = data.actualizacion_perfil.perfil;
                 user.super_mayoreo_exp = data.actualizacion_perfil.super_mayoreo_exp;
