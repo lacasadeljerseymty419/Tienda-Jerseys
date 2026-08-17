@@ -80,7 +80,7 @@ let isSessionExpiring = false;
 function getFirstImage(fotoField) {
     if (!fotoField) return '';
     const parts = String(fotoField).split(',');
-    return parts[0].trim();
+    return getOptimizedImageUrl(parts[0].trim(), 500);
 }
 
 function getOptimizedImageUrl(rawUrl, width = 500) {
@@ -94,12 +94,13 @@ function getOptimizedImageUrl(rawUrl, width = 500) {
         url = url.split(',')[0].trim();
     }
 
-    // Transformación para Google Drive Thumbnail API (WebP / JPEG comprimido por CDN de Google)
+    // Extraer ID de archivo de Google Drive / Google UserContent
     let driveId = '';
     const matchId = url.match(/id=([a-zA-Z0-9_-]+)/) || url.match(/\/d\/([a-zA-Z0-9_-]+)/);
     if (matchId && matchId[1]) {
         driveId = matchId[1];
-        return `https://drive.google.com/thumbnail?id=${driveId}&sz=w${width}`;
+        // CDN ultra-rápido de Google Edge Direct CDN (WebP automático + resize a resolución óptima)
+        return `https://lh3.googleusercontent.com/d/${driveId}=w${width}-rw`;
     }
 
     // Transformación para Google UserContent (lh3.googleusercontent.com)
