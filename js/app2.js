@@ -3143,16 +3143,13 @@ function renderProductsWithFilters() {
     }
 }
 
+let searchDebounceTimer = null;
+
 function handleLocalSearch() {
-    renderSkeletons(6);
+    if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
     
-    const originalText = DOM.btnAplicar.innerText;
-    DOM.btnAplicar.innerHTML = `<svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Filtrando...`;
-    DOM.btnAplicar.disabled = true;
-    DOM.btnAplicar.classList.add('opacity-75', 'cursor-not-allowed');
-    
-    // Simulamos un pequeño retraso para mostrar la animación visual de que se está filtrando
-    setTimeout(() => {
+    // Búsqueda instantánea suave (50ms) sin reseteo de esqueletos ni retrasos artificiales
+    searchDebounceTimer = setTimeout(() => {
         const activeProductsOnly = (allProducts || []).filter(p => p.activo === undefined || p.activo === null || p.activo === "" || Number(p.activo) === 1);
         const nombreQ = DOM.filters.nombre.value.trim().toLowerCase();
         const tipoQ = DOM.filters.tipo.value;
@@ -3169,11 +3166,7 @@ function handleLocalSearch() {
         });
         
         renderLocalProducts(filtrados);
-        
-        DOM.btnAplicar.innerText = originalText;
-        DOM.btnAplicar.disabled = false;
-        DOM.btnAplicar.classList.remove('opacity-75', 'cursor-not-allowed');
-    }, 300);
+    }, 50);
 }
 
 let currentRenderToken = 0;
@@ -3194,11 +3187,11 @@ function renderLocalProducts(productos) {
     DOM.resultsCount.textContent = `${productos.length} producto${productos.length !== 1 ? 's' : ''}`;
 
     const token = ++currentRenderToken;
-    const CHUNK_SIZE = 20; // 20 tarjetas por lote para renderizado instantáneo <16ms
+    const CHUNK_SIZE = 24; // 24 tarjetas por lote optimizadas para pantallas Retina/ProMotion 120Hz
     let index = 0;
 
     function renderNextChunk() {
-        if (token !== currentRenderToken) return; // Detener si se inició una nueva renderización
+        if (token !== currentRenderToken) return;
         
         const fragment = document.createDocumentFragment();
         const end = Math.min(index + CHUNK_SIZE, productos.length);
@@ -3229,11 +3222,11 @@ function createProductCard(producto) {
     const imgUrl = getOptimizedImageUrl(rawImg, 500);
     
     let tagsHtml = '<div class="flex flex-wrap gap-1 sm:gap-2 mb-1.5 sm:mb-3 z-10 relative">';
-    if (producto.version) tagsHtml += `<span class="px-1.5 py-0.5 sm:px-2.5 sm:py-1 text-[8px] sm:text-[10px] font-bold uppercase tracking-wider bg-white/5 text-gray-400 rounded-md border border-white/10 backdrop-blur-sm">${producto.version}</span>`;
-    if (producto.tipo) tagsHtml += `<span class="px-1.5 py-0.5 sm:px-2.5 sm:py-1 text-[8px] sm:text-[10px] font-bold uppercase tracking-wider bg-white/5 text-gray-300 rounded-md border border-white/10 backdrop-blur-sm">${producto.tipo}</span>`;
+    if (producto.version) tagsHtml += `<span class="px-1.5 py-0.5 sm:px-2.5 sm:py-1 text-[8px] sm:text-[10px] font-bold uppercase tracking-wider bg-dark-200/90 text-gray-400 rounded-md border border-white/10">${producto.version}</span>`;
+    if (producto.tipo) tagsHtml += `<span class="px-1.5 py-0.5 sm:px-2.5 sm:py-1 text-[8px] sm:text-[10px] font-bold uppercase tracking-wider bg-dark-200/90 text-gray-300 rounded-md border border-white/10">${producto.tipo}</span>`;
     if (producto.genero) {
         const colorGen = getGenderColorClass(producto.genero);
-        tagsHtml += `<span class="px-1.5 py-0.5 sm:px-2.5 sm:py-1 text-[8px] sm:text-[10px] font-bold uppercase tracking-wider ${colorGen} rounded-md border backdrop-blur-sm">${producto.genero}</span>`;
+        tagsHtml += `<span class="px-1.5 py-0.5 sm:px-2.5 sm:py-1 text-[8px] sm:text-[10px] font-bold uppercase tracking-wider ${colorGen} rounded-md border">${producto.genero}</span>`;
     }
     tagsHtml += '</div>';
 
@@ -3255,13 +3248,14 @@ function createProductCard(producto) {
             
             const adminStockHtml = isAdmin ? `<span class="absolute -top-2 -right-2 bg-navy-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full shadow-lg border border-dark z-20">${stockVal}</span>` : '';
 
+            const displayTalla = String(t.talla || '');
             tallasHtml += `
                 <div class="relative">
                     <button type="button" class="talla-btn w-6 h-6 sm:w-9 sm:h-9 rounded-md sm:rounded-lg flex items-center justify-center text-[8px] sm:text-xs font-semibold border transition-all duration-200 ${btnClass}" 
-                            data-talla="${t.talla}"
+                            data-talla="${displayTalla}"
                             ${!hasStock ? 'disabled' : ''} 
                             title="${hasStock ? `Stock: ${stockVal}` : 'Agotado'}">
-                        ${t.talla}
+                        ${displayTalla}
                     </button>
                     ${adminStockHtml}
                 </div>
@@ -3289,7 +3283,7 @@ function createProductCard(producto) {
         const priceColorClass = isSuper ? 'text-amber-400 font-bold' : 'text-navy-400';
 
         statusTextHtml = `
-            <div class="mt-1 mb-2 bg-dark-200/40 border border-white/5 rounded-xl p-1.5 sm:p-2.5 space-y-0.5 sm:space-y-1 text-[9px] sm:text-xs z-10 relative backdrop-blur-sm">
+            <div class="mt-1 mb-2 bg-dark-200/80 border border-white/5 rounded-xl p-1.5 sm:p-2.5 space-y-0.5 sm:space-y-1 text-[9px] sm:text-xs z-10 relative">
                 <div class="flex justify-between items-center text-gray-400">
                     <span class="font-medium">Precio:</span>
                     <span class="font-bold ${priceColorClass}">$${basePrice.toFixed(2)}</span>
@@ -3316,13 +3310,13 @@ function createProductCard(producto) {
     let imageOverlayHtml = '';
     if (isProximamente) {
         imageOverlayHtml = `
-            <div class="absolute inset-0 flex items-center justify-center bg-dark/40 backdrop-blur-[2px] z-20">
+            <div class="absolute inset-0 flex items-center justify-center bg-dark/60 z-20">
                 <span class="bg-amber-500 text-white px-2 sm:px-5 py-1 sm:py-2 rounded-lg font-bold tracking-widest uppercase text-[8px] sm:text-xs border border-amber-400 shadow-xl shadow-amber-500/20 transform -rotate-6">Próximamente</span>
             </div>
         `;
     } else if (isAgotado) {
         imageOverlayHtml = `
-            <div class="absolute inset-0 flex items-center justify-center bg-dark/30 backdrop-blur-[2px] z-20">
+            <div class="absolute inset-0 flex items-center justify-center bg-dark/50 z-20">
                 <span class="bg-red-500 text-white px-2 sm:px-5 py-1 sm:py-2 rounded-lg font-bold tracking-widest uppercase text-[8px] sm:text-xs border border-red-400 shadow-xl shadow-red-500/20 transform -rotate-6">Agotado</span>
             </div>
         `;
@@ -3331,13 +3325,13 @@ function createProductCard(producto) {
     let carouselControlsHtml = '';
     if (images.length > 1) {
         carouselControlsHtml = `
-            <button type="button" class="carousel-prev-btn absolute left-1.5 sm:left-2 top-1/2 -translate-y-1/2 w-6 h-6 sm:w-8 sm:h-8 bg-black/60 hover:bg-black/80 backdrop-blur-sm rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-all text-white z-30 opacity-100 md:opacity-0 md:group-hover:opacity-100">
+            <button type="button" class="carousel-prev-btn absolute left-1.5 sm:left-2 top-1/2 -translate-y-1/2 w-6 h-6 sm:w-8 sm:h-8 bg-black/70 hover:bg-black/90 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-all text-white z-30 opacity-100 md:opacity-0 md:group-hover:opacity-100">
                 <svg class="w-3 h-3 sm:w-4.5 sm:h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"></path></svg>
             </button>
-            <button type="button" class="carousel-next-btn absolute right-1.5 sm:right-2 top-1/2 -translate-y-1/2 w-6 h-6 sm:w-8 sm:h-8 bg-black/60 hover:bg-black/80 backdrop-blur-sm rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-all text-white z-30 opacity-100 md:opacity-0 md:group-hover:opacity-100">
+            <button type="button" class="carousel-next-btn absolute right-1.5 sm:right-2 top-1/2 -translate-y-1/2 w-6 h-6 sm:w-8 sm:h-8 bg-black/70 hover:bg-black/90 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-all text-white z-30 opacity-100 md:opacity-0 md:group-hover:opacity-100">
                 <svg class="w-3 h-3 sm:w-4.5 sm:h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"></path></svg>
             </button>
-            <div class="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1 z-30 bg-black/40 backdrop-blur-xs px-2 py-1 rounded-full opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+            <div class="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1 z-30 bg-black/60 px-2 py-1 rounded-full opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                 ${images.map((_, i) => `<span class="carousel-dot w-1.5 h-1.5 rounded-full ${i === 0 ? 'bg-white' : 'bg-white/40'} transition-all duration-300" data-idx="${i}"></span>`).join('')}
             </div>
         `;
