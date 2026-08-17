@@ -2139,8 +2139,8 @@ window.handleToggleProductActive = handleToggleProductActive;
 function updateNewTallaSelect(producto) {
     if (DOM.admin.newTallaVal) {
         const tallas = getTallasForGender(producto.genero);
-        const existentes = (producto.tallas || []).map(t => String(t.talla).trim().toUpperCase());
-        const disponibles = tallas.filter(t => !existentes.includes(t.trim().toUpperCase()));
+        const existentes = (producto.tallas || []).map(t => String(t.talla || '').trim().toUpperCase());
+        const disponibles = tallas.filter(t => !existentes.includes(String(t || '').trim().toUpperCase()));
         
         if (disponibles.length === 0) {
             DOM.admin.newTallaVal.innerHTML = '<option value="" disabled selected>Sin tallas disponibles</option>';
@@ -2296,12 +2296,13 @@ function renderInventorySizes(producto) {
     producto.tallas.forEach((t, idx) => {
         const stockActual = t.stock !== undefined ? t.stock : (t.inventario || 0);
         const isNewTag = t.isNew || (t.id_inventario && String(t.id_inventario).startsWith('TEMP_'));
+        const displayTalla = String(t.talla || '');
         const div = document.createElement('div');
         div.className = 'flex items-center justify-between gap-3 bg-dark-200/20 p-2.5 rounded-xl border border-white/5';
         div.innerHTML = `
             <div class="flex items-center gap-3">
                 <div class="w-12 h-10 bg-dark-200/50 border border-white/5 rounded-lg flex items-center justify-center font-bold text-white text-sm relative">
-                    ${t.talla}
+                    ${displayTalla}
                     ${isNewTag ? '<span class="absolute -top-1.5 -right-1.5 bg-amber-500 text-black text-[7px] font-extrabold px-1 rounded-full shadow">NUEVA</span>' : ''}
                 </div>
                 <div>
@@ -2333,14 +2334,14 @@ function handleAddNewTalla(e) {
     e.preventDefault();
     if (!currentJerseyToManage) return;
     
-    const tallaVal = DOM.admin.newTallaVal.value.trim();
+    const tallaVal = DOM.admin.newTallaVal && DOM.admin.newTallaVal.value ? String(DOM.admin.newTallaVal.value).trim() : '';
     const stockVal = parseInt(DOM.admin.newStockVal.value);
     
     if (!tallaVal) return;
     const finalStock = isNaN(stockVal) || stockVal < 0 ? 0 : stockVal;
 
     // Validar duplicados (máximo de 2 veces la misma talla)
-    const existingCount = (currentJerseyToManage.tallas || []).filter(t => t.talla.trim().toUpperCase() === tallaVal.toUpperCase()).length;
+    const existingCount = (currentJerseyToManage.tallas || []).filter(t => String(t.talla || '').trim().toUpperCase() === tallaVal.toUpperCase()).length;
     if (existingCount >= 2) {
         Swal.fire({
             icon: 'warning',
@@ -2391,13 +2392,22 @@ function handleAddNewTalla(e) {
 async function handleSaveBatchTallas() {
     if (!currentJerseyToManage) return;
 
+    // Sincronizar existencias leídas directamente de los campos DOM activos antes de guardar
+    document.querySelectorAll('.input-stock-local-val').forEach(input => {
+        const idx = parseInt(input.getAttribute('data-idx'));
+        const val = parseInt(input.value);
+        if (!isNaN(idx) && currentJerseyToManage && currentJerseyToManage.tallas && currentJerseyToManage.tallas[idx]) {
+            currentJerseyToManage.tallas[idx].stock = isNaN(val) || val < 0 ? 0 : val;
+        }
+    });
+
     const btnSubmit = document.getElementById('btn-submit-save-tallas');
     if (!btnSubmit) return;
     const originalContent = btnSubmit.innerHTML;
 
     btnSubmit.disabled = true;
     btnSubmit.innerHTML = `
-        <svg class="animate-spin h-4 w-4 text-white mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+        <svg class="animate-spin h-4 w-4 text-white mr-2 inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
         <span>Guardando Datos...</span>
     `;
 
@@ -2424,6 +2434,23 @@ async function handleSaveBatchTallas() {
         const data = await response.json();
 
         if (data.status === 'success') {
+            // Limpiar etiquetas temporales para que no aparezca "NUEVA"
+            if (currentJerseyToManage.tallas) {
+                currentJerseyToManage.tallas.forEach(t => {
+                    delete t.isNew;
+                });
+            }
+
+            // Invalidad caché local del catálogo
+            try {
+                localStorage.removeItem('jerseys_products_cache_v5');
+            } catch (eCache) {}
+
+            // Actualizar vista local del modal de inmediato con los datos guardados
+            renderInventorySizes(currentJerseyToManage);
+            updateNewTallaSelect(currentJerseyToManage);
+            renderAdminTable();
+
             Swal.fire({
                 icon: 'success',
                 title: '¡Datos Actualizados!',
@@ -2434,17 +2461,16 @@ async function handleSaveBatchTallas() {
                 customClass: { popup: 'border border-white/10 rounded-2xl' }
             });
 
-            // Refrescar inventario principal en fondo
-            await fetchInitialProducts();
-
-            // Sincronizar referencia local del producto
-            const updatedProduct = allProducts.find(p => p.id === currentJerseyToManage.id);
-            if (updatedProduct) {
-                currentJerseyToManage = updatedProduct;
-                renderInventorySizes(updatedProduct);
-                updateNewTallaSelect(updatedProduct);
-                renderAdminTable();
-            }
+            // Refrescar inventario en segundo plano desde el servidor
+            fetchInitialProducts(true).then(() => {
+                const updatedProduct = allProducts.find(p => p.id === currentJerseyToManage.id);
+                if (updatedProduct) {
+                    currentJerseyToManage = updatedProduct;
+                    renderInventorySizes(updatedProduct);
+                    updateNewTallaSelect(updatedProduct);
+                    renderAdminTable();
+                }
+            });
         } else {
             throw new Error(data.message || 'Error al guardar los datos.');
         }
