@@ -284,6 +284,10 @@
                                     <svg class="w-4 h-4 text-navy-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
                                     Órdenes/Pedidos
                                 </button>
+                                <button onclick="if(window.openAdminArticulosModal) window.openAdminArticulosModal();" class="w-full text-left px-3.5 py-2 text-xs font-semibold text-amber-300 hover:text-white hover:bg-amber-500/20 rounded-lg transition-colors flex items-center gap-2">
+                                    <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                    Artículos Deportivos
+                                </button>
 
                                 <!-- Submenú Proveedor -->
                                 <div class="relative group/sub pt-1 border-t border-white/10">
@@ -2254,10 +2258,208 @@
         </div>
     </div>
 
+    <!-- MODAL DE ADMINISTRACIÓN DE ARTÍCULOS DEPORTIVOS GENERALES -->
+    <div id="modal-admin-articulos" class="fixed inset-0 z-[85] flex items-center justify-center hidden bg-dark/95 backdrop-blur-md transition-opacity duration-300 opacity-0 p-3 sm:p-6 overflow-hidden">
+        <div class="bg-dark-100 border border-amber-500/30 rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden relative">
+            <div class="p-4 sm:p-5 border-b border-white/10 bg-black/40 flex justify-between items-center flex-shrink-0">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-amber-500/20 text-amber-400 rounded-xl flex items-center justify-center border border-amber-500/30 font-bold">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    </div>
+                    <div>
+                        <h2 class="text-base sm:text-xl font-black text-white flex items-center gap-2 tracking-tight">
+                            Gestión de Artículos Deportivos
+                        </h2>
+                        <p class="text-xs text-gray-400">Alta y administración de balones, guantes, calcetines y accesorios</p>
+                    </div>
+                </div>
+                <button type="button" onclick="if(window.closeAdminArticulosModal) window.closeAdminArticulosModal();" class="text-white/50 hover:text-white transition-colors p-2 bg-white/5 rounded-full hover:bg-white/10">
+                    <svg class="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+
+            <div class="p-4 sm:p-6 overflow-y-auto custom-scrollbar space-y-6 flex-grow">
+                <!-- Formulario de Alta de Artículo -->
+                <form id="form-create-articulo" class="bg-dark-200/50 p-4 rounded-xl border border-white/5 space-y-4">
+                    <h3 class="text-xs font-bold text-amber-400 uppercase tracking-wider">Nuevo Artículo Deportivo</h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Nombre del Artículo:</label>
+                            <input type="text" id="art-nombre" placeholder="Ej. Balón Voit Liga MX #5" required class="w-full bg-dark-100 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Categoría:</label>
+                            <select id="art-categoria" required class="w-full bg-dark-100 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400">
+                                <option value="Balones">⚽ Balones</option>
+                                <option value="Guantes">🧤 Guantes de Portero</option>
+                                <option value="Calcetines">🧦 Calcetines y Medias</option>
+                                <option value="Accesorios" selected>🛡️ Accesorios / Equipo</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Marca:</label>
+                            <input type="text" id="art-marca" placeholder="Ej. Voit, Rinat, Adidas" class="w-full bg-dark-100 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Precio Menudeo ($):</label>
+                            <input type="number" step="0.01" id="art-precio-menudeo" placeholder="Ej. 450.00" required class="w-full bg-dark-100 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400 font-mono">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Precio Mayoreo ($):</label>
+                            <input type="number" step="0.01" id="art-precio-mayoreo" placeholder="Ej. 350.00" required class="w-full bg-dark-100 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400 font-mono">
+                        </div>
+                    </div>
+
+                    <!-- Fotografías y Carga de Archivos -->
+                    <div class="pt-2 border-t border-white/5 space-y-2">
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase">Fotografía / Imagen del Artículo:</label>
+                        <input type="hidden" id="art-foto">
+                        <div class="flex items-center gap-3">
+                            <label class="cursor-pointer bg-amber-500 hover:bg-amber-400 text-black px-3.5 py-2 rounded-xl text-xs font-extrabold transition-all flex items-center gap-2 shadow-md shrink-0">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                                <span>Subir Imagen o Foto</span>
+                                <input type="file" id="art-foto-file" accept="image/*" class="hidden">
+                            </label>
+                            <span id="art-foto-file-info" class="text-xs text-gray-400">Sin archivo seleccionado</span>
+                        </div>
+                        <div id="art-foto-preview-container" class="mt-2 hidden"></div>
+                    </div>
+
+                    <!-- Configuración de Variantes y Stock Inicial -->
+                    <div class="pt-3 border-t border-white/5 space-y-2">
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase">Variante & Stock Inicial:</label>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                            <div>
+                                <input type="text" id="art-var-nombre" placeholder="Ej. #5, Talla 9, Unitalla" value="Unitalla" class="w-full bg-dark-100 border border-white/10 rounded-xl px-3 py-2 text-xs text-white">
+                            </div>
+                            <div>
+                                <input type="number" id="art-var-stock-main" placeholder="Stock Almacén General" value="10" class="w-full bg-dark-100 border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-mono">
+                            </div>
+                            <div>
+                                <input type="number" id="art-var-stock-419" placeholder="Stock Local 419" value="5" class="w-full bg-dark-100 border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-mono">
+                            </div>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="w-full py-2.5 bg-amber-500 hover:bg-amber-400 text-black font-extrabold text-xs uppercase tracking-wider rounded-xl transition-all shadow-md">
+                        Guardar Artículo Deportivo
+                    </button>
+                </form>
+
+                <!-- Lista / Tabla de Artículos Registrados -->
+                <div class="space-y-3">
+                    <h3 class="text-xs font-bold text-white uppercase tracking-wider flex items-center justify-between">
+                        <span>Artículos Deportivos Registrados</span>
+                        <button type="button" onclick="if(window.fetchArticulos) window.fetchArticulos();" class="text-[10px] text-amber-400 hover:underline">🔄 Actualizar Lista</button>
+                    </h3>
+                    <div id="admin-articulos-list-container" class="space-y-2">
+                        <!-- Inyectado dinámicamente -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para Editar Artículo Deportivo -->
+    <div id="modal-edit-articulo" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-[150] hidden opacity-0 transition-opacity duration-300 flex items-center justify-center p-4 overflow-y-auto">
+        <div class="bg-dark-100 border border-white/10 rounded-2xl max-w-lg w-full max-h-[90vh] flex flex-col shadow-2xl transform scale-95 transition-transform duration-300 my-auto">
+            <!-- Encabezado Modal -->
+            <div class="p-4 border-b border-white/5 flex justify-between items-center bg-dark-200/50">
+                <div class="flex items-center gap-2">
+                    <div class="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold">✏️</div>
+                    <div>
+                        <h3 class="text-sm font-bold text-white">Editar Artículo Deportivo</h3>
+                        <p class="text-[10px] text-gray-400">Modifica la información, precios, foto y estatus</p>
+                    </div>
+                </div>
+                <button type="button" onclick="window.closeEditArticuloModal()" class="text-gray-400 hover:text-white p-1 rounded-lg hover:bg-white/5 transition-colors">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+
+            <!-- Cuerpo Modal Formulario -->
+            <div class="p-4 overflow-y-auto space-y-4 text-xs">
+                <form id="form-edit-articulo" class="space-y-3">
+                    <input type="hidden" id="edit-art-id">
+
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Nombre del Artículo:</label>
+                        <input type="text" id="edit-art-nombre" required class="w-full bg-dark-200/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400">
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Categoría:</label>
+                            <select id="edit-art-categoria" required class="w-full bg-dark-200/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400">
+                                <option value="Balones">Balones</option>
+                                <option value="Guantes">Guantes</option>
+                                <option value="Calcetines">Calcetines</option>
+                                <option value="Espinilleras">Espinilleras</option>
+                                <option value="Accesorios">Accesorios</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Marca:</label>
+                            <input type="text" id="edit-art-marca" placeholder="Ej. Adidas, Generic" class="w-full bg-dark-200/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-3">
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Menudeo ($):</label>
+                            <input type="number" step="0.01" id="edit-art-precio-menudeo" required class="w-full bg-dark-200/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-amber-400">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Mayoreo ($):</label>
+                            <input type="number" step="0.01" id="edit-art-precio-mayoreo" required class="w-full bg-dark-200/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-amber-400">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Estatus:</label>
+                            <select id="edit-art-activo" class="w-full bg-dark-200/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400">
+                                <option value="1">Activo</option>
+                                <option value="0">Inactivo</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Foto -->
+                    <div class="pt-2 border-t border-white/5 space-y-2">
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase">Fotografía del Artículo:</label>
+                        <input type="hidden" id="edit-art-foto">
+                        <div class="flex items-center gap-3">
+                            <label class="cursor-pointer bg-navy-500 hover:bg-navy-600 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-md shrink-0">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                                <span>Cambiar Imagen</span>
+                                <input type="file" id="edit-art-foto-file" accept="image/*" class="hidden">
+                            </label>
+                            <span id="edit-art-foto-file-info" class="text-xs text-gray-400">Sin cambios</span>
+                        </div>
+                        <div id="edit-art-foto-preview-container" class="mt-2"></div>
+                    </div>
+
+                    <!-- Variantes e Inventario -->
+                    <div class="pt-2 border-t border-white/5 space-y-2">
+                        <label class="block text-[10px] font-bold text-amber-400 uppercase">Inventario / Variantes:</label>
+                        <div id="edit-art-variantes-container" class="space-y-2"></div>
+                    </div>
+
+                    <div class="flex items-center gap-2 pt-3 border-t border-white/5">
+                        <button type="button" onclick="window.closeEditArticuloModal()" class="w-1/3 py-2.5 bg-dark-200 hover:bg-white/10 text-gray-300 font-bold text-xs rounded-xl transition-all">
+                            Cancelar
+                        </button>
+                        <button type="submit" class="w-2/3 py-2.5 bg-amber-500 hover:bg-amber-400 text-black font-extrabold text-xs uppercase tracking-wider rounded-xl transition-all shadow-md">
+                            Guardar Cambios
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <!-- Configuración Global API -->
-    <script src="./js/config.js?v=6.4.0"></script>
+    <script src="./js/config.js?v=6.9.0"></script>
     <!-- Módulo Principal JS -->
-    <script src="./js/app2.js?v=14.1.0"></script>
+    <script src="./js/app2.js?v=16.5.0"></script>
 </body>
 </html>
 

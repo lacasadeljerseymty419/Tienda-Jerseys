@@ -63,6 +63,26 @@ async function search(filtros = { nombre: "", tipo: "", version: "", genero: "" 
     }
 }
 
+function normalizeText(str) {
+    if (str === undefined || str === null) return '';
+    return String(str)
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function matchText(fullText, query) {
+    if (!query) return true;
+    const normQuery = normalizeText(query);
+    if (!normQuery) return true;
+    const normTarget = normalizeText(fullText);
+    const terms = normQuery.split(' ').filter(Boolean);
+    return terms.every(term => normTarget.includes(term));
+}
+
 // Inicialización
 document.addEventListener('DOMContentLoaded', initCatalogo);
 
@@ -255,8 +275,10 @@ function applyFilters(filtros) {
     let filtered = allProducts;
     
     if (filtros.nombre) {
-        const q = filtros.nombre.toLowerCase();
-        filtered = filtered.filter(p => p.nombre.toLowerCase().includes(q));
+        filtered = filtered.filter(p => {
+            const targetText = `${p.nombre || ''} ${p.equipo || ''} ${p.tipo || ''} ${p.version || ''} ${p.genero || ''} ${p.id || p.id_producto || ''}`;
+            return matchText(targetText, filtros.nombre);
+        });
     }
     if (filtros.tipo) filtered = filtered.filter(p => p.tipo === filtros.tipo);
     if (filtros.version) filtered = filtered.filter(p => p.version === filtros.version);

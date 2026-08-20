@@ -77,6 +77,28 @@ let isSessionExpiring = false;
     };
 })();
 
+function normalizeText(str) {
+    if (str === undefined || str === null) return '';
+    return String(str)
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+window.normalizeText = normalizeText;
+
+function matchText(fullText, query) {
+    if (!query) return true;
+    const normQuery = normalizeText(query);
+    if (!normQuery) return true;
+    const normTarget = normalizeText(fullText);
+    const terms = normQuery.split(' ').filter(Boolean);
+    return terms.every(term => normTarget.includes(term));
+}
+window.matchText = matchText;
+
 function getFirstImage(fotoField) {
     if (!fotoField) return '';
     const parts = String(fotoField).split(',');
@@ -99,14 +121,13 @@ function getOptimizedImageUrl(rawUrl, width = 500) {
     const matchId = url.match(/id=([a-zA-Z0-9_-]+)/) || url.match(/\/d\/([a-zA-Z0-9_-]+)/);
     if (matchId && matchId[1]) {
         driveId = matchId[1];
-        // CDN ultra-rápido de Google Edge Direct CDN (WebP automático + resize a resolución óptima)
-        return `https://lh3.googleusercontent.com/d/${driveId}=w${width}-rw`;
+        return `https://drive.google.com/thumbnail?id=${driveId}&sz=w${width}`;
     }
 
     // Transformación para Google UserContent (lh3.googleusercontent.com)
     if (url.includes('googleusercontent.com')) {
         const clean = url.split('=')[0];
-        return `${clean}=w${width}-rw`;
+        return `${clean}=w${width}`;
     }
 
     // Transformación para Unsplash
@@ -1914,7 +1935,7 @@ function renderSkeletons(count) {
 // --- FUNCIONES DE ADMINISTRACIÓN ---
 
 function applyAdminFilters(keepPage = false) {
-    const term = DOM.admin.filterSearch.value.toLowerCase();
+    const term = DOM.admin.filterSearch ? DOM.admin.filterSearch.value : '';
     const tipo = DOM.admin.filterTipo.value;
     const version = DOM.admin.filterVersion.value;
     const genero = DOM.admin.filterGenero.value;
@@ -1923,7 +1944,8 @@ function applyAdminFilters(keepPage = false) {
     adminFilteredProducts = allProducts.filter(p => {
         const isActivoVal = (p.activo === undefined || p.activo === null || p.activo === "" || Number(p.activo) === 1) ? 1 : 0;
         const matchActivo = (activoSel === "all") || (isActivoVal === Number(activoSel));
-        const matchName = !term || (p.nombre && p.nombre.toLowerCase().includes(term));
+        const targetText = `${p.nombre || ''} ${p.equipo || ''} ${p.tipo || ''} ${p.version || ''} ${p.genero || ''} ${p.id || ''}`;
+        const matchName = !term || matchText(targetText, term);
         const matchTipo = !tipo || p.tipo === tipo;
         const matchVersion = !version || p.version === version;
         const matchGenero = !genero || p.genero === genero;
@@ -3063,22 +3085,54 @@ async function loadProductsFromApi(cacheKey) {
     renderSkeletons(8);
     const filtros = { nombre: "", tipo: "", version: "", genero: "" };
     try {
-        const response = await search(filtros);
+        const [jerseyRes, artRes] = await Promise.all([
+            search(filtros),
+            fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({ action: "search_articulos" })
+            }).then(r => r.json()).catch(() => ({ status: "error", data: [] }))
+        ]);
+
         let productsData = [];
-        if (Array.isArray(response)) {
-            productsData = response;
-        } else if (response && response.status === 'success') {
-            productsData = response.data || response.productos || [];
+        if (Array.isArray(jerseyRes)) {
+            productsData = jerseyRes;
+        } else if (jerseyRes && jerseyRes.status === 'success') {
+            productsData = jerseyRes.data || jerseyRes.productos || [];
         }
-        
-        allProducts = productsData;
-        
-        // Guardar en caché
+
+        let articulosData = [];
+        if (artRes && artRes.status === 'success' && Array.isArray(artRes.data)) {
+            articulosData = artRes.data.map(art => ({
+                id: art.id || art.id_articulo,
+                id_articulo: art.id_articulo || art.id,
+                nombre: art.nombre,
+                version: art.categoria || "Accesorio",
+                tipo: art.marca || "Deportivo",
+                genero: "Accesorio",
+                foto: art.foto,
+                precio_menudeo: Number(art.precio_menudeo || 0),
+                precio_mayoreo: Number(art.precio_mayoreo || 0),
+                precio_mayoreo_super: Number(art.precio_mayoreo || 0),
+                precio_Menudeo: Number(art.precio_menudeo || 0),
+                precio: Number(art.precio_menudeo || 0),
+                activo: art.activo !== undefined ? art.activo : 1,
+                es_articulo: true,
+                tallas: (art.variantes || []).map(v => ({
+                    talla: v.variante || "Unitalla",
+                    stock: Number(v.stock) || 0,
+                    id_inventario: v.id_inventario
+                }))
+            }));
+        }
+
+        allProducts = [...productsData, ...articulosData];
+
         try {
-            const wrapper = { data: productsData, timestamp: Date.now() };
+            const wrapper = { data: allProducts, timestamp: Date.now() };
             localStorage.setItem(cacheKey, JSON.stringify(wrapper));
         } catch (e) {}
-        
+
         renderProductsWithFilters();
     } catch (err) {
         console.error("Error al cargar productos de la API:", err);
@@ -3088,25 +3142,58 @@ async function loadProductsFromApi(cacheKey) {
 async function revalidateProductsBackground(cacheKey) {
     const filtros = { nombre: "", tipo: "", version: "", genero: "" };
     try {
-        const response = await search(filtros);
+        const [jerseyRes, artRes] = await Promise.all([
+            search(filtros),
+            fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({ action: "search_articulos" })
+            }).then(r => r.json()).catch(() => ({ status: "error", data: [] }))
+        ]);
+
         let productsData = [];
-        if (Array.isArray(response)) {
-            productsData = response;
-        } else if (response && response.status === 'success') {
-            productsData = response.data || response.productos || [];
+        if (Array.isArray(jerseyRes)) {
+            productsData = jerseyRes;
+        } else if (jerseyRes && jerseyRes.status === 'success') {
+            productsData = jerseyRes.data || jerseyRes.productos || [];
         }
-        
-        // Guardar en caché
+
+        let articulosData = [];
+        if (artRes && artRes.status === 'success' && Array.isArray(artRes.data)) {
+            articulosData = artRes.data.map(art => ({
+                id: art.id || art.id_articulo,
+                id_articulo: art.id_articulo || art.id,
+                nombre: art.nombre,
+                version: art.categoria || "Accesorio",
+                tipo: art.marca || "Deportivo",
+                genero: "Accesorio",
+                foto: art.foto,
+                precio_menudeo: Number(art.precio_menudeo || 0),
+                precio_mayoreo: Number(art.precio_mayoreo || 0),
+                precio_mayoreo_super: Number(art.precio_mayoreo || 0),
+                precio_Menudeo: Number(art.precio_menudeo || 0),
+                precio: Number(art.precio_menudeo || 0),
+                activo: art.activo !== undefined ? art.activo : 1,
+                es_articulo: true,
+                tallas: (art.variantes || []).map(v => ({
+                    talla: v.variante || "Unitalla",
+                    stock: Number(v.stock) || 0,
+                    id_inventario: v.id_inventario
+                }))
+            }));
+        }
+
+        const combined = [...productsData, ...articulosData];
+
         try {
-            const wrapper = { data: productsData, timestamp: Date.now() };
+            const wrapper = { data: combined, timestamp: Date.now() };
             localStorage.setItem(cacheKey, JSON.stringify(wrapper));
         } catch (e) {}
-        
-        // Solo actualizar silenciosamente en pantalla si el usuario no tiene modal abierto
+
         const isUserActive = document.getElementById('add-to-pedido-modal')?.classList.contains('hidden') === false;
-                             
+
         if (!isUserActive) {
-            allProducts = productsData;
+            allProducts = combined;
             renderProductsWithFilters();
         }
     } catch (err) {
@@ -3130,14 +3217,17 @@ function renderProductsWithFilters() {
                              (DOM.filters.genero && DOM.filters.genero.value !== "");
                              
     if (hasActiveFilters) {
-        const nombreQ = DOM.filters.nombre ? DOM.filters.nombre.value.trim().toLowerCase() : "";
+        const nombreQ = DOM.filters.nombre ? DOM.filters.nombre.value : "";
         const tipoQ = DOM.filters.tipo ? DOM.filters.tipo.value : "";
         const versionQ = DOM.filters.version ? DOM.filters.version.value : "";
         const generoQ = DOM.filters.genero ? DOM.filters.genero.value : "";
         
         const filtrados = activeProductsOnly.filter(p => {
             let match = true;
-            if (nombreQ && !(p.nombre || '').toLowerCase().includes(nombreQ)) match = false;
+            if (nombreQ) {
+                const targetText = `${p.nombre || ''} ${p.equipo || ''} ${p.tipo || ''} ${p.version || ''} ${p.genero || ''} ${p.id || ''}`;
+                if (!matchText(targetText, nombreQ)) match = false;
+            }
             if (tipoQ && p.tipo !== tipoQ) match = false;
             if (versionQ && p.version !== versionQ) match = false;
             if (generoQ && p.genero !== generoQ) match = false;
@@ -3162,14 +3252,17 @@ function handleLocalSearch() {
     // Búsqueda instantánea suave (50ms) sin reseteo de esqueletos ni retrasos artificiales
     searchDebounceTimer = setTimeout(() => {
         const activeProductsOnly = (allProducts || []).filter(p => p.activo === undefined || p.activo === null || p.activo === "" || Number(p.activo) === 1);
-        const nombreQ = DOM.filters.nombre.value.trim().toLowerCase();
-        const tipoQ = DOM.filters.tipo.value;
-        const versionQ = DOM.filters.version.value;
-        const generoQ = DOM.filters.genero.value;
+        const nombreQ = DOM.filters.nombre ? DOM.filters.nombre.value : "";
+        const tipoQ = DOM.filters.tipo ? DOM.filters.tipo.value : "";
+        const versionQ = DOM.filters.version ? DOM.filters.version.value : "";
+        const generoQ = DOM.filters.genero ? DOM.filters.genero.value : "";
         
         const filtrados = activeProductsOnly.filter(p => {
             let match = true;
-            if (nombreQ && !(p.nombre || '').toLowerCase().includes(nombreQ)) match = false;
+            if (nombreQ) {
+                const targetText = `${p.nombre || ''} ${p.equipo || ''} ${p.tipo || ''} ${p.version || ''} ${p.genero || ''} ${p.id || ''}`;
+                if (!matchText(targetText, nombreQ)) match = false;
+            }
             if (tipoQ && p.tipo !== tipoQ) match = false;
             if (versionQ && p.version !== versionQ) match = false;
             if (generoQ && p.genero !== generoQ) match = false;
@@ -3455,13 +3548,22 @@ function createProductCard(producto) {
             if (e.target.closest('.carousel-prev-btn') || e.target.closest('.carousel-next-btn') || e.target.closest('.carousel-dot')) {
                 return;
             }
-            openModal(images[currentImgIdx], images, currentImgIdx);
+            const activeProfile = localStorage.getItem('current_perfil') || 'Menudeo';
+            const isAdmin = activeProfile === 'Administrador';
+            if (producto.es_articulo && isAdmin) {
+                openEditArticuloModal(producto);
+            } else {
+                openModal(images[currentImgIdx], images, currentImgIdx);
+            }
         });
     }
     
     const detailsContainer = article.querySelector('.product-details-container');
     if (detailsContainer) {
         detailsContainer.addEventListener('click', (e) => {
+            const activeProfile = localStorage.getItem('current_perfil') || 'Menudeo';
+            const isAdmin = activeProfile === 'Administrador';
+
             if (currentView === 'jerseys-pedido') {
                 if (!isAgotado && !isProximamente) {
                     if (window.isLocal419Mode) {
@@ -3471,9 +3573,12 @@ function createProductCard(producto) {
                     }
                 }
             } else {
-                const activeProfile = localStorage.getItem('current_perfil') || 'Administrador';
-                if (activeProfile === 'Administrador') {
-                    openInventoryModal(producto);
+                if (isAdmin) {
+                    if (producto.es_articulo) {
+                        openEditArticuloModal(producto);
+                    } else {
+                        openInventoryModal(producto);
+                    }
                 }
             }
         });
@@ -3482,7 +3587,7 @@ function createProductCard(producto) {
     const btnAgregar = article.querySelector('.btn-agregar-pedido');
     if (btnAgregar) {
         btnAgregar.addEventListener('click', (e) => {
-            e.stopPropagation(); // Evitar doble click en detailsContainer
+            e.stopPropagation();
             openPedidoModal(producto, preselectedTalla);
         });
     }
@@ -3516,11 +3621,11 @@ async function fetchClients(keepPage = false) {
 }
 
 function applyClientFilters(keepPage = false) {
-    const term = DOM.admin.clientFilterSearch ? DOM.admin.clientFilterSearch.value.trim().toLowerCase() : '';
+    const term = DOM.admin.clientFilterSearch ? DOM.admin.clientFilterSearch.value : '';
     
     clientsFiltered = allClients.filter(c => {
-        const matchName = !term || (c.nombre_completo && c.nombre_completo.toLowerCase().includes(term));
-        const matchUser = !term || (c.usuario && c.usuario.toLowerCase().includes(term));
+        const matchName = !term || matchText(c.nombre_completo || '', term);
+        const matchUser = !term || matchText(c.usuario || '', term);
         return matchName || matchUser;
     });
 
@@ -5242,16 +5347,16 @@ function closeOrdenesModal() {
 }
 
 function handleSearchOrdenes() {
-    const nombre = DOM.admin.Ordenes.filtros.nombre.value.trim().toLowerCase();
-    const id = DOM.admin.Ordenes.filtros.id.value.trim().toLowerCase();
+    const nombre = DOM.admin.Ordenes.filtros.nombre.value;
+    const id = DOM.admin.Ordenes.filtros.id.value;
     const estatus = DOM.admin.Ordenes.filtros.estatus.value;
     
     currentOrdenes = allFetchedOrdenes.filter(orden => {
         const clientObj = window.allClients ? window.allClients.find(c => String(c.id_cliente) === String(orden.id_cliente)) : null;
-        const nombreCliente = (orden.nombre_cliente || (clientObj ? clientObj.nombre_completo : null) || orden.id_cliente || '').toLowerCase();
+        const nombreCliente = orden.nombre_cliente || (clientObj ? clientObj.nombre_completo : null) || orden.id_cliente || '';
         
-        const matchNombre = !nombre || nombreCliente.includes(nombre);
-        const matchId = !id || orden.id_orden.toLowerCase().includes(id);
+        const matchNombre = !nombre || matchText(nombreCliente, nombre);
+        const matchId = !id || matchText(orden.id_orden, id);
         const matchEstatus = !estatus || orden.estatus === estatus;
         
         return matchNombre && matchId && matchEstatus;
@@ -8470,30 +8575,61 @@ async function fetchProducts419(force = false) {
     isLocal419Loading = true;
 
     try {
-        const response = await fetch(API_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify({
-                action: 'search',
-                origen: '419',
-                filtros: { nombre: "", tipo: "", version: "", genero: "" }
-            })
-        });
+        const [jerseyRes, artRes] = await Promise.all([
+            fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({
+                    action: 'search',
+                    origen: '419',
+                    filtros: { nombre: "", tipo: "", version: "", genero: "" }
+                })
+            }).then(r => r.json()).catch(() => ({ status: "error", data: [] })),
 
-        const data = await response.json();
+            fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({ action: "search_articulos_419" })
+            }).then(r => r.json()).catch(() => ({ status: "error", data: [] }))
+        ]);
+
         let productsData = [];
-
-        if (Array.isArray(data)) {
-            productsData = data;
-        } else if (data && data.status === 'success') {
-            productsData = data.data || data.productos || [];
+        if (Array.isArray(jerseyRes)) {
+            productsData = jerseyRes;
+        } else if (jerseyRes && jerseyRes.status === 'success') {
+            productsData = jerseyRes.data || jerseyRes.productos || [];
         }
 
-        allProducts419 = productsData;
+        let articulosData = [];
+        if (artRes && artRes.status === 'success' && Array.isArray(artRes.data)) {
+            articulosData = artRes.data.map(art => ({
+                id: art.id || art.id_articulo,
+                id_articulo: art.id_articulo || art.id,
+                nombre: art.nombre,
+                equipo: art.nombre,
+                tipo: art.marca || "Deportivo",
+                version: art.categoria || "Accesorio",
+                genero: "Accesorio",
+                foto: art.foto,
+                precio_menudeo: Number(art.precio_menudeo || 0),
+                precio_mayoreo: Number(art.precio_mayoreo || 0),
+                precio_mayoreo_super: Number(art.precio_mayoreo || 0),
+                precio_Menudeo: Number(art.precio_menudeo || 0),
+                precio: Number(art.precio_menudeo || 0),
+                activo: art.activo !== undefined ? art.activo : 1,
+                es_articulo: true,
+                tallas: (art.variantes || []).map(v => ({
+                    talla: v.variante || "Unitalla",
+                    stock: Number(v.stock) || 0,
+                    id_inventario: v.id_inventario
+                }))
+            }));
+        }
 
-        // Guardar respuesta en caché para accesos futuros instantáneos
+        allProducts419 = [...productsData, ...articulosData];
+
         try {
-            localStorage.setItem(CACHE_KEY_419, JSON.stringify({ data: productsData, timestamp: Date.now() }));
+            localStorage.setItem(CACHE_KEY_419, JSON.stringify({ data: allProducts419, timestamp: Date.now() }));
         } catch (eSave) {}
 
         renderInventario419Grid(allProducts419);
@@ -8530,11 +8666,11 @@ function renderInventario419Grid(products) {
         });
     }
 
-    const searchTerm = (searchInput?.value || '').toLowerCase().trim();
+    const searchTerm = searchInput ? searchInput.value : '';
     const filtered = (products || []).filter(p => {
         if (!searchTerm) return true;
-        const targetStr = `${p.equipo || ''} ${p.nombre || ''} ${p.tipo || ''} ${p.version || ''} ${p.genero || ''} ${p.id || ''}`.toLowerCase();
-        return targetStr.includes(searchTerm);
+        const targetStr = `${p.equipo || ''} ${p.nombre || ''} ${p.tipo || ''} ${p.version || ''} ${p.genero || ''} ${p.id || ''}`;
+        return matchText(targetStr, searchTerm);
     });
 
     if (filtered.length === 0) {
@@ -8653,31 +8789,38 @@ async function updateLocal419SizeStock(id_playera, talla, nuevaCantidad) {
     const cantNum = parseInt(nuevaCantidad, 10);
     if (isNaN(cantNum) || cantNum < 0) return;
 
+    const targetProd = (allProducts419 || []).find(p => String(p.id || p.id_articulo).toUpperCase() === String(id_playera).toUpperCase());
+    const isArt = targetProd && targetProd.es_articulo;
+
     try {
+        const payload = isArt ? {
+            action: 'update_stock_articulo',
+            origen: '419',
+            id_articulo: id_playera,
+            variante: talla,
+            stock: cantNum
+        } : {
+            action: 'update_stock_talla',
+            origen: '419',
+            id_playera: id_playera,
+            talla: talla,
+            cantidad: cantNum,
+            token: localStorage.getItem('session_token') || ''
+        };
+
         const response = await fetch(API_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify({
-                action: 'update_stock_talla',
-                origen: '419',
-                id_playera: id_playera,
-                talla: talla,
-                cantidad: cantNum,
-                token: localStorage.getItem('session_token') || ''
-            })
+            body: JSON.stringify(payload)
         });
 
         const data = await response.json();
         if (data.status === 'success') {
-            const prod = allProducts419.find(p => String(p.id) === String(id_playera));
-            if (prod) {
-                if (Array.isArray(prod.tallas)) {
-                    const item = prod.tallas.find(x => String(x.talla).trim().toUpperCase() === String(talla).trim().toUpperCase());
+            if (targetProd) {
+                if (Array.isArray(targetProd.tallas)) {
+                    const item = targetProd.tallas.find(x => String(x.talla).trim().toUpperCase() === String(talla).trim().toUpperCase());
                     if (item) item.stock = cantNum;
-                    else prod.tallas.push({ talla: talla, stock: cantNum, id_inventario: '' });
-                }
-                if (prod.tallas_stock) {
-                    prod.tallas_stock[talla] = cantNum;
+                    else targetProd.tallas.push({ talla: talla, stock: cantNum, id_inventario: '' });
                 }
             }
             const toast = Swal.mixin({ toast: true, position: 'bottom-end', showConfirmButton: false, timer: 1500, background: '#151515', color: '#fff' });
@@ -8981,7 +9124,7 @@ async function filterPOS419Clients(query) {
         await loadClientsForPOS();
     }
     
-    const q = (query || '').toLowerCase().trim();
+    const q = query ? query.trim() : '';
     if (!q) {
         resultsContainer.classList.add('hidden');
         resultsContainer.innerHTML = '';
@@ -8989,8 +9132,8 @@ async function filterPOS419Clients(query) {
     }
     
     const filtered = allClientsPOSCache.filter(c => {
-        const full = `${c.nombre_completo || ''} ${c.usuario || ''} ${c.telefono || ''} ${c.id_cliente || ''}`.toLowerCase();
-        return full.includes(q);
+        const full = `${c.nombre_completo || ''} ${c.usuario || ''} ${c.telefono || ''} ${c.id_cliente || ''}`;
+        return matchText(full, q);
     }).slice(0, 8);
     
     if (filtered.length === 0) {
@@ -9030,12 +9173,12 @@ function renderPos419Catalog() {
         searchInput.oninput = () => renderPos419Catalog();
     }
     
-    const q = (searchInput?.value || '').toLowerCase().trim();
+    const q = searchInput ? searchInput.value : '';
     
     const filtered = (allProducts419 || []).filter(p => {
         if (!q) return true;
-        const targetStr = `${p.equipo || ''} ${p.nombre || ''} ${p.tipo || ''} ${p.version || ''} ${p.genero || ''} ${p.id || ''}`.toLowerCase();
-        return targetStr.includes(q);
+        const targetStr = `${p.equipo || ''} ${p.nombre || ''} ${p.tipo || ''} ${p.version || ''} ${p.genero || ''} ${p.id || ''}`;
+        return matchText(targetStr, q);
     });
     
     if (filtered.length === 0) {
@@ -9587,6 +9730,492 @@ async function submitPos419Order() {
     }
 }
 window.submitPos419Order = submitPos419Order;
+
+// =========================================================================
+// MÓDULO FRONTEND: GESTIÓN Y VENTA DE ARTÍCULOS DEPORTIVOS GENERALES
+// =========================================================================
+
+let allArticulos = [];
+let allArticulos419 = [];
+
+async function openAdminArticulosModal() {
+    const modal = document.getElementById('modal-admin-articulos');
+    if (!modal) return;
+
+    document.body.style.overflow = 'hidden';
+    modal.classList.remove('hidden');
+    void modal.offsetWidth;
+    modal.classList.remove('opacity-0');
+
+    fetchArticulos();
+}
+window.openAdminArticulosModal = openAdminArticulosModal;
+
+function closeAdminArticulosModal() {
+    const modal = document.getElementById('modal-admin-articulos');
+    if (modal) {
+        modal.classList.add('opacity-0');
+        setTimeout(() => {
+            modal.classList.add('hidden');
+            document.body.style.overflow = '';
+        }, 300);
+    } else {
+        document.body.style.overflow = '';
+    }
+}
+window.closeAdminArticulosModal = closeAdminArticulosModal;
+
+async function fetchArticulos() {
+    const listContainer = document.getElementById('admin-articulos-list-container');
+    if (listContainer) {
+        listContainer.innerHTML = `<div class="text-center py-6 text-xs text-gray-400">Cargando artículos deportivos...</div>`;
+    }
+
+    try {
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'search_articulos' })
+        });
+        const data = await response.json();
+        if (data.status === 'success' && Array.isArray(data.data)) {
+            allArticulos = data.data;
+            renderAdminArticulosList();
+        } else {
+            if (listContainer) listContainer.innerHTML = `<div class="text-center py-6 text-xs text-gray-400">No hay artículos deportivos registrados aún.</div>`;
+        }
+    } catch (err) {
+        console.error("Error al consultar artículos deportivos:", err);
+        if (listContainer) listContainer.innerHTML = `<div class="text-center py-6 text-xs text-red-400">Error al cargar artículos.</div>`;
+    }
+}
+window.fetchArticulos = fetchArticulos;
+
+let currentEditArticulo = null;
+
+function openEditArticuloModal(artObj) {
+    if (!artObj) return;
+    currentEditArticulo = artObj;
+
+    const modal = document.getElementById('modal-edit-articulo');
+    if (!modal) return;
+
+    document.getElementById('edit-art-id').value = artObj.id || artObj.id_articulo;
+    document.getElementById('edit-art-nombre').value = artObj.nombre || '';
+    document.getElementById('edit-art-categoria').value = artObj.categoria || 'Balones';
+    document.getElementById('edit-art-marca').value = artObj.marca || '';
+    document.getElementById('edit-art-precio-menudeo').value = artObj.precio_menudeo || artObj.precio_Menudeo || 0;
+    document.getElementById('edit-art-precio-mayoreo').value = artObj.precio_mayoreo || 0;
+    document.getElementById('edit-art-activo').value = (artObj.activo !== undefined && artObj.activo !== null && artObj.activo !== "") ? String(artObj.activo) : "1";
+
+    const fotoInput = document.getElementById('edit-art-foto');
+    const fotoPreviewContainer = document.getElementById('edit-art-foto-preview-container');
+    const fotoFileInfo = document.getElementById('edit-art-foto-file-info');
+
+    if (fotoInput) fotoInput.value = artObj.foto || '';
+    if (fotoFileInfo) fotoFileInfo.textContent = artObj.foto ? 'Imagen cargada' : 'Sin cambios';
+
+    if (fotoPreviewContainer) {
+        if (artObj.foto) {
+            renderImagePreviews(fotoPreviewContainer, [artObj.foto]);
+        } else {
+            fotoPreviewContainer.classList.add('hidden');
+            fotoPreviewContainer.innerHTML = '';
+        }
+    }
+
+    const varContainer = document.getElementById('edit-art-variantes-container');
+    if (varContainer) {
+        varContainer.innerHTML = '';
+        const variantes = Array.isArray(artObj.variantes) && artObj.variantes.length > 0
+            ? artObj.variantes
+            : (Array.isArray(artObj.tallas) && artObj.tallas.length > 0
+                ? artObj.tallas.map(t => ({ variante: t.talla || t.variante || 'Unitalla', stock: t.stock !== undefined ? t.stock : (t.inventario || 0) }))
+                : [{ variante: 'Unitalla', stock: 0 }]);
+
+        variantes.forEach((v, idx) => {
+            const div = document.createElement('div');
+            div.className = 'grid grid-cols-2 gap-2 bg-black/30 p-2 rounded-xl border border-white/5 items-center';
+            div.innerHTML = `
+                <div>
+                    <label class="block text-[9px] font-bold text-gray-400 uppercase">Variante / Talla:</label>
+                    <input type="text" value="${v.variante || 'Unitalla'}" class="edit-var-name w-full bg-dark-100 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white" data-idx="${idx}">
+                </div>
+                <div>
+                    <label class="block text-[9px] font-bold text-gray-400 uppercase">Stock Almacén:</label>
+                    <input type="number" value="${v.stock !== undefined ? v.stock : 0}" class="edit-var-stock w-full bg-dark-100 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono" data-idx="${idx}">
+                </div>
+            `;
+            varContainer.appendChild(div);
+        });
+    }
+
+    document.body.style.overflow = 'hidden';
+    modal.classList.remove('hidden');
+    void modal.offsetWidth;
+    modal.classList.remove('opacity-0');
+    modal.querySelector('.transform').classList.remove('scale-95');
+    modal.querySelector('.transform').classList.add('scale-100');
+}
+window.openEditArticuloModal = openEditArticuloModal;
+
+function closeEditArticuloModal() {
+    const modal = document.getElementById('modal-edit-articulo');
+    if (!modal) return;
+    modal.classList.add('opacity-0');
+    modal.querySelector('.transform').classList.remove('scale-100');
+    modal.querySelector('.transform').classList.add('scale-95');
+    setTimeout(() => {
+        modal.classList.add('hidden');
+        document.body.style.overflow = '';
+        currentEditArticulo = null;
+    }, 300);
+}
+window.closeEditArticuloModal = closeEditArticuloModal;
+
+window.editArticuloFromList = function(id) {
+    const art = allArticulos.find(a => String(a.id || a.id_articulo).toUpperCase() === String(id).toUpperCase());
+    if (art) {
+        openEditArticuloModal(art);
+    }
+};
+
+function renderAdminArticulosList() {
+    const listContainer = document.getElementById('admin-articulos-list-container');
+    if (!listContainer) return;
+
+    if (allArticulos.length === 0) {
+        listContainer.innerHTML = `<div class="text-center py-6 text-xs text-gray-400">No hay artículos deportivos registrados aún.</div>`;
+        return;
+    }
+
+    listContainer.innerHTML = allArticulos.map(art => {
+        const imgUrl = art.foto ? getOptimizedImageUrl(art.foto, 100) : 'https://via.placeholder.com/100?text=Articulo';
+        const pMen = Number(art.precio_menudeo || 0).toFixed(2);
+        const pMay = Number(art.precio_mayoreo || 0).toFixed(2);
+
+        const varsHtml = (art.variantes || []).map(v => `
+            <span class="bg-black/40 border border-white/10 text-gray-300 px-2 py-0.5 rounded text-[10px] font-mono">
+                ${v.variante}: <strong class="text-amber-400">${v.stock} pcs</strong>
+            </span>
+        `).join('');
+
+        return `
+            <div class="bg-dark-200 p-3 rounded-xl border border-white/5 flex items-center justify-between gap-3 hover:border-amber-500/30 transition-all cursor-pointer" onclick="window.editArticuloFromList('${art.id || art.id_articulo}')">
+                <div class="flex items-center gap-3 min-w-0">
+                    <img src="${imgUrl}" referrerpolicy="no-referrer" onerror="this.onerror=null; if(this.src.includes('thumbnail')) { this.src=this.src.replace('thumbnail?id=', 'uc?export=view&id=').split('&')[0]; } else { this.src='https://images.unsplash.com/photo-1577212017184-807dd6acefd6?auto=format&fit=crop&q=80&w=200'; }" class="w-12 h-12 object-cover rounded-lg bg-black border border-white/10 flex-shrink-0">
+                    <div class="min-w-0">
+                        <div class="flex items-center gap-2">
+                            <h4 class="text-xs font-bold text-white truncate">${art.nombre}</h4>
+                            <span class="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 border border-blue-500/30">${art.categoria || 'Accesorio'}</span>
+                        </div>
+                        <div class="text-[10px] text-gray-400 mt-0.5">Marca: ${art.marca || 'Genérico'} | Menudeo: <span class="text-emerald-400 font-mono font-bold">$${pMen}</span> | Mayoreo: <span class="text-amber-400 font-mono font-bold">$${pMay}</span></div>
+                        <div class="flex flex-wrap gap-1 mt-1.5">${varsHtml || '<span class="text-[9px] text-gray-500 italic">Sin variantes</span>'}</div>
+                    </div>
+                </div>
+                <div class="flex items-center gap-1.5 flex-shrink-0">
+                    <button type="button" onclick="event.stopPropagation(); window.editArticuloFromList('${art.id || art.id_articulo}')" class="px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-300 hover:bg-amber-500 hover:text-black transition-all text-xs font-bold flex items-center gap-1 border border-amber-500/30">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                        Editar
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const formCreateArt = document.getElementById('form-create-articulo');
+    if (formCreateArt) {
+        formCreateArt.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const nom = document.getElementById('art-nombre').value.trim();
+            const cat = document.getElementById('art-categoria').value;
+            const mar = document.getElementById('art-marca').value.trim();
+            const pMen = document.getElementById('art-precio-menudeo').value;
+            const pMay = document.getElementById('art-precio-mayoreo').value;
+            const fot = document.getElementById('art-foto').value.trim();
+
+            const varNom = document.getElementById('art-var-nombre').value.trim() || 'Unitalla';
+            const stMain = document.getElementById('art-var-stock-main').value || 0;
+            const st419 = document.getElementById('art-var-stock-419').value || 0;
+
+            Swal.fire({
+                title: 'Guardando Artículo...',
+                allowOutsideClick: false,
+                background: '#151515', color: '#fff',
+                didOpen: () => Swal.showLoading()
+            });
+
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        action: 'create_articulo',
+                        nombre: nom,
+                        categoria: cat,
+                        marca: mar,
+                        precio_menudeo: pMen,
+                        precio_mayoreo: pMay,
+                        foto: fot,
+                        variantes: [
+                            { variante: varNom, stock: stMain, stock_419: st419 }
+                        ]
+                    })
+                });
+
+                const data = await response.json();
+                if (data.status === 'success') {
+                    Swal.fire({
+                        icon: 'success',
+                        title: '¡Artículo Guardado!',
+                        text: data.message,
+                        background: '#151515', color: '#fff',
+                        timer: 1500, showConfirmButton: false
+                    });
+
+                    formCreateArt.reset();
+                    document.getElementById('art-var-nombre').value = 'Unitalla';
+                    document.getElementById('art-var-stock-main').value = '10';
+                    document.getElementById('art-var-stock-419').value = '5';
+                    const pContainer = document.getElementById('art-foto-preview-container');
+                    if (pContainer) pContainer.classList.add('hidden');
+                    const fInfo = document.getElementById('art-foto-file-info');
+                    if (fInfo) fInfo.textContent = 'O pega una URL:';
+
+                    fetchArticulos();
+                } else {
+                    throw new Error(data.message || 'Error al guardar');
+                }
+            } catch (err) {
+                console.error("Error al crear artículo:", err);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: err.message || 'No se pudo registrar el artículo.',
+                    background: '#151515', color: '#fff'
+                });
+            }
+        });
+    }
+
+    const artFotoFile = document.getElementById('art-foto-file');
+    const artFotoInput = document.getElementById('art-foto');
+    const artFotoPreviewContainer = document.getElementById('art-foto-preview-container');
+    const artFotoFileInfo = document.getElementById('art-foto-file-info');
+
+    if (artFotoFile) {
+        artFotoFile.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) {
+                if (artFotoFileInfo) artFotoFileInfo.textContent = 'Sin archivo seleccionado';
+                if (artFotoInput) artFotoInput.value = '';
+                renderImagePreviews(artFotoPreviewContainer, []);
+                return;
+            }
+
+            if (artFotoFileInfo) {
+                artFotoFileInfo.textContent = '⏳ Subiendo imagen a Google Drive...';
+                artFotoFileInfo.className = 'text-xs text-amber-400 font-bold animate-pulse';
+            }
+
+            if (artFotoPreviewContainer) {
+                artFotoPreviewContainer.classList.remove('hidden');
+                artFotoPreviewContainer.innerHTML = `
+                    <div class="flex items-center gap-3 p-3 bg-dark-200/80 rounded-xl border border-navy-500/40">
+                        <div class="w-5 h-5 border-2 border-navy-400 border-t-transparent rounded-full animate-spin"></div>
+                        <span class="text-xs font-bold text-white">Subiendo imagen al servidor de Google Drive...</span>
+                    </div>
+                `;
+            }
+
+            try {
+                const base64 = await readFileAsBase64(file);
+                const uploadRes = await uploadImageToDrive(base64, file.name);
+
+                if (uploadRes && uploadRes.status === 'success' && uploadRes.url) {
+                    if (artFotoInput) artFotoInput.value = uploadRes.url;
+                    if (artFotoFileInfo) {
+                        artFotoFileInfo.textContent = `✓ Subido a Google Drive (${file.name})`;
+                        artFotoFileInfo.className = 'text-xs text-green-400 font-semibold';
+                    }
+                    renderImagePreviews(artFotoPreviewContainer, [uploadRes.url]);
+                } else {
+                    throw new Error(uploadRes ? uploadRes.message : "Error al subir");
+                }
+            } catch (err) {
+                console.error("Error al subir foto de artículo a Drive:", err);
+                if (artFotoFileInfo) {
+                    artFotoFileInfo.textContent = 'Error al subir imagen';
+                    artFotoFileInfo.className = 'text-xs text-red-400 font-semibold';
+                }
+                if (artFotoPreviewContainer) {
+                    artFotoPreviewContainer.classList.add('hidden');
+                    artFotoPreviewContainer.innerHTML = '';
+                }
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error al subir',
+                    text: `No se pudo subir la imagen a Google Drive: ${err.message}`,
+                    background: '#151515', color: '#fff'
+                });
+            }
+        });
+    }
+
+    const editArtFotoFile = document.getElementById('edit-art-foto-file');
+    const editArtFotoInput = document.getElementById('edit-art-foto');
+    const editArtFotoPreviewContainer = document.getElementById('edit-art-foto-preview-container');
+    const editArtFotoFileInfo = document.getElementById('edit-art-foto-file-info');
+
+    if (editArtFotoFile) {
+        editArtFotoFile.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            if (editArtFotoFileInfo) {
+                editArtFotoFileInfo.textContent = '⏳ Subiendo nueva imagen...';
+                editArtFotoFileInfo.className = 'text-xs text-amber-400 font-bold animate-pulse';
+            }
+
+            if (editArtFotoPreviewContainer) {
+                editArtFotoPreviewContainer.classList.remove('hidden');
+                editArtFotoPreviewContainer.innerHTML = `
+                    <div class="flex items-center gap-3 p-3 bg-dark-200/80 rounded-xl border border-navy-500/40">
+                        <div class="w-5 h-5 border-2 border-navy-400 border-t-transparent rounded-full animate-spin"></div>
+                        <span class="text-xs font-bold text-white">Subiendo imagen al servidor de Google Drive...</span>
+                    </div>
+                `;
+            }
+
+            try {
+                const base64 = await readFileAsBase64(file);
+                const uploadRes = await uploadImageToDrive(base64, file.name);
+
+                if (uploadRes && uploadRes.status === 'success' && uploadRes.url) {
+                    if (editArtFotoInput) editArtFotoInput.value = uploadRes.url;
+                    if (editArtFotoFileInfo) {
+                        editArtFotoFileInfo.textContent = `✓ Nueva foto subida a Google Drive (${file.name})`;
+                        editArtFotoFileInfo.className = 'text-xs text-green-400 font-semibold';
+                    }
+                    renderImagePreviews(editArtFotoPreviewContainer, [uploadRes.url]);
+                } else {
+                    throw new Error(uploadRes ? uploadRes.message : "Error al subir");
+                }
+            } catch (err) {
+                console.error("Error al subir foto de artículo a Drive:", err);
+                if (editArtFotoFileInfo) {
+                    editArtFotoFileInfo.textContent = 'Error al subir imagen';
+                    editArtFotoFileInfo.className = 'text-xs text-red-400 font-semibold';
+                }
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: `No se pudo subir la nueva imagen: ${err.message}`,
+                    background: '#151515', color: '#fff'
+                });
+            }
+        });
+    }
+
+    const formEditArt = document.getElementById('form-edit-articulo');
+    if (formEditArt) {
+        formEditArt.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const idArt = document.getElementById('edit-art-id').value.trim();
+            const nom = document.getElementById('edit-art-nombre').value.trim();
+            const cat = document.getElementById('edit-art-categoria').value;
+            const mar = document.getElementById('edit-art-marca').value.trim();
+            const pMen = document.getElementById('edit-art-precio-menudeo').value;
+            const pMay = document.getElementById('edit-art-precio-mayoreo').value;
+            const act = document.getElementById('edit-art-activo').value;
+            const fot = document.getElementById('edit-art-foto').value.trim();
+
+            Swal.fire({
+                title: 'Guardando Cambios...',
+                allowOutsideClick: false,
+                background: '#151515', color: '#fff',
+                didOpen: () => Swal.showLoading()
+            });
+
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        action: 'update_articulo',
+                        id_articulo: idArt,
+                        nombre: nom,
+                        categoria: cat,
+                        marca: mar,
+                        precio_menudeo: Number(pMen),
+                        precio_mayoreo: Number(pMay),
+                        activo: Number(act),
+                        foto: fot
+                    })
+                });
+
+                const data = await response.json();
+                if (data.status === 'success') {
+                    const varInputsName = document.querySelectorAll('.edit-var-name');
+                    const varInputsStock = document.querySelectorAll('.edit-var-stock');
+
+                    for (let i = 0; i < varInputsName.length; i++) {
+                        const vName = varInputsName[i].value.trim() || 'Unitalla';
+                        const vStock = Number(varInputsStock[i].value) || 0;
+
+                        await fetch(API_URL, {
+                            method: 'POST',
+                            body: JSON.stringify({
+                                action: 'update_stock_articulo',
+                                id_articulo: idArt,
+                                variante: vName,
+                                stock: vStock
+                            })
+                        });
+                    }
+
+                    Swal.fire({
+                        icon: 'success',
+                        title: '¡Artículo Actualizado!',
+                        text: 'Los cambios fueron guardados exitosamente.',
+                        background: '#151515', color: '#fff',
+                        timer: 1500, showConfirmButton: false
+                    });
+
+                    closeEditArticuloModal();
+                    fetchArticulos();
+                    if (typeof loadProductsFromApi === 'function') {
+                        loadProductsFromApi('jerseys_products_cache_v5');
+                    }
+                } else {
+                    throw new Error(data.message || 'Error al actualizar');
+                }
+            } catch (err) {
+                console.error("Error al actualizar artículo deportivo:", err);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: err.message || 'No se pudieron guardar los cambios del artículo.',
+                    background: '#151515', color: '#fff'
+                });
+            }
+        });
+    }
+
+    const catSelect = document.getElementById('art-categoria');
+    if (catSelect) {
+        catSelect.addEventListener('change', (e) => {
+            const val = e.target.value;
+            const inputVar = document.getElementById('art-var-nombre');
+            if (!inputVar) return;
+
+            if (val === 'Balones') inputVar.value = '#5';
+            else if (val === 'Guantes') inputVar.value = 'Talla 9';
+            else if (val === 'Calcetines') inputVar.value = 'Adulto';
+            else inputVar.value = 'Unitalla';
+        });
+    }
+});
 
 
 
