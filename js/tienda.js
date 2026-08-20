@@ -135,6 +135,17 @@ async function initTienda() {
             });
         }
         
+        // Listener de descarga en Modal
+        const modalDownloadBtn = document.getElementById('modal-download-btn');
+        if (modalDownloadBtn) {
+            modalDownloadBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (DOM.modal.img && DOM.modal.img.src) {
+                    downloadProductImage(DOM.modal.img.src, `producto_imagen_${modalCurrentIndex + 1}`);
+                }
+            });
+        }
+        
         window.addEventListener('keydown', (e) => {
             if (!DOM.modal.overlay || DOM.modal.overlay.classList.contains('hidden')) return;
             if (e.key === 'ArrowLeft') {
@@ -503,13 +514,21 @@ function renderLocalProducts(products) {
                 </div>
 
                 <!-- Tallas en Existencia -->
-                <div class="mt-auto pt-3 border-t border-white/5">
+                <div class="mt-auto pt-3 border-t border-white/5 mb-2.5">
                     <div class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2 flex justify-between items-center">
                         <span>Tallas disponibles:</span>
                     </div>
                     <div class="flex flex-wrap gap-1.5">
                         ${tallasHtml || '<span class="text-xs text-red-400 font-medium">Sin existencia</span>'}
                     </div>
+                </div>
+
+                <!-- Footer del Card con Botón Sutil de Descargar Imagen -->
+                <div class="flex items-center justify-end pt-1.5 border-t border-white/5 mt-auto">
+                    <button type="button" class="btn-download-card-img p-1.5 text-gray-500 hover:text-blue-400 hover:bg-white/5 rounded-lg transition-all duration-200 cursor-pointer active:scale-95 flex items-center gap-1 text-[11px] font-semibold" title="Descargar foto del producto">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                        <span class="text-[10px]">Descargar</span>
+                    </button>
                 </div>
             </div>
         `;
@@ -564,9 +583,48 @@ function renderLocalProducts(products) {
                 openImageModal(images[currentImgIdx], images, currentImgIdx);
             });
         }
+
+        // Listener del Botón de Descargar Imagen
+        const downloadBtn = card.querySelector('.btn-download-card-img');
+        if (downloadBtn) {
+            downloadBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const activeUrl = (images && images[currentImgIdx]) ? images[currentImgIdx] : imgUrl;
+                downloadProductImage(activeUrl, `${nombre}_foto${currentImgIdx + 1}`);
+            });
+        }
         
         DOM.grid.appendChild(card);
     });
+}
+
+// Función para descargar imagen
+async function downloadProductImage(url, fileName = 'producto') {
+    if (!url) return;
+    const safeName = String(fileName || 'producto').replace(/[^a-z0-9_-]/gi, '_');
+
+    try {
+        const response = await fetch(url, { mode: 'cors' });
+        if (!response.ok) throw new Error('Fetch status ' + response.status);
+        const blob = await response.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = `${safeName}.jpg`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 2000);
+    } catch (e) {
+        const a = document.createElement('a');
+        a.href = url;
+        a.target = '_blank';
+        a.download = `${safeName}.jpg`;
+        a.rel = 'noopener noreferrer';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    }
 }
 
 let modalImages = [];

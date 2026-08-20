@@ -73,6 +73,27 @@
         
         select option { background-color: #151515; color: #fff; }
 
+        .hidden, [hidden] {
+            display: none !important;
+            overflow: hidden !important;
+            max-height: 0 !important;
+            max-width: 0 !important;
+            pointer-events: none !important;
+            opacity: 0 !important;
+        }
+
+        /* Prevención de bloqueo de scroll y touch lock de SweetAlert en celulares */
+        html.swal2-shown, body.swal2-shown {
+            overflow: auto !important;
+            height: auto !important;
+        }
+        .swal2-container.swal2-toast-container {
+            pointer-events: none !important;
+        }
+        .swal2-container.swal2-toast-container .swal2-popup {
+            pointer-events: auto !important;
+        }
+
         @keyframes kenburns {
             0% { transform: scale(1.05) translate(0, 0); }
             50% { transform: scale(1.15) translate(-1%, -0.5%); }
@@ -866,8 +887,8 @@
     </div>
 
     <!-- Modal de Gestión de Inventario -->
-    <div id="admin-inventory-modal" class="fixed inset-0 z-[65] flex items-center justify-center hidden bg-dark/95 backdrop-blur-md transition-opacity duration-300 opacity-0 overflow-y-auto py-6 sm:py-10">
-        <div class="bg-dark-100 border border-white/10 rounded-2xl w-full max-w-2xl mx-4 shadow-2xl shadow-navy-500/10 transform scale-95 transition-transform duration-300 flex flex-col my-auto relative max-h-none sm:max-h-[85vh]">
+    <div id="admin-inventory-modal" class="fixed inset-0 z-[65] flex items-center justify-center hidden bg-dark/95 backdrop-blur-md transition-opacity duration-300 opacity-0 overflow-y-auto py-3 sm:py-10 p-2 sm:p-4">
+        <div class="bg-dark-100 border border-white/10 rounded-2xl w-full max-w-2xl mx-auto shadow-2xl shadow-navy-500/10 transform scale-95 transition-transform duration-300 flex flex-col my-auto relative max-h-[92vh] sm:max-h-[85vh] overflow-hidden">
             <div class="p-4 border-b border-white/5 flex justify-between items-center bg-dark-100/90 backdrop-blur-md rounded-t-2xl z-10 flex-shrink-0">
                 <div class="flex items-center gap-4">
                     <img id="inv-modal-img" src="" alt="Jersey" class="w-12 h-12 rounded-lg object-cover bg-dark">
@@ -882,7 +903,7 @@
                 </button>
             </div>
             
-            <div class="p-4 sm:p-6 space-y-6 overflow-y-visible sm:overflow-y-auto flex-grow custom-scrollbar">
+            <div class="p-4 sm:p-6 space-y-6 overflow-y-auto flex-grow custom-scrollbar">
                 <!-- Formulario para Actualizar Detalles -->
                 <div>
                     <h3 class="text-sm font-semibold text-gray-300 mb-3 uppercase tracking-wider">Actualizar Datos del Jersey</h3>
@@ -2463,7 +2484,7 @@
     <!-- Configuración Global API -->
     <script src="./js/config.js?v=6.9.0"></script>
     <!-- Módulo Principal JS -->
-    <script src="./js/app2.js?v=16.6.0"></script>
+    <script src="./js/app2.js?v=16.7.0"></script>
 </body>
 </html>
 

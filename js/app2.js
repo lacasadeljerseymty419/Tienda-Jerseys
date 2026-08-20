@@ -2408,18 +2408,22 @@ function handleAddNewTalla(e) {
     renderInventorySizes(currentJerseyToManage);
     updateNewTallaSelect(currentJerseyToManage);
 
-    // Notificación informativa
+    // Notificación informativa sin bloqueo de pantalla en celulares
     const Toast = Swal.mixin({
         toast: true,
         position: 'bottom-end',
         showConfirmButton: false,
         timer: 2500,
         background: '#141416',
-        color: '#fff'
+        color: '#fff',
+        heightAuto: false,
+        customClass: {
+            container: 'swal2-toast-no-lock'
+        }
     });
     Toast.fire({
         icon: 'info',
-        title: `Talla ${tallaVal} agregada al listado. Presiona "Actualizar Datos" para guardar.`
+        title: `Talla ${tallaVal} agregada. Presiona "Actualizar Datos" para guardar.`
     });
 }
 
