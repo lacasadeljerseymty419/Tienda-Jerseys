@@ -227,27 +227,31 @@ function renderImagePreviews(container, imagesArray) {
     
     container.classList.remove('hidden');
     
-    if (urls.length === 1) {
+    urls.forEach((url, i) => {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'relative aspect-square rounded-xl overflow-hidden border border-white/10 bg-dark group h-24 w-24 flex-shrink-0 shadow-md inline-block mr-2 mb-2';
+        
+        const loader = document.createElement('div');
+        loader.className = 'absolute inset-0 flex flex-col items-center justify-center bg-dark-100/90 text-white z-10 transition-opacity duration-300 pointer-events-none';
+        loader.innerHTML = `<div class="w-5 h-5 border-2 border-navy-400 border-t-transparent rounded-full animate-spin mb-1"></div><span class="text-[9px] text-gray-300 font-semibold">Cargando...</span>`;
+        
         const img = document.createElement('img');
-        img.src = urls[0];
-        img.className = 'h-32 rounded-lg border border-white/10 object-contain bg-dark col-span-4 w-full';
-        img.id = 'preview-foto';
-        img.alt = 'Preview';
-        container.appendChild(img);
-    } else {
-        urls.forEach((url, i) => {
-            const wrapper = document.createElement('div');
-            wrapper.className = 'relative aspect-square rounded-lg overflow-hidden border border-white/10 bg-dark group h-20 w-20 flex-shrink-0';
-            
-            const img = document.createElement('img');
-            img.src = url;
-            img.className = 'w-full h-full object-cover';
-            img.alt = `Preview ${i + 1}`;
-            
-            wrapper.appendChild(img);
-            container.appendChild(wrapper);
-        });
-    }
+        img.src = getOptimizedImageUrl(url, 300);
+        img.className = 'w-full h-full object-cover transition-opacity duration-300 opacity-0';
+        img.alt = `Vista previa ${i + 1}`;
+        img.onload = () => {
+            img.classList.remove('opacity-0');
+            loader.classList.add('opacity-0');
+            setTimeout(() => { if (loader.parentNode) loader.remove(); }, 300);
+        };
+        img.onerror = () => {
+            loader.innerHTML = `<span class="text-[9px] text-red-400 font-semibold">Error foto</span>`;
+        };
+        
+        wrapper.appendChild(loader);
+        wrapper.appendChild(img);
+        container.appendChild(wrapper);
+    });
 }
 // --- FIN DE api.js ---
 
@@ -943,13 +947,13 @@ async function initApp() {
     // Listeners para Menú Local 419
     if (DOM.local419 && DOM.local419.actionsPos) {
         DOM.local419.actionsPos.forEach(btn => btn.addEventListener('click', () => {
-            switchView('jerseys-pedido');
+            if (typeof openPos419Modal === 'function') openPos419Modal();
             closemobileMenu();
         }));
     }
     if (DOM.local419 && DOM.local419.actionsOrdenar) {
         DOM.local419.actionsOrdenar.forEach(btn => btn.addEventListener('click', () => {
-            switchView('jerseys-pedido');
+            if (typeof openPos419Modal === 'function') openPos419Modal();
             closemobileMenu();
         }));
     }
@@ -1148,14 +1152,17 @@ async function initApp() {
                 return;
             }
             
-            DOM.admin.createFotoFileInfo.textContent = `Subiendo ${files.length} archivo(s)...`;
-            DOM.admin.createFotoFileInfo.className = 'text-xs text-amber-400 font-semibold animate-pulse';
+            DOM.admin.createFotoFileInfo.textContent = `⏳ Subiendo ${files.length} imagen(es) al servidor...`;
+            DOM.admin.createFotoFileInfo.className = 'text-xs text-amber-400 font-bold animate-pulse';
             
             DOM.admin.fotoPreviewContainer.classList.remove('hidden');
             DOM.admin.fotoPreviewContainer.innerHTML = `
-                <div class="col-span-4 flex flex-col items-center justify-center p-6 bg-dark-200/50 rounded-xl border border-white/5 w-full">
-                    <svg class="animate-spin h-8 w-8 text-navy-400 mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                    <span class="text-xs text-gray-400">Guardando imagen...</span>
+                <div class="col-span-4 flex flex-col items-center justify-center p-6 bg-dark-200/80 rounded-2xl border border-navy-500/40 text-center w-full shadow-2xl">
+                    <div class="relative mb-3">
+                        <div class="w-10 h-10 border-4 border-navy-500 border-t-transparent rounded-full animate-spin"></div>
+                    </div>
+                    <span class="text-sm font-bold text-white mb-1">Subiendo imagen al servidor de Google Drive...</span>
+                    <span class="text-xs text-amber-400 font-semibold animate-pulse">Por favor espera un momento, procesando archivo</span>
                 </div>
             `;
             
@@ -1186,12 +1193,12 @@ async function initApp() {
             if (uploadSuccess && urls.length > 0) {
                 const fotoUrl = urls.join(',');
                 DOM.admin.fotoInput.value = fotoUrl;
-                DOM.admin.createFotoFileInfo.textContent = `${urls.length} archivo(s) subido(s) con éxito`;
+                DOM.admin.createFotoFileInfo.textContent = `✓ ${urls.length} imagen(es) subida(s) con éxito`;
                 DOM.admin.createFotoFileInfo.className = 'text-xs text-green-400 font-semibold';
                 renderImagePreviews(DOM.admin.fotoPreviewContainer, urls);
             } else {
                 DOM.admin.fotoInput.value = '';
-                DOM.admin.createFotoFileInfo.textContent = 'Error al subir';
+                DOM.admin.createFotoFileInfo.textContent = 'Error al subir imagen';
                 DOM.admin.createFotoFileInfo.className = 'text-xs text-red-400 font-semibold';
                 DOM.admin.fotoPreviewContainer.classList.add('hidden');
                 DOM.admin.fotoPreviewContainer.innerHTML = '';
@@ -1216,15 +1223,19 @@ async function initApp() {
                 return;
             }
             
+            DOM.admin.updateFotoFileInfo.textContent = `⏳ Subiendo ${files.length} imagen(es)...`;
+            DOM.admin.updateFotoFileInfo.className = 'text-xs text-amber-400 font-bold animate-pulse';
+
             if (DOM.admin.invImg) {
                 DOM.admin.invImg.classList.add('opacity-40');
             }
             if (DOM.admin.updateFotoPreviewContainer) {
                 DOM.admin.updateFotoPreviewContainer.classList.remove('hidden');
                 DOM.admin.updateFotoPreviewContainer.innerHTML = `
-                    <div class="col-span-4 flex items-center justify-center p-4 bg-dark-200/50 rounded-xl border border-white/5 w-full">
-                        <svg class="animate-spin h-5 w-5 text-navy-400 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                        <span class="text-xs text-gray-400">Guardando imagen...</span>
+                    <div class="col-span-4 flex flex-col items-center justify-center p-5 bg-dark-200/80 rounded-2xl border border-navy-500/40 text-center w-full shadow-2xl">
+                        <div class="w-8 h-8 border-3 border-navy-400 border-t-transparent rounded-full animate-spin mb-2"></div>
+                        <span class="text-xs font-bold text-white mb-0.5">Subiendo nueva imagen a Google Drive...</span>
+                        <span class="text-[10px] text-amber-400 font-semibold animate-pulse">Por favor espera</span>
                     </div>
                 `;
             }
@@ -3341,6 +3352,8 @@ function createProductCard(producto) {
     if (currentView === 'jerseys-pedido') {
         if (isProximamente || isAgotado) {
             bottomSectionHtml += `<button class="w-full mt-auto mt-3 py-2 rounded-lg bg-dark-200 text-gray-600 font-bold text-[11px] uppercase cursor-not-allowed border border-white/5" disabled>No disponible</button>`;
+        } else if (window.isLocal419Mode) {
+            bottomSectionHtml += `<button type="button" onclick="window.openPos419Modal()" class="w-full mt-auto mt-3 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-extrabold text-[11px] uppercase tracking-wider transition-all duration-300 shadow hover:shadow-amber-500/20 active:scale-[0.97]">Venta Exprés 419</button>`;
         } else {
             bottomSectionHtml += `<button class="w-full mt-auto mt-3 py-2 rounded-lg bg-navy-500 hover:bg-navy-400 text-white font-bold text-[11px] uppercase tracking-wider transition-all duration-300 shadow hover:shadow-navy-500/20 active:scale-[0.97] btn-agregar-pedido">Agregar a mi pedido</button>`;
         }
@@ -3385,7 +3398,11 @@ function createProductCard(producto) {
             
             if (currentView === 'jerseys-pedido') {
                 if (!isAgotado && !isProximamente) {
-                    openPedidoModal(producto, preselectedTalla);
+                    if (window.isLocal419Mode) {
+                        openPos419Modal();
+                    } else {
+                        openPedidoModal(producto, preselectedTalla);
+                    }
                 }
             }
         });
@@ -3447,7 +3464,11 @@ function createProductCard(producto) {
         detailsContainer.addEventListener('click', (e) => {
             if (currentView === 'jerseys-pedido') {
                 if (!isAgotado && !isProximamente) {
-                    openPedidoModal(producto, preselectedTalla);
+                    if (window.isLocal419Mode) {
+                        openPos419Modal();
+                    } else {
+                        openPedidoModal(producto, preselectedTalla);
+                    }
                 }
             } else {
                 const activeProfile = localStorage.getItem('current_perfil') || 'Administrador';
@@ -4061,6 +4082,11 @@ function getTallaStock(tallaObj) {
 }
 
 function openPedidoModal(producto, preselectedTalla = null) {
+    const posModal = document.getElementById('modal-pos-local419');
+    if (posModal && !posModal.classList.contains('hidden')) {
+        return;
+    }
+
     currentJerseyForPedido = producto;
     
     // Configurar información del modal
@@ -8250,6 +8276,15 @@ function handleSupplierProductSelectChange(idx, selectedId) {
             </div>
         </div>
     `;
+
+    // Guardar la selección en la estructura local en memoria
+    if (currentSupplierOrderEditing && currentSupplierOrderEditing._groupedItems) {
+        const groupKeys = Object.keys(currentSupplierOrderEditing._groupedItems);
+        const groupKey = groupKeys[idx];
+        if (groupKey && currentSupplierOrderEditing._groupedItems[groupKey]) {
+            currentSupplierOrderEditing._groupedItems[groupKey].id_producto = selectedId;
+        }
+    }
 }
 window.handleSupplierProductSelectChange = handleSupplierProductSelectChange;
 
@@ -8346,11 +8381,30 @@ async function confirmSupplierStockMigration() {
             const finalStatus = data.final_status || 'Ingresado a Stock';
             const isCompleted = (finalStatus === 'Ingresado a Stock');
             
+            // Invalidad caché local del catálogo para asegurar datos 100% frescos
+            try {
+                localStorage.removeItem('jerseys_products_cache_v5');
+            } catch (eCache) {}
+
+            // Recargar catálogo de productos en memoria desde el servidor
+            if (typeof fetchInitialProducts === 'function') {
+                await fetchInitialProducts(true);
+            }
+            window.allProducts = allProducts;
+
+            // Refrescar vistas en pantalla
+            if (typeof renderAdminTable === 'function') {
+                renderAdminTable();
+            }
+            if (typeof renderProductsWithFilters === 'function') {
+                renderProductsWithFilters();
+            }
+
             await Swal.fire({
                 icon: 'success',
                 title: isCompleted ? '¡Pedido Completado e Ingresado!' : '¡Ingreso Parcial Registrado!',
                 text: isCompleted 
-                    ? `Se sumaron ${totalReceivedInThisIngress} piezas al stock y el pedido ${folio} ha sido marcado como COMPLETADO.` 
+                    ? `Se sumaron ${totalReceivedInThisIngress} piezas al stock del catálogo y el pedido ${folio} ha sido actualizado a COMPLETADO.` 
                     : `Se sumaron ${totalReceivedInThisIngress} piezas al stock. El pedido ${folio} permanece PENDIENTE/PARCIAL por las piezas restantes.`,
                 background: '#151515', color: '#fff',
                 confirmButtonColor: '#10b981'
@@ -8358,9 +8412,6 @@ async function confirmSupplierStockMigration() {
             
             closeSupplierOrderDetailsModal();
             loadSupplierOrders();
-            
-            // Recargar catálogo de la app si está disponible
-            if (window.loadCatalog) window.loadCatalog();
         } else {
             throw new Error(data.message || 'Error al migrar al stock');
         }
@@ -8379,10 +8430,26 @@ let isLocal419Loading = false;
 
 async function fetchProducts419(force = false) {
     if (isLocal419Loading && !force) return;
-    isLocal419Loading = true;
     
     const gridContainer = document.getElementById('local419-inventario-grid');
-    if (gridContainer) {
+    const CACHE_KEY_419 = 'local419_products_cache_v1';
+
+    // ⚡ 1. Carga instantánea desde Caché Local (Stale-While-Revalidate < 15ms)
+    if (!force) {
+        try {
+            const cachedStr = localStorage.getItem(CACHE_KEY_419);
+            if (cachedStr) {
+                const cachedWrapper = JSON.parse(cachedStr);
+                if (cachedWrapper && cachedWrapper.data && Array.isArray(cachedWrapper.data)) {
+                    allProducts419 = cachedWrapper.data;
+                    renderInventario419Grid(allProducts419);
+                }
+            }
+        } catch (eCache) {}
+    }
+
+    // Si no hay nada en pantalla, mostrar esqueletos elegantes de carga
+    if ((!allProducts419 || allProducts419.length === 0) && gridContainer) {
         gridContainer.innerHTML = Array(8).fill(0).map(() => `
             <div class="bg-[#141416] rounded-2xl p-4 border border-white/5 animate-pulse flex flex-col justify-between h-[440px]">
                 <div class="w-full h-56 bg-white/5 rounded-xl mb-4 relative overflow-hidden flex items-center justify-center">
@@ -8393,18 +8460,14 @@ async function fetchProducts419(force = false) {
                     <div class="flex gap-2">
                         <div class="h-3 bg-white/5 rounded-md w-12"></div>
                         <div class="h-3 bg-white/5 rounded-md w-12"></div>
-                        <div class="h-3 bg-white/5 rounded-md w-12"></div>
                     </div>
                     <div class="h-6 bg-amber-500/10 border border-amber-500/20 rounded-lg w-28"></div>
-                    <div class="pt-2 flex gap-1.5">
-                        <div class="w-10 h-10 bg-white/5 rounded-lg border border-white/5"></div>
-                        <div class="w-10 h-10 bg-white/5 rounded-lg border border-white/5"></div>
-                        <div class="w-10 h-10 bg-white/5 rounded-lg border border-white/5"></div>
-                    </div>
                 </div>
             </div>
         `).join('');
     }
+
+    isLocal419Loading = true;
 
     try {
         const response = await fetch(API_URL, {
@@ -8427,10 +8490,16 @@ async function fetchProducts419(force = false) {
         }
 
         allProducts419 = productsData;
+
+        // Guardar respuesta en caché para accesos futuros instantáneos
+        try {
+            localStorage.setItem(CACHE_KEY_419, JSON.stringify({ data: productsData, timestamp: Date.now() }));
+        } catch (eSave) {}
+
         renderInventario419Grid(allProducts419);
     } catch (err) {
         console.error('Error al cargar inventario de Local 419:', err);
-        if (gridContainer) {
+        if ((!allProducts419 || allProducts419.length === 0) && gridContainer) {
             gridContainer.innerHTML = `
                 <div class="col-span-full text-center py-12 bg-[#141416] rounded-2xl border border-red-500/20 p-6">
                     <i class="fa-solid fa-triangle-exclamation text-3xl text-red-400 mb-3"></i>
@@ -8451,7 +8520,17 @@ function renderInventario419Grid(products) {
     const gridContainer = document.getElementById('local419-inventario-grid');
     if (!gridContainer) return;
 
-    const searchTerm = (document.getElementById('inv419-search-input')?.value || '').toLowerCase().trim();
+    const searchInput = document.getElementById('inv419-search-input');
+    if (searchInput && !searchInput.dataset.hasListener) {
+        searchInput.dataset.hasListener = "true";
+        let searchTimer = null;
+        searchInput.addEventListener('input', () => {
+            if (searchTimer) clearTimeout(searchTimer);
+            searchTimer = setTimeout(() => renderInventario419Grid(allProducts419), 50);
+        });
+    }
+
+    const searchTerm = (searchInput?.value || '').toLowerCase().trim();
     const filtered = (products || []).filter(p => {
         if (!searchTerm) return true;
         const targetStr = `${p.equipo || ''} ${p.nombre || ''} ${p.tipo || ''} ${p.version || ''} ${p.genero || ''} ${p.id || ''}`.toLowerCase();
@@ -8463,6 +8542,8 @@ function renderInventario419Grid(products) {
         return;
     }
 
+    const mainCatalog = (typeof allProducts !== 'undefined' && allProducts && allProducts.length > 0) ? allProducts : (window.allProducts || []);
+
     gridContainer.innerHTML = filtered.map(prod => {
         const rawImg = getFirstImage(prod.foto || prod.imagen) || 'https://images.unsplash.com/photo-1577212017184-807dd6acefd6?auto=format&fit=crop&q=80&w=400';
         const imgUrl = getOptimizedImageUrl(rawImg, 400);
@@ -8470,35 +8551,48 @@ function renderInventario419Grid(products) {
         const tipo = (prod.tipo || 'DESCONOCIDO').toUpperCase();
         const version = (prod.version || 'REGULAR').toUpperCase();
         const genero = (prod.genero || 'HOMBRE').toUpperCase();
-        const precio = Number(prod.precio_menudeo || prod.precio || 0);
+        
+        // 🌟 Resolución inteligente de precios (evita $0.00 en pantalla)
+        let precioVal = Number(prod.precio_menudeo || prod.precio || prod.precio_mayoreo || 0);
+        if (precioVal === 0) {
+            const mainMatch = mainCatalog.find(ap => String(ap.id || '').toUpperCase() === String(prod.id || '').toUpperCase() || String(ap.nombre || '').toUpperCase() === String(equipoNombre).toUpperCase());
+            if (mainMatch) {
+                precioVal = Number(mainMatch.precio_menudeo || mainMatch.precio_mayoreo || mainMatch.precio || 0);
+            }
+        }
+        const precioDisplay = precioVal > 0 ? `$${precioVal.toFixed(2)}` : 'Consultar';
 
         // Extraer arreglo de tallas del producto
         const tallasArray = Array.isArray(prod.tallas) ? prod.tallas : [];
         let sizeBoxesHtml = '';
+        let totalStock419 = 0;
 
         if (tallasArray.length > 0) {
             sizeBoxesHtml = tallasArray.map(tObj => {
                 const sz = (tObj.talla || '').toUpperCase();
                 const cant = Number(tObj.stock || 0);
+                totalStock419 += cant;
                 const hasStock = cant > 0;
                 
                 const boxStyle = hasStock
                     ? 'bg-[#222226] text-white border-white/10 hover:border-amber-400'
                     : 'bg-white/5 text-gray-500 border-white/5 opacity-60';
 
-                const badgeBg = hasStock ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300';
+                const badgeBg = hasStock ? 'bg-amber-500 text-black font-extrabold' : 'bg-gray-700 text-gray-300';
 
                 return `
                 <div class="relative group/size cursor-pointer" onclick="editLocal419SizeStockPrompt('${prod.id}', '${sz}', ${cant})" title="Editar stock de talla ${sz}">
                     <div class="w-10 h-10 sm:w-11 sm:h-11 rounded-xl border flex items-center justify-center font-bold text-xs ${boxStyle} transition-all shadow-sm">
                         ${sz}
                     </div>
-                    <span class="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1 rounded-full ${badgeBg} text-[10px] font-extrabold flex items-center justify-center shadow-md border border-dark-100">
+                    <span class="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1 rounded-full ${badgeBg} text-[10px] flex items-center justify-center shadow-md border border-dark-100">
                         ${cant}
                     </span>
                 </div>`;
             }).join('');
         }
+
+        const stockBadgeColor = totalStock419 > 0 ? 'bg-amber-500/20 text-amber-400 border-amber-500/30' : 'bg-red-500/10 text-red-400 border-red-500/20';
 
         const addTallaBtn = `
         <div class="relative cursor-pointer" onclick="addNewLocal419SizePrompt('${prod.id}', '${genero.replace(/'/g, "\\'")}')" title="Agregar Talla">
@@ -8514,6 +8608,9 @@ function renderInventario419Grid(products) {
                 <div class="relative w-full aspect-[4/5] rounded-xl overflow-hidden mb-3 bg-dark-300 border border-white/5">
                     <img src="${imgUrl}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" alt="${equipoNombre}">
                     <div class="absolute inset-0 bg-gradient-to-t from-dark/60 via-transparent to-transparent opacity-60"></div>
+                    <span class="absolute top-2 right-2 px-2.5 py-1 rounded-lg ${stockBadgeColor} font-bold text-[10px] uppercase border shadow-md backdrop-blur-xs">
+                        ${totalStock419} pcs 419
+                    </span>
                 </div>
 
                 <!-- Título del Jersey -->
@@ -8534,7 +8631,7 @@ function renderInventario419Grid(products) {
                 <!-- Precio -->
                 <div class="bg-dark-300/80 rounded-xl px-3 py-2 border border-white/5 flex items-center justify-between mb-3.5">
                     <span class="text-xs text-gray-400 font-medium">Precio:</span>
-                    <span class="text-sm font-bold text-blue-400">$${precio.toFixed(2)}</span>
+                    <span class="text-sm font-bold text-amber-400">${precioDisplay}</span>
                 </div>
             </div>
 
@@ -8689,7 +8786,7 @@ document.addEventListener('click', (e) => {
     const posBtn = e.target.closest('.action-local419-pos');
     if (posBtn) {
         closeInventario419View();
-        if (typeof switchView === 'function') switchView('jerseys-pedido');
+        if (typeof openPos419Modal === 'function') openPos419Modal();
         if (typeof closemobileMenu === 'function') closemobileMenu();
         return;
     }
@@ -8697,7 +8794,7 @@ document.addEventListener('click', (e) => {
     const ordenarBtn = e.target.closest('.action-local419-ordenar');
     if (ordenarBtn) {
         closeInventario419View();
-        if (typeof switchView === 'function') switchView('jerseys-pedido');
+        if (typeof openPos419Modal === 'function') openPos419Modal();
         if (typeof closemobileMenu === 'function') closemobileMenu();
         return;
     }
@@ -8719,18 +8816,27 @@ document.addEventListener('click', (e) => {
     }
 });
 
-// Event Listeners para la Vista de Inventario 419
+// Event Listeners para la Vista de Inventario y POS 419
 document.addEventListener('DOMContentLoaded', () => {
     const closeBtn = document.getElementById('close-local419-inventario-modal');
     if (closeBtn) {
         closeBtn.onclick = () => closeInventario419View();
     }
 
+    const closePosBtn = document.getElementById('close-pos-local419-modal');
+    if (closePosBtn) {
+        closePosBtn.onclick = () => closePos419Modal();
+    }
+
     const btnLocal419Menu = document.getElementById('btn-local419-menu');
     if (btnLocal419Menu) {
         btnLocal419Menu.onclick = (e) => {
             e.preventDefault();
-            openInventario419View();
+            window.isLocal419Mode = true;
+            // En móvil abre la vista de inventario, en desktop se usa el menú desplegable
+            if (window.innerWidth < 640 && typeof openInventario419View === 'function') {
+                openInventario419View();
+            }
         };
     }
 
@@ -8743,7 +8849,744 @@ document.addEventListener('DOMContentLoaded', () => {
     if (searchInput) {
         searchInput.oninput = () => renderInventario419Grid(allProducts419);
     }
+
+    // Botones de conmutación de clientes en POS
+    const btnMostrador = document.getElementById('btn-pos419-client-mostrador');
+    if (btnMostrador) {
+        btnMostrador.onclick = () => {
+            selectPos419Client({ id_cliente: 'CLI-MOSTRADOR', nombre_completo: 'Cliente Mostrador', perfil: 'Menudeo' });
+            const searchContainer = document.getElementById('pos419-client-search-container');
+            if (searchContainer) searchContainer.classList.add('hidden');
+        };
+    }
+
+    const btnToggleSearchClient = document.getElementById('btn-pos419-toggle-search-client');
+    if (btnToggleSearchClient) {
+        btnToggleSearchClient.onclick = () => {
+            const searchContainer = document.getElementById('pos419-client-search-container');
+            if (searchContainer) {
+                searchContainer.classList.toggle('hidden');
+                if (!searchContainer.classList.contains('hidden')) {
+                    const input = document.getElementById('pos419-client-search-input');
+                    if (input) input.focus();
+                }
+            }
+        };
+    }
+
+    const clientSearchInput = document.getElementById('pos419-client-search-input');
+    if (clientSearchInput) {
+        clientSearchInput.oninput = (e) => filterPOS419Clients(e.target.value);
+    }
+
+    const btnSubmitPOS = document.getElementById('btn-submit-pos419');
+    if (btnSubmitPOS) {
+        btnSubmitPOS.onclick = () => submitPos419Order();
+    }
 });
+
+// =========================================================================
+// MÓDULO: PUNTO DE VENTA / VENTA EXPRÉS LOCAL 419
+// =========================================================================
+
+let pos419Cart = [];
+let pos419Client = { id_cliente: 'CLI-MOSTRADOR', nombre_completo: 'Cliente Mostrador', perfil: 'Menudeo' };
+let allClientsPOSCache = [];
+
+async function openPos419Modal() {
+    const modal = document.getElementById('modal-pos-local419');
+    if (!modal) return;
+
+    // 1. Resetear carrito y cliente a Cliente Mostrador
+    pos419Cart = [];
+    selectPos419Client({ id_cliente: 'CLI-MOSTRADOR', nombre_completo: 'Cliente Mostrador', perfil: 'Menudeo' });
+    
+    // Ocultar buscador de clientes por defecto
+    const searchContainer = document.getElementById('pos419-client-search-container');
+    if (searchContainer) searchContainer.classList.add('hidden');
+
+    // 2. Cargar existencias de Local 419 si no están en memoria
+    if (!allProducts419 || allProducts419.length === 0) {
+        await fetchProducts419();
+    }
+    
+    // Cargar caché de clientes silenciosamente para autocompletado
+    loadClientsForPOS();
+
+    // 3. Renderizar catálogo POS y vista previa
+    renderPos419Catalog();
+    renderPos419Cart();
+
+    // 4. Mostrar modal
+    document.body.style.overflow = 'hidden';
+    modal.classList.remove('hidden');
+    void modal.offsetWidth;
+    modal.classList.remove('opacity-0');
+}
+window.openPos419Modal = openPos419Modal;
+
+function closePos419Modal() {
+    const modal = document.getElementById('modal-pos-local419');
+    if (modal) {
+        modal.classList.add('opacity-0');
+        setTimeout(() => {
+            modal.classList.add('hidden');
+            document.body.style.overflow = '';
+        }, 300);
+    }
+}
+window.closePos419Modal = closePos419Modal;
+
+async function loadClientsForPOS() {
+    try {
+        const res = await fetch(API_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'search_clients' })
+        });
+        const data = await res.json();
+        if (data.status === 'success' && Array.isArray(data.data)) {
+            allClientsPOSCache = data.data;
+        }
+    } catch (e) {
+        console.error("Error al obtener clientes desde la hoja Clientes para POS:", e);
+    }
+}
+
+function selectPos419Client(clientObj) {
+    pos419Client = clientObj || { id_cliente: 'CLI-MOSTRADOR', nombre_completo: 'Cliente Mostrador', perfil: 'Menudeo' };
+    
+    const nameEl = document.getElementById('pos419-active-client-name');
+    const profileEl = document.getElementById('pos419-active-client-profile');
+    
+    if (nameEl) nameEl.textContent = pos419Client.nombre_completo || pos419Client.nombre || 'Cliente Mostrador';
+    if (profileEl) {
+        const perf = pos419Client.perfil || 'Menudeo';
+        profileEl.textContent = perf;
+        profileEl.className = perf === 'Súper Mayoreo'
+            ? 'px-2 py-0.5 rounded text-[9px] font-extrabold uppercase bg-amber-500/20 text-amber-400 border border-amber-500/30'
+            : (perf === 'Mayoreo' 
+                ? 'px-2 py-0.5 rounded text-[9px] font-extrabold uppercase bg-blue-500/20 text-blue-400 border border-blue-500/30' 
+                : 'px-2 py-0.5 rounded text-[9px] font-extrabold uppercase bg-white/10 text-gray-300');
+    }
+    
+    recalculatePos419Cart();
+    renderPos419Catalog();
+}
+
+async function filterPOS419Clients(query) {
+    const resultsContainer = document.getElementById('pos419-client-search-results');
+    if (!resultsContainer) return;
+    
+    if (!allClientsPOSCache || allClientsPOSCache.length === 0) {
+        await loadClientsForPOS();
+    }
+    
+    const q = (query || '').toLowerCase().trim();
+    if (!q) {
+        resultsContainer.classList.add('hidden');
+        resultsContainer.innerHTML = '';
+        return;
+    }
+    
+    const filtered = allClientsPOSCache.filter(c => {
+        const full = `${c.nombre_completo || ''} ${c.usuario || ''} ${c.telefono || ''} ${c.id_cliente || ''}`.toLowerCase();
+        return full.includes(q);
+    }).slice(0, 8);
+    
+    if (filtered.length === 0) {
+        resultsContainer.innerHTML = `<div class="p-3 text-xs text-gray-500 text-center italic">No se encontraron clientes en el registro</div>`;
+    } else {
+        resultsContainer.innerHTML = filtered.map(c => `
+            <div onclick="window.onSelectPOS419ClientFromSearch('${c.id_cliente}')" class="p-2 sm:p-2.5 hover:bg-white/10 rounded-lg cursor-pointer transition-colors flex items-center justify-between gap-2 border-b border-white/5 last:border-none">
+                <div>
+                    <div class="text-xs font-bold text-white">${c.nombre_completo}</div>
+                    <div class="text-[10px] text-gray-400 font-mono">${c.telefono || 'Sin tel'} | ${c.usuario}</div>
+                </div>
+                <span class="px-2 py-0.5 rounded text-[9px] font-bold uppercase ${c.perfil === 'Súper Mayoreo' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : (c.perfil === 'Mayoreo' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' : 'bg-white/10 text-gray-300')}">${c.perfil || 'Menudeo'}</span>
+            </div>
+        `).join('');
+    }
+    resultsContainer.classList.remove('hidden');
+}
+
+window.onSelectPOS419ClientFromSearch = (idCli) => {
+    const target = allClientsPOSCache.find(c => String(c.id_cliente) === String(idCli));
+    if (target) {
+        selectPos419Client(target);
+    }
+    const resultsContainer = document.getElementById('pos419-client-search-results');
+    const searchContainer = document.getElementById('pos419-client-search-container');
+    if (resultsContainer) resultsContainer.classList.add('hidden');
+    if (searchContainer) searchContainer.classList.add('hidden');
+};
+
+function renderPos419Catalog() {
+    const gridContainer = document.getElementById('pos419-catalog-grid');
+    if (!gridContainer) return;
+    
+    const searchInput = document.getElementById('pos419-catalog-search-input');
+    if (searchInput && !searchInput.dataset.hasPOSListener) {
+        searchInput.dataset.hasPOSListener = "true";
+        searchInput.oninput = () => renderPos419Catalog();
+    }
+    
+    const q = (searchInput?.value || '').toLowerCase().trim();
+    
+    const filtered = (allProducts419 || []).filter(p => {
+        if (!q) return true;
+        const targetStr = `${p.equipo || ''} ${p.nombre || ''} ${p.tipo || ''} ${p.version || ''} ${p.genero || ''} ${p.id || ''}`.toLowerCase();
+        return targetStr.includes(q);
+    });
+    
+    if (filtered.length === 0) {
+        gridContainer.innerHTML = `<div class="col-span-full text-center py-10 text-gray-500 italic text-xs">No hay prendas disponibles en Local 419 que coincidan.</div>`;
+        return;
+    }
+
+    let currentTier = 'Menudeo';
+    let totalPieces = 0;
+    pos419Cart.forEach(i => totalPieces += i.cantidad);
+    const clientPerfil = pos419Client.perfil || 'Menudeo';
+    const isMostrador = pos419Client.id_cliente === 'CLI-MOSTRADOR';
+    
+    if (isMostrador) {
+        if (totalPieces >= 12) currentTier = 'Súper Mayoreo';
+        else if (totalPieces >= 6) currentTier = 'Mayoreo';
+        else currentTier = 'Menudeo';
+    } else {
+        if (clientPerfil === 'Súper Mayoreo' || totalPieces >= 12) currentTier = 'Súper Mayoreo';
+        else if (clientPerfil === 'Mayoreo' || totalPieces >= 6) currentTier = 'Mayoreo';
+        else currentTier = 'Menudeo';
+    }
+    
+    gridContainer.innerHTML = filtered.map(prod => {
+        const rawImg = getFirstImage(prod.foto || prod.imagen) || 'https://images.unsplash.com/photo-1577212017184-807dd6acefd6?auto=format&fit=crop&q=80&w=400';
+        const imgUrl = getOptimizedImageUrl(rawImg, 300);
+        const equipoNombre = (prod.nombre || prod.equipo || 'JERSEY').toUpperCase();
+        const verGen = [prod.tipo, prod.version, prod.genero].filter(Boolean).join(' ').toUpperCase();
+        
+        // Obtener precio correspondiente al perfil actual
+        const mainCatalog = (typeof allProducts !== 'undefined' && allProducts && allProducts.length > 0) ? allProducts : (window.allProducts || []);
+        const mainMatch = mainCatalog.find(ap => String(ap.id || '').toUpperCase() === String(prod.id || '').toUpperCase() || String(ap.nombre || '').toUpperCase() === String(equipoNombre).toUpperCase());
+        
+        const pMen = Number(prod.precio_menudeo || prod.precio || (mainMatch ? mainMatch.precio_menudeo : 0) || 0);
+        const pMay = Number(prod.precio_mayoreo || (mainMatch ? mainMatch.precio_mayoreo : 0) || pMen);
+        const pSup = Number(prod.precio_mayoreo_super || (mainMatch ? mainMatch.precio_mayoreo_super : 0) || pMay);
+        
+        let pDisplay = pMen;
+        if (currentTier === 'Súper Mayoreo' && pSup > 0) pDisplay = pSup;
+        else if ((currentTier === 'Mayoreo' || currentTier === 'Súper Mayoreo') && pMay > 0) pDisplay = pMay;
+        
+        // Obtener tallas y sus existencias en 419
+        const tallasArray = Array.isArray(prod.tallas) ? prod.tallas : [];
+        
+        // Botones de selección rápida por talla
+        let sizeButtonsHtml = '';
+        tallasArray.forEach(tObj => {
+            const sz = (tObj.talla || '').toUpperCase();
+            const avail419 = Number(tObj.stock || 0);
+            
+            const inCartItem = pos419Cart.find(ci => ci.id_playera === prod.id && ci.talla === sz);
+            const inCartQty = inCartItem ? inCartItem.cantidad : 0;
+            const remAvail = Math.max(0, avail419 - inCartQty);
+            
+            if (avail419 > 0) {
+                const btnColor = remAvail > 0
+                    ? 'bg-amber-500/10 hover:bg-amber-500 text-amber-400 hover:text-black border-amber-500/30'
+                    : 'bg-red-500/10 text-red-400 border-red-500/20 cursor-not-allowed opacity-50';
+                
+                sizeButtonsHtml += `
+                    <button type="button" ${remAvail <= 0 ? 'disabled' : ''} onclick="window.addPos419Item('${prod.id}', '${sz}')" class="px-2 py-1 rounded-lg border text-center font-bold text-[10px] transition-all flex items-center justify-between gap-1 ${btnColor}">
+                        <span>${sz}</span>
+                        <span class="text-[9px] opacity-80">(${remAvail})</span>
+                    </button>
+                `;
+            }
+        });
+        
+        if (!sizeButtonsHtml) {
+            sizeButtonsHtml = `<span class="text-[10px] text-gray-500 italic">Sin stock en 419</span>`;
+        }
+        
+        return `
+            <div class="bg-dark-200/50 border border-white/5 rounded-xl p-3 space-y-2 hover:border-amber-500/30 transition-all flex flex-col justify-between">
+                <div class="flex items-start gap-3">
+                    <div class="w-14 h-14 flex-shrink-0 bg-dark-100 border border-white/10 rounded-lg overflow-hidden p-0.5">
+                        <img src="${imgUrl}" class="w-full h-full object-cover rounded">
+                    </div>
+                    <div class="min-w-0 flex-grow">
+                        <div class="flex items-center justify-between gap-1">
+                            <h4 class="text-xs font-bold text-white leading-tight truncate">${equipoNombre}</h4>
+                            <span class="text-xs font-bold text-amber-400 font-mono flex-shrink-0">$${pDisplay.toFixed(2)}</span>
+                        </div>
+                        <div class="text-[10px] text-gray-400 truncate mt-0.5">${verGen}</div>
+                        <div class="text-[9px] text-gray-500 font-mono mt-0.5">ID: ${prod.id}</div>
+                    </div>
+                </div>
+                <div class="pt-2 border-t border-white/5">
+                    <div class="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Tallas Disponibles en 419:</div>
+                    <div class="grid grid-cols-3 gap-1.5">
+                        ${sizeButtonsHtml}
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+window.renderPos419Catalog = renderPos419Catalog;
+
+function addPos419Item(id_playera, talla) {
+    const prod = (allProducts419 || []).find(p => String(p.id) === String(id_playera));
+    if (!prod) return;
+    
+    const tallasArray = Array.isArray(prod.tallas) ? prod.tallas : [];
+    const tObj = tallasArray.find(x => String(x.talla).trim().toUpperCase() === String(talla).trim().toUpperCase());
+    const maxStock = tObj ? Number(tObj.stock || 0) : 0;
+    
+    const existing = pos419Cart.find(item => item.id_playera === id_playera && item.talla === talla && item.tipo_personalizacion === 'PERS-NONE');
+    const currentQty = existing ? existing.cantidad : 0;
+    
+    if (currentQty + 1 > maxStock) {
+        const toast = Swal.mixin({ toast: true, position: 'bottom-end', showConfirmButton: false, timer: 1800, background: '#151515', color: '#fff' });
+        toast.fire({ icon: 'warning', title: `Límite alcanzado (${maxStock} disponible en 419)` });
+        return;
+    }
+    
+    if (existing) {
+        existing.cantidad += 1;
+    } else {
+        const mainCatalog = (typeof allProducts !== 'undefined' && allProducts && allProducts.length > 0) ? allProducts : (window.allProducts || []);
+        const mainMatch = mainCatalog.find(ap => String(ap.id || '').toUpperCase() === String(id_playera).toUpperCase() || String(ap.nombre || '').toUpperCase() === String(prod.nombre || prod.equipo || '').toUpperCase());
+        
+        pos419Cart.push({
+            id_playera: prod.id,
+            nombre: prod.nombre || prod.equipo || 'Jersey',
+            tipo: prod.tipo || 'Regular',
+            version: prod.version || 'Aficionado',
+            genero: prod.genero || 'Hombre',
+            foto: getFirstImage(prod.foto || prod.imagen),
+            talla: talla,
+            cantidad: 1,
+            precio_menudeo: Number(prod.precio_menudeo || prod.precio || (mainMatch ? mainMatch.precio_menudeo : 0) || 0),
+            precio_mayoreo: Number(prod.precio_mayoreo || (mainMatch ? mainMatch.precio_mayoreo : 0) || 0),
+            precio_mayoreo_super: Number(prod.precio_mayoreo_super || (mainMatch ? mainMatch.precio_mayoreo_super : 0) || 0),
+            tipo_personalizacion: 'PERS-NONE',
+            personalizacion_texto: '',
+            costo_personalizacion: 0,
+            personalizaciones_oficiales: prod.personalizaciones_oficiales || (mainMatch ? mainMatch.personalizaciones_oficiales : null)
+        });
+    }
+    
+    recalculatePos419Cart();
+    renderPos419Catalog();
+}
+window.addPos419Item = addPos419Item;
+
+function updatePos419ItemQty(idx, delta) {
+    const item = pos419Cart[idx];
+    if (!item) return;
+    
+    const prod = (allProducts419 || []).find(p => String(p.id) === String(item.id_playera));
+    const tallasArray = prod && Array.isArray(prod.tallas) ? prod.tallas : [];
+    const tObj = tallasArray.find(x => String(x.talla).trim().toUpperCase() === String(item.talla).trim().toUpperCase());
+    const maxStock = tObj ? Number(tObj.stock || 0) : 99;
+    
+    const newQty = item.cantidad + delta;
+    if (newQty <= 0) {
+        pos419Cart.splice(idx, 1);
+    } else if (newQty > maxStock) {
+        const toast = Swal.mixin({ toast: true, position: 'bottom-end', showConfirmButton: false, timer: 1800, background: '#151515', color: '#fff' });
+        toast.fire({ icon: 'warning', title: `Máximo disponible en 419: ${maxStock}` });
+        return;
+    } else {
+        item.cantidad = newQty;
+    }
+    
+    recalculatePos419Cart();
+    renderPos419Catalog();
+}
+window.updatePos419ItemQty = updatePos419ItemQty;
+
+function removePos419Item(idx) {
+    pos419Cart.splice(idx, 1);
+    recalculatePos419Cart();
+    renderPos419Catalog();
+}
+window.removePos419Item = removePos419Item;
+
+async function configurePos419Personalizacion(idx) {
+    const item = pos419Cart[idx];
+    if (!item) return;
+
+    let rawOficial = item.personalizaciones_oficiales;
+    let bPriceM = 0, bPriceMay = 0, oPriceM = 0, oPriceMay = 0;
+    let opcionesOficiales = [];
+
+    if (rawOficial && typeof rawOficial === 'object' && !Array.isArray(rawOficial)) {
+        bPriceM = parseFloat(rawOficial.basica_precio_menudeo || 0);
+        bPriceMay = parseFloat(rawOficial.basica_precio_mayoreo || 0);
+        oPriceM = parseFloat(rawOficial.oficial_precio_menudeo || rawOficial.precio || 0);
+        oPriceMay = parseFloat(rawOficial.oficial_precio_mayoreo || 0);
+        opcionesOficiales = Array.isArray(rawOficial.opciones) ? rawOficial.opciones : [];
+    } else if (Array.isArray(rawOficial)) {
+        opcionesOficiales = rawOficial;
+    }
+
+    const isMay = (item.appliedTier === 'Mayoreo' || item.appliedTier === 'Súper Mayoreo');
+    const costBasica = isMay ? bPriceMay : bPriceM;
+    const costOficial = isMay ? oPriceMay : oPriceM;
+
+    let htmlContent = `
+        <div class="text-left space-y-3 text-xs text-white p-1">
+            <div>
+                <label class="block text-gray-400 font-bold mb-1 uppercase text-[10px]">Tipo de Personalización:</label>
+                <select id="swal-pos-pers-type" class="w-full bg-dark-200 border border-white/10 rounded-xl px-3 py-2 text-xs font-semibold text-white focus:outline-none focus:border-amber-400">
+                    <option value="PERS-NONE" ${item.tipo_personalizacion === 'PERS-NONE' ? 'selected' : ''}>Sin Personalización (+$0.00)</option>
+                    <option value="PERS-BASICA" ${item.tipo_personalizacion === 'PERS-BASICA' ? 'selected' : ''}>Básica (Nombre y Número Libre) ${costBasica > 0 ? '(+$' + costBasica.toFixed(2) + ')' : ''}</option>
+                    ${opcionesOficiales.length > 0 ? `<option value="PERS-OFICIAL" ${item.tipo_personalizacion === 'PERS-OFICIAL' ? 'selected' : ''}>Oficial de Jugador ${costOficial > 0 ? '(+$' + costOficial.toFixed(2) + ')' : ''}</option>` : ''}
+                </select>
+            </div>
+
+            <!-- Campos para Básica -->
+            <div id="swal-pos-pers-basica-fields" class="${item.tipo_personalizacion === 'PERS-BASICA' ? '' : 'hidden'} space-y-2 pt-1">
+                <div>
+                    <label class="block text-gray-400 font-semibold mb-1 text-[10px]">Nombre a estampar:</label>
+                    <input type="text" id="swal-pos-pers-nombre" placeholder="Ej. RAMÍREZ" value="${item.tipo_personalizacion === 'PERS-BASICA' ? (item.personalizacion_texto.split('#')[0] || '').trim() : ''}" class="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white uppercase focus:outline-none focus:border-amber-400">
+                </div>
+                <div>
+                    <label class="block text-gray-400 font-semibold mb-1 text-[10px]">Número a estampar:</label>
+                    <input type="text" id="swal-pos-pers-numero" placeholder="Ej. 10" value="${item.tipo_personalizacion === 'PERS-BASICA' ? (item.personalizacion_texto.split('#')[1] || '').trim() : ''}" class="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white uppercase focus:outline-none focus:border-amber-400">
+                </div>
+            </div>
+
+            <!-- Campos para Oficial -->
+            <div id="swal-pos-pers-oficial-fields" class="${item.tipo_personalizacion === 'PERS-OFICIAL' ? '' : 'hidden'} pt-1">
+                <label class="block text-gray-400 font-semibold mb-1 text-[10px]">Seleccionar Jugador Oficial:</label>
+                <select id="swal-pos-pers-oficial-select" class="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400">
+                    <option value="">-- Selecciona Jugador --</option>
+                    ${opcionesOficiales.map(o => {
+                        const valStr = `${o.nombre} #${o.numero || ''}`.trim();
+                        return `<option value="${valStr}" ${item.personalizacion_texto === valStr ? 'selected' : ''}>${valStr}</option>`;
+                    }).join('')}
+                </select>
+            </div>
+        </div>
+    `;
+
+    const res = await Swal.fire({
+        title: 'Configurar Personalización',
+        html: htmlContent,
+        icon: 'info',
+        showCancelButton: true,
+        confirmButtonText: 'Guardar Personalización',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#f59e0b',
+        cancelButtonColor: '#374151',
+        background: '#151515', color: '#fff',
+        didOpen: () => {
+            const selType = document.getElementById('swal-pos-pers-type');
+            const basicaDiv = document.getElementById('swal-pos-pers-basica-fields');
+            const oficialDiv = document.getElementById('swal-pos-pers-oficial-fields');
+
+            selType.onchange = () => {
+                const v = selType.value;
+                if (v === 'PERS-BASICA') {
+                    if (basicaDiv) basicaDiv.classList.remove('hidden');
+                    if (oficialDiv) oficialDiv.classList.add('hidden');
+                } else if (v === 'PERS-OFICIAL') {
+                    if (basicaDiv) basicaDiv.classList.add('hidden');
+                    if (oficialDiv) oficialDiv.classList.remove('hidden');
+                } else {
+                    if (basicaDiv) basicaDiv.classList.add('hidden');
+                    if (oficialDiv) oficialDiv.classList.add('hidden');
+                }
+            };
+        },
+        preConfirm: () => {
+            const vType = document.getElementById('swal-pos-pers-type').value;
+            let text = '';
+            if (vType === 'PERS-BASICA') {
+                const nom = (document.getElementById('swal-pos-pers-nombre').value || '').trim().toUpperCase();
+                const num = (document.getElementById('swal-pos-pers-numero').value || '').trim().toUpperCase();
+                if (!nom && !num) {
+                    Swal.showValidationMessage('Ingresa al menos nombre o número para personalización básica.');
+                    return false;
+                }
+                text = `${nom} #${num}`.trim();
+            } else if (vType === 'PERS-OFICIAL') {
+                text = document.getElementById('swal-pos-pers-oficial-select').value;
+                if (!text) {
+                    Swal.showValidationMessage('Selecciona un jugador oficial.');
+                    return false;
+                }
+            }
+            return { tipo: vType, texto: text };
+        }
+    });
+
+    if (res.isConfirmed && res.value) {
+        item.tipo_personalizacion = res.value.tipo;
+        item.personalizacion_texto = res.value.texto;
+        recalculatePos419Cart();
+    }
+}
+window.configurePos419Personalizacion = configurePos419Personalizacion;
+
+function recalculatePos419Cart() {
+    let totalPieces = 0;
+    pos419Cart.forEach(i => totalPieces += i.cantidad);
+    
+    let appliedTier = 'Menudeo';
+    const clientPerfil = pos419Client.perfil || 'Menudeo';
+    const isMostrador = pos419Client.id_cliente === 'CLI-MOSTRADOR';
+    
+    if (isMostrador) {
+        if (totalPieces >= 12) appliedTier = 'Súper Mayoreo';
+        else if (totalPieces >= 6) appliedTier = 'Mayoreo';
+        else appliedTier = 'Menudeo';
+    } else {
+        if (clientPerfil === 'Súper Mayoreo' || totalPieces >= 12) {
+            appliedTier = 'Súper Mayoreo';
+        } else if (clientPerfil === 'Mayoreo' || totalPieces >= 6) {
+            appliedTier = 'Mayoreo';
+        } else {
+            appliedTier = 'Menudeo';
+        }
+    }
+    
+    const tierBadge = document.getElementById('pos419-applied-tier-badge');
+    if (tierBadge) {
+        tierBadge.textContent = appliedTier.toUpperCase();
+        tierBadge.className = appliedTier === 'Súper Mayoreo'
+            ? 'px-2 py-0.5 rounded font-extrabold text-[10px] uppercase bg-amber-500/20 text-amber-400 border border-amber-500/30'
+            : (appliedTier === 'Mayoreo' 
+                ? 'px-2 py-0.5 rounded font-extrabold text-[10px] uppercase bg-blue-500/20 text-blue-400 border border-blue-500/30' 
+                : 'px-2 py-0.5 rounded font-extrabold text-[10px] uppercase bg-white/10 text-gray-300');
+    }
+    
+    let granTotal = 0;
+    const isMay = (appliedTier === 'Mayoreo' || appliedTier === 'Súper Mayoreo');
+
+    pos419Cart.forEach(item => {
+        item.appliedTier = appliedTier;
+        let pUnit = item.precio_menudeo || 0;
+        if (appliedTier === 'Súper Mayoreo' && item.precio_mayoreo_super > 0) {
+            pUnit = item.precio_mayoreo_super;
+        } else if ((appliedTier === 'Mayoreo' || appliedTier === 'Súper Mayoreo') && item.precio_mayoreo > 0) {
+            pUnit = item.precio_mayoreo;
+        }
+
+        // Calcular costo de personalización
+        let rawOficial = item.personalizaciones_oficiales;
+        let bPriceM = 0, bPriceMay = 0, oPriceM = 0, oPriceMay = 0;
+        if (rawOficial && typeof rawOficial === 'object' && !Array.isArray(rawOficial)) {
+            bPriceM = parseFloat(rawOficial.basica_precio_menudeo || 0);
+            bPriceMay = parseFloat(rawOficial.basica_precio_mayoreo || 0);
+            oPriceM = parseFloat(rawOficial.oficial_precio_menudeo || rawOficial.precio || 0);
+            oPriceMay = parseFloat(rawOficial.oficial_precio_mayoreo || 0);
+        }
+
+        let costoPersUnit = 0;
+        if (item.tipo_personalizacion === 'PERS-BASICA') {
+            costoPersUnit = isMay ? bPriceMay : bPriceM;
+        } else if (item.tipo_personalizacion === 'PERS-OFICIAL') {
+            costoPersUnit = isMay ? oPriceMay : oPriceM;
+        }
+
+        item.costo_personalizacion = costoPersUnit;
+        item.precio_unitario_aplicado = pUnit;
+        item.subtotal = (pUnit + costoPersUnit) * item.cantidad;
+        granTotal += item.subtotal;
+    });
+    
+    const totalEl = document.getElementById('pos419-gran-total');
+    const badgeCountEl = document.getElementById('pos419-cart-count-badge');
+    const btnSubmit = document.getElementById('btn-submit-pos419');
+    
+    if (totalEl) totalEl.textContent = `$${granTotal.toFixed(2)}`;
+    if (badgeCountEl) badgeCountEl.textContent = `${totalPieces} pcs`;
+    if (btnSubmit) btnSubmit.disabled = (pos419Cart.length === 0);
+    
+    renderPos419Cart();
+}
+
+function renderPos419Cart() {
+    const container = document.getElementById('pos419-cart-items-container');
+    if (!container) return;
+    
+    if (pos419Cart.length === 0) {
+        container.innerHTML = `
+            <div class="text-center py-10 bg-black/20 rounded-xl border border-dashed border-white/10 p-4">
+                <svg class="w-8 h-8 text-gray-600 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path></svg>
+                <p class="text-xs text-gray-400 font-semibold">Carrito presencial vacío</p>
+                <p class="text-[10px] text-gray-500 mt-0.5">Toca una talla en el panel izquierdo para agregar piezas.</p>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = pos419Cart.map((item, idx) => {
+        let persBadgeHtml = '';
+        if (item.tipo_personalizacion === 'PERS-BASICA') {
+            persBadgeHtml = `<button type="button" onclick="window.configurePos419Personalizacion(${idx})" class="mt-1 text-[10px] bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded-md font-bold flex items-center gap-1 transition-all"><span>🎨 Básica: ${item.personalizacion_texto} (+$${(item.costo_personalizacion || 0).toFixed(2)})</span></button>`;
+        } else if (item.tipo_personalizacion === 'PERS-OFICIAL') {
+            persBadgeHtml = `<button type="button" onclick="window.configurePos419Personalizacion(${idx})" class="mt-1 text-[10px] bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30 px-2 py-0.5 rounded-md font-bold flex items-center gap-1 transition-all"><span>⭐ Oficial: ${item.personalizacion_texto} (+$${(item.costo_personalizacion || 0).toFixed(2)})</span></button>`;
+        } else {
+            persBadgeHtml = `<button type="button" onclick="window.configurePos419Personalizacion(${idx})" class="mt-1 text-[9px] bg-white/5 hover:bg-white/10 text-gray-400 border border-white/10 px-1.5 py-0.5 rounded-md font-semibold flex items-center gap-1 transition-all"><span>+ Agregar Personalizado</span></button>`;
+        }
+
+        return `
+        <div class="bg-dark-100 p-2.5 rounded-xl border border-white/5 flex flex-col gap-1.5">
+            <div class="flex items-center justify-between gap-2.5">
+                <div class="w-10 h-10 flex-shrink-0 bg-dark-200 border border-white/10 rounded-lg overflow-hidden">
+                    <img src="${getOptimizedImageUrl(item.foto, 100)}" class="w-full h-full object-cover">
+                </div>
+                <div class="min-w-0 flex-grow">
+                    <h5 class="text-xs font-bold text-white truncate">${item.nombre}</h5>
+                    <div class="flex items-center gap-2 mt-0.5 text-[10px]">
+                        <span class="bg-amber-500/20 text-amber-400 font-bold px-1.5 rounded">${item.talla}</span>
+                        <span class="text-gray-400 font-mono">$${(item.precio_unitario_aplicado || 0).toFixed(2)} c/u</span>
+                    </div>
+                </div>
+                <div class="flex items-center gap-1.5 flex-shrink-0">
+                    <div class="flex items-center bg-black/40 border border-white/10 rounded-lg p-0.5">
+                        <button type="button" onclick="window.updatePos419ItemQty(${idx}, -1)" class="w-5 h-5 flex items-center justify-center text-gray-400 hover:text-white text-xs font-bold">-</button>
+                        <span class="w-6 text-center text-xs font-bold text-amber-400 font-mono">${item.cantidad}</span>
+                        <button type="button" onclick="window.updatePos419ItemQty(${idx}, 1)" class="w-5 h-5 flex items-center justify-center text-gray-400 hover:text-white text-xs font-bold">+</button>
+                    </div>
+                    <button type="button" onclick="window.removePos419Item(${idx})" class="p-1 text-gray-500 hover:text-red-400 transition-colors">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                    </button>
+                </div>
+            </div>
+            <div class="pt-1 border-t border-white/5 flex items-center justify-between">
+                ${persBadgeHtml}
+                <span class="text-xs font-bold text-amber-400 font-mono">$${(item.subtotal || 0).toFixed(2)}</span>
+            </div>
+        </div>
+        `;
+    }).join('');
+}
+
+async function submitPos419Order() {
+    if (pos419Cart.length === 0) return;
+    
+    const metodoPago = document.getElementById('pos419-payment-method')?.value || 'Efectivo';
+    
+    let granTotal = 0;
+    pos419Cart.forEach(i => granTotal += (i.subtotal || 0));
+    
+    let totalPieces = 0;
+    pos419Cart.forEach(i => totalPieces += i.cantidad);
+    
+    let appliedTier = 'Menudeo';
+    const clientPerfil = pos419Client.perfil || 'Menudeo';
+    const isMostrador = pos419Client.id_cliente === 'CLI-MOSTRADOR';
+    
+    if (isMostrador) {
+        if (totalPieces >= 12) appliedTier = 'Súper Mayoreo';
+        else if (totalPieces >= 6) appliedTier = 'Mayoreo';
+        else appliedTier = 'Menudeo';
+    } else {
+        if (clientPerfil === 'Súper Mayoreo' || totalPieces >= 12) appliedTier = 'Súper Mayoreo';
+        else if (clientPerfil === 'Mayoreo' || totalPieces >= 6) appliedTier = 'Mayoreo';
+        else appliedTier = 'Menudeo';
+    }
+    
+    const confirmRes = await Swal.fire({
+        title: '¿Confirmar Venta en Local 419?',
+        html: `
+            <div class="text-left space-y-2 text-xs text-gray-300 py-2">
+                <p>Cliente: <strong class="text-white">${pos419Client.nombre_completo}</strong></p>
+                <p>Piezas: <strong class="text-white">${totalPieces} pzas</strong></p>
+                <p>Nivel de Precio: <strong class="text-amber-400">${appliedTier}</strong></p>
+                <p>Método de Pago: <strong class="text-emerald-400">${metodoPago}</strong></p>
+                <p class="text-sm font-bold text-white pt-2 border-t border-white/10">Total a Cobrar: <span class="text-amber-400 font-mono">$${granTotal.toFixed(2)}</span></p>
+            </div>
+        `,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Sí, Cobrar y Generar Orden',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#f59e0b',
+        cancelButtonColor: '#374151',
+        background: '#151515', color: '#fff'
+    });
+    
+    if (!confirmRes.isConfirmed) return;
+    
+    Swal.fire({
+        title: 'Registrando Venta...',
+        text: 'Descontando inventario de Local 419 y generando orden...',
+        allowOutsideClick: false,
+        background: '#151515', color: '#fff',
+        didOpen: () => Swal.showLoading()
+    });
+    
+    try {
+        const payload = {
+            action: 'create_pos_419_order',
+            id_cliente: pos419Client.id_cliente,
+            nombre_cliente: pos419Client.nombre_completo,
+            tipo_precio_aplicado: appliedTier,
+            metodo_pago: metodoPago,
+            items: pos419Cart.map(i => ({
+                id_playera: i.id_playera,
+                talla: i.talla,
+                cantidad: i.cantidad,
+                categoria: i.genero || 'Adulto',
+                precio_unitario: i.precio_unitario_aplicado,
+                tipo_personalizacion: i.tipo_personalizacion || 'PERS-NONE',
+                detalles_personalizacion: i.personalizacion_texto || '',
+                subtotal: i.subtotal
+            }))
+        };
+        
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            body: JSON.stringify(payload)
+        });
+        
+        const resData = await response.json();
+        
+        if (resData.status === 'success') {
+            try {
+                localStorage.removeItem('local419_products_cache_v1');
+            } catch (eC) {}
+            
+            fetchProducts419(true);
+            if (typeof fetchInitialProducts === 'function') fetchInitialProducts(true);
+            
+            await Swal.fire({
+                icon: 'success',
+                title: '¡Venta Registrada con Éxito!',
+                html: `
+                    <div class="text-center space-y-2 py-2">
+                        <p class="text-xs text-gray-300">Folio Orden: <strong class="text-white font-mono">${resData.id_orden}</strong></p>
+                        <p class="text-sm font-bold text-amber-400 font-mono">Cobrado: $${granTotal.toFixed(2)} (${metodoPago})</p>
+                        <p class="text-[11px] text-emerald-400">✓ Piezas descontadas del stock de Local 419</p>
+                    </div>
+                `,
+                confirmButtonColor: '#10b981',
+                background: '#151515', color: '#fff'
+            });
+            
+            closePos419Modal();
+            openInventario419View();
+        } else {
+            throw new Error(resData.message || 'Error al registrar venta');
+        }
+    } catch (err) {
+        console.error("Error al registrar venta POS 419:", err);
+        Swal.fire({
+            icon: 'error',
+            title: 'Error de Venta',
+            text: err.message || 'No se pudo procesar la orden en Local 419.',
+            background: '#151515', color: '#fff'
+        });
+    }
+}
+window.submitPos419Order = submitPos419Order;
 
 
 

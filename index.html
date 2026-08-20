@@ -2136,10 +2136,128 @@
         </main>
     </div>
 
+    <!-- Modal: Punto de Venta / Venta Exprés Local 419 -->
+    <div id="modal-pos-local419" class="fixed inset-0 z-[80] flex items-center justify-center hidden bg-dark/95 backdrop-blur-md transition-opacity duration-300 opacity-0 p-2 sm:p-6 overflow-hidden">
+        <div class="bg-dark-100 border border-amber-500/30 rounded-2xl w-full max-w-6xl h-[92vh] flex flex-col shadow-2xl shadow-amber-500/10 overflow-hidden relative">
+            
+            <!-- Encabezado del Modal -->
+            <div class="p-3.5 sm:p-5 border-b border-white/10 bg-black/40 flex justify-between items-center flex-shrink-0">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-amber-500/20 text-amber-400 rounded-xl flex items-center justify-center border border-amber-500/30 font-bold">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2z"></path></svg>
+                    </div>
+                    <div>
+                        <h2 class="text-base sm:text-xl font-black text-white flex items-center gap-2 tracking-tight">
+                            Punto Venta Exprés Local 419
+                        </h2>
+                        <p class="text-xs text-gray-400">Captura rápida presencial con existencias del Local 419</p>
+                    </div>
+                </div>
+                <button type="button" id="close-pos-local419-modal" class="text-white/50 hover:text-white transition-colors p-2 bg-white/5 rounded-full hover:bg-white/10">
+                    <svg class="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+
+            <!-- Barra de Selección de Cliente -->
+            <div class="bg-dark-200/60 p-3 sm:p-4 border-b border-white/5 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 flex-shrink-0">
+                <!-- Conmutadores de Cliente -->
+                <div class="flex items-center gap-2">
+                    <button type="button" id="btn-pos419-client-mostrador" class="px-3.5 py-2 rounded-xl bg-amber-500 text-black font-bold text-xs shadow-md transition-all flex items-center gap-1.5 border border-amber-400">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path></svg>
+                        Cliente Mostrador (Menudeo)
+                    </button>
+                    <button type="button" id="btn-pos419-toggle-search-client" class="px-3.5 py-2 rounded-xl bg-dark-100 hover:bg-white/10 text-gray-300 hover:text-white font-semibold text-xs border border-white/10 transition-all flex items-center gap-1.5">
+                        <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                        Buscar Cliente Registrado
+                    </button>
+                </div>
+
+                <!-- Campo Autocompletado de Cliente -->
+                <div id="pos419-client-search-container" class="hidden relative flex-grow max-w-md">
+                    <input type="text" id="pos419-client-search-input" placeholder="🔍 Nombre, usuario o teléfono del cliente..." class="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-amber-400">
+                    <div id="pos419-client-search-results" class="hidden absolute top-full left-0 right-0 mt-1 bg-dark-100 border border-white/10 rounded-xl shadow-2xl max-h-48 overflow-y-auto z-50 p-1"></div>
+                </div>
+
+                <!-- Insignia del Cliente Actual -->
+                <div id="pos419-active-client-badge" class="flex items-center gap-2 bg-black/30 px-3 py-1.5 rounded-xl border border-white/10">
+                    <span class="text-[10px] text-gray-400 font-semibold uppercase">Cliente:</span>
+                    <span id="pos419-active-client-name" class="text-xs font-bold text-amber-400">Cliente Mostrador</span>
+                    <span id="pos419-active-client-profile" class="px-2 py-0.5 rounded text-[9px] font-extrabold uppercase bg-white/10 text-gray-300">Menudeo</span>
+                </div>
+            </div>
+
+            <!-- Cuerpo Principal: Grid de Catálogo 419 + Panel Lateral POS -->
+            <div class="flex-grow flex flex-col md:flex-row overflow-hidden">
+                
+                <!-- Columna Izquierda: Catálogo de Tallas de Local 419 -->
+                <div class="flex-grow flex flex-col overflow-hidden p-3 sm:p-5 border-b md:border-b-0 md:border-r border-white/5">
+                    <!-- Buscador de Jerseys en POS -->
+                    <div class="mb-3 relative flex-shrink-0">
+                        <svg class="w-4 h-4 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                        <input type="text" id="pos419-catalog-search-input" placeholder="🔍 Buscar por equipo, versión o género en Local 419..." class="w-full bg-dark-200 border border-white/10 rounded-xl pl-9 pr-4 py-2 text-xs focus:outline-none focus:border-amber-400 text-white placeholder-gray-500 transition-colors">
+                    </div>
+
+                    <!-- Grid de Selección Rápida por Talla -->
+                    <div id="pos419-catalog-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 overflow-y-auto custom-scrollbar p-1 flex-grow">
+                        <!-- Se inyecta dinámicamente -->
+                    </div>
+                </div>
+
+                <!-- Columna Derecha: Panel de Carrito POS & Cobro Presencial -->
+                <div class="w-full md:w-96 flex flex-col bg-dark-200/40 p-3 sm:p-5 overflow-hidden flex-shrink-0">
+                    <h3 class="text-xs font-bold text-gray-300 uppercase tracking-wider mb-3 flex items-center justify-between flex-shrink-0">
+                        <span>Resumen de Venta Presencial</span>
+                        <span id="pos419-cart-count-badge" class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 font-mono font-bold text-[10px]">0 pcs</span>
+                    </h3>
+
+                    <!-- Lista de Artículos en Carrito POS -->
+                    <div id="pos419-cart-items-container" class="flex-grow overflow-y-auto space-y-2.5 custom-scrollbar pr-1 mb-3">
+                        <!-- Inyectado vía JS -->
+                    </div>
+
+                    <!-- Footer de Totales y Método de Pago -->
+                    <div class="pt-3 border-t border-white/10 space-y-3 flex-shrink-0 bg-dark-100/90 p-3.5 rounded-xl border border-white/5">
+                        
+                        <!-- Insignia del Nivel de Precio Aplicado -->
+                        <div class="flex items-center justify-between text-xs">
+                            <span class="text-gray-400">Nivel de Precio Aplicado:</span>
+                            <span id="pos419-applied-tier-badge" class="px-2 py-0.5 rounded font-extrabold text-[10px] uppercase bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                                MENUDEO
+                            </span>
+                        </div>
+
+                        <!-- Selector de Método de Pago -->
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Método de Pago:</label>
+                            <select id="pos419-payment-method" class="w-full bg-dark-200 border border-white/10 rounded-xl px-3 py-2 text-xs font-semibold text-white focus:outline-none focus:border-amber-400">
+                                <option value="Efectivo" selected>💵 Efectivo</option>
+                                <option value="Transferencia">📱 Transferencia Bancaria</option>
+                                <option value="Tarjeta">💳 Tarjeta (Terminal)</option>
+                            </select>
+                        </div>
+
+                        <!-- Gran Total -->
+                        <div class="flex items-center justify-between pt-2 border-t border-white/5">
+                            <span class="text-sm font-bold text-white">Total a Cobrar:</span>
+                            <span id="pos419-gran-total" class="text-xl font-black text-amber-400 font-mono">$0.00</span>
+                        </div>
+
+                        <!-- Botón Confirmar y Cobrar -->
+                        <button type="button" id="btn-submit-pos419" disabled class="w-full py-3 px-4 bg-amber-500 hover:bg-amber-400 text-black font-extrabold rounded-xl shadow-lg shadow-amber-500/20 transition-all text-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            Confirmar y Cobrar Venta 419
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
     <!-- Configuración Global API -->
     <script src="./js/config.js?v=6.4.0"></script>
     <!-- Módulo Principal JS -->
-    <script src="./js/app2.js?v=11.8.0"></script>
+    <script src="./js/app2.js?v=14.1.0"></script>
 </body>
 </html>
 
