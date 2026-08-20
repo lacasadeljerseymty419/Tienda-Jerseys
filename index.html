@@ -6,8 +6,22 @@
     <!-- Meta etiquetas de Control de Caché -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
-    <meta http-equiv="Expires" content="0" />
     <title>Jerseys | Tienda Premium</title>
+    <!-- Redirección automática de visitantes públicos a Tienda.html -->
+    <script>
+        (function() {
+            try {
+                const urlParams = new URLSearchParams(window.location.search);
+                const isAdminParam = urlParams.has('admin') || urlParams.has('login');
+                const isHashAdmin = window.location.hash.includes('admin') || window.location.hash.includes('login');
+                const hasSession = !!localStorage.getItem('logged_user');
+                
+                if (!hasSession && !isAdminParam && !isHashAdmin) {
+                    window.location.replace("./404.html");
+                }
+            } catch (e) {}
+        })();
+    </script>
     <!-- Precarga prioritaria de imagen de fondo del Login -->
     <link rel="preload" as="image" href="./login_stadium_bg_opt.jpg">
     <script src="https://cdn.tailwindcss.com"></script>
@@ -2463,7 +2477,7 @@
     <!-- Configuración Global API -->
     <script src="./js/config.js?v=6.9.0"></script>
     <!-- Módulo Principal JS -->
-    <script src="./js/app2.js?v=16.5.0"></script>
+    <script src="./js/app2.js?v=16.6.0"></script>
 </body>
 </html>
 

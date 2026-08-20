@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Redireccionando a la Tienda...</title>
+    <!-- Redirección Meta para compatibilidad inmediata -->
+    <meta http-equiv="refresh" content="0; url=./Tienda.html">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        // Redirección JS inmediata a Tienda.html
+        (function() {
+            window.location.replace("./Tienda.html");
+        })();
+    </script>
+</head>
+<body class="bg-[#09090b] text-gray-100 min-h-screen flex flex-col items-center justify-center p-4 font-sans">
+    <div class="text-center bg-[#141416] p-8 rounded-2xl border border-white/10 shadow-2xl max-w-md w-full">
+        <div class="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+        <h1 class="text-xl font-extrabold text-white mb-2 uppercase tracking-wide">Redireccionando...</h1>
+        <p class="text-gray-400 text-sm mb-6">La dirección ingresada no existe o cambió. Te estamos llevando a la tienda principal.</p>
+        <a href="./Tienda.html" class="inline-block px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-extrabold rounded-xl transition-all shadow-lg shadow-blue-500/20 text-sm">
+            Ir a la Tienda
+        </a>
+    </div>
+</body>
+</html>
