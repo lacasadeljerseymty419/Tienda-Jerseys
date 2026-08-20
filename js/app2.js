@@ -8745,7 +8745,7 @@ function renderInventario419Grid(products) {
                     <img src="${imgUrl}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" alt="${equipoNombre}">
                     <div class="absolute inset-0 bg-gradient-to-t from-dark/60 via-transparent to-transparent opacity-60"></div>
                     <span class="absolute top-2 right-2 px-2.5 py-1 rounded-lg ${stockBadgeColor} font-bold text-[10px] uppercase border shadow-md backdrop-blur-xs">
-                        ${totalStock419} pcs 419
+                        ${totalStock419} pcs
                     </span>
                 </div>
 
