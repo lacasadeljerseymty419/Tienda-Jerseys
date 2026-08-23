@@ -865,9 +865,9 @@ function updateUserLoginUI(loggedUser) {
         if (DOM.local419 && DOM.local419.mobileSection) DOM.local419.mobileSection.classList.remove('hidden');
         if (DOM.btnAdminOrdersNav) DOM.btnAdminOrdersNav.classList.remove('hidden');
         
-        // Para Administrador: Ocultar los botones sueltos "Ordenar" y "Mis Pedidos" (movidos a Local 419)
-        if (DOM.actions && DOM.actions.navJerseysView) DOM.actions.navJerseysView.forEach(btn => btn.classList.add('hidden'));
-        if (DOM.actions && DOM.actions.navMisPedidosView) DOM.actions.navMisPedidosView.forEach(btn => btn.classList.add('hidden'));
+        // Mantener visibles botones de acción principal
+        if (DOM.actions && DOM.actions.navJerseysView) DOM.actions.navJerseysView.forEach(btn => btn.classList.remove('hidden'));
+        if (DOM.actions && DOM.actions.navMisPedidosView) DOM.actions.navMisPedidosView.forEach(btn => btn.classList.remove('hidden'));
 
         const savedSub = localStorage.getItem('current_subperfil') || 'Mayoreo';
         if (DOM.adminSubperfilSelect) {
@@ -996,6 +996,51 @@ async function initApp() {
             closemobileMenu();
         }));
     }
+
+    // 📱 Soporte táctil directo para iPad/Tablets/Celulares en menús desplegables
+    const btnLocal419 = document.getElementById('btn-local419-menu');
+    const btnAdminMenu = document.getElementById('btn-admin-menu');
+
+    function closeAllHeaderDropdowns() {
+        document.querySelectorAll('#local419-menu-wrapper > div, #admin-menu-wrapper > div').forEach(dd => {
+            if (dd.classList.contains('absolute')) {
+                dd.classList.add('opacity-0', 'invisible', 'translate-y-2');
+                dd.classList.remove('opacity-100', 'visible', 'translate-y-0');
+            }
+        });
+    }
+
+    function toggleHeaderDropdown(menuBtn) {
+        if (!menuBtn) return;
+        const wrapper = menuBtn.closest('.relative');
+        if (!wrapper) return;
+        const dropdown = wrapper.querySelector('.absolute');
+        if (!dropdown) return;
+        
+        const isCurrentlyVisible = dropdown.classList.contains('opacity-100') || !dropdown.classList.contains('opacity-0');
+        closeAllHeaderDropdowns();
+
+        if (!isCurrentlyVisible) {
+            dropdown.classList.remove('opacity-0', 'invisible', 'translate-y-2');
+            dropdown.classList.add('opacity-100', 'visible', 'translate-y-0');
+        }
+    }
+
+    if (btnLocal419) {
+        btnLocal419.addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleHeaderDropdown(btnLocal419);
+        });
+    }
+
+    if (btnAdminMenu) {
+        btnAdminMenu.addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleHeaderDropdown(btnAdminMenu);
+        });
+    }
+
+    document.addEventListener('click', () => closeAllHeaderDropdowns());
 
     function handleSubperfilChange(e) {
         const val = e.target.value;
@@ -1715,7 +1760,7 @@ async function handleLoginSubmit(e) {
             const navLogoutBtn = document.getElementById('nav-logout-btn');
             if (navLogoutBtn) {
                 navLogoutBtn.classList.remove('hidden');
-                navLogoutBtn.classList.add('sm:flex');
+                navLogoutBtn.classList.add('md:flex');
             }
             
             // 🌟 Alertas de Súper Mayoreo según Reglas Maestras
@@ -2170,14 +2215,36 @@ async function handleToggleProductActive(id, newStatus) {
 }
 window.handleToggleProductActive = handleToggleProductActive;
 
+function getTallasForGender(genero) {
+    const g = String(genero || '').trim().toLowerCase();
+
+    if (g.includes('dama') || g.includes('mujer') || g.includes('women') || g.includes('lady') || g.includes('female')) {
+        return (typeof configTallasDama !== 'undefined' && configTallasDama && configTallasDama.length > 0)
+            ? configTallasDama
+            : ['XS', 'S', 'M', 'L', 'XL', '2XL'];
+    }
+
+    if (g.includes('niño') || g.includes('nino') || g.includes('infantil') || g.includes('kid') || g.includes('joven') || g.includes('boy') || g.includes('girl')) {
+        return (typeof configTallasNino !== 'undefined' && configTallasNino && configTallasNino.length > 0)
+            ? configTallasNino
+            : ['14', '16', '18', '20', '22', '24', '26', '28'];
+    }
+
+    // Default: Hombre / Adultos / Unisex / Jugador
+    return (typeof configTallasHombre !== 'undefined' && configTallasHombre && configTallasHombre.length > 0)
+        ? configTallasHombre
+        : ['S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL', '6XL'];
+}
+window.getTallasForGender = getTallasForGender;
+
 function updateNewTallaSelect(producto) {
-    if (DOM.admin.newTallaVal) {
+    if (DOM.admin && DOM.admin.newTallaVal && producto) {
         const tallas = getTallasForGender(producto.genero);
         const existentes = (producto.tallas || []).map(t => String(t.talla || '').trim().toUpperCase());
         const disponibles = tallas.filter(t => !existentes.includes(String(t || '').trim().toUpperCase()));
         
         if (disponibles.length === 0) {
-            DOM.admin.newTallaVal.innerHTML = '<option value="" disabled selected>Sin tallas disponibles</option>';
+            DOM.admin.newTallaVal.innerHTML = '<option value="" disabled selected>Todas las tallas agregadas</option>';
         } else {
             DOM.admin.newTallaVal.innerHTML = '<option value="" disabled selected>Elige talla...</option>' + 
                 disponibles.map(t => `<option value="${t}">${t}</option>`).join('');
@@ -8709,7 +8776,7 @@ function renderInventario419Grid(products) {
 
         if (tallasArray.length > 0) {
             sizeBoxesHtml = tallasArray.map(tObj => {
-                const sz = (tObj.talla || '').toUpperCase();
+                const sz = String(tObj.talla || '').toUpperCase();
                 const cant = Number(tObj.stock || 0);
                 totalStock419 += cant;
                 const hasStock = cant > 0;
@@ -8721,7 +8788,7 @@ function renderInventario419Grid(products) {
                 const badgeBg = hasStock ? 'bg-amber-500 text-black font-extrabold' : 'bg-gray-700 text-gray-300';
 
                 return `
-                <div class="relative group/size cursor-pointer" onclick="editLocal419SizeStockPrompt('${prod.id}', '${sz}', ${cant})" title="Editar stock de talla ${sz}">
+                <div class="relative group/size cursor-pointer" onclick="openLocal419InventoryModal('${prod.id}')" title="Gestionar existencias 419 (Talla ${sz})">
                     <div class="w-10 h-10 sm:w-11 sm:h-11 rounded-xl border flex items-center justify-center font-bold text-xs ${boxStyle} transition-all shadow-sm">
                         ${sz}
                     </div>
@@ -8735,7 +8802,7 @@ function renderInventario419Grid(products) {
         const stockBadgeColor = totalStock419 > 0 ? 'bg-amber-500/20 text-amber-400 border-amber-500/30' : 'bg-red-500/10 text-red-400 border-red-500/20';
 
         const addTallaBtn = `
-        <div class="relative cursor-pointer" onclick="addNewLocal419SizePrompt('${prod.id}', '${genero.replace(/'/g, "\\'")}')" title="Agregar Talla">
+        <div class="relative cursor-pointer" onclick="openLocal419InventoryModal('${prod.id}')" title="Añadir / Gestionar Tallas Local 419">
             <div class="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center text-sm font-bold transition-all shadow-sm">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"></path></svg>
             </div>
@@ -8777,7 +8844,12 @@ function renderInventario419Grid(products) {
 
             <!-- Sección de Tallas y Existencias Local 419 -->
             <div class="pt-3 border-t border-white/5">
-                <div class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Existencias 419:</div>
+                <div class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2 flex items-center justify-between">
+                    <span>Existencias 419:</span>
+                    <button type="button" onclick="openLocal419InventoryModal('${prod.id}')" class="text-amber-400 hover:underline font-bold text-[9px] flex items-center gap-1">
+                        <span>✏️ Gestionar</span>
+                    </button>
+                </div>
                 <div class="flex flex-wrap gap-2 items-center">
                     ${sizeBoxesHtml}
                     ${addTallaBtn}
@@ -8827,79 +8899,269 @@ async function updateLocal419SizeStock(id_playera, talla, nuevaCantidad) {
                     else targetProd.tallas.push({ talla: talla, stock: cantNum, id_inventario: '' });
                 }
             }
-            const toast = Swal.mixin({ toast: true, position: 'bottom-end', showConfirmButton: false, timer: 1500, background: '#151515', color: '#fff' });
-            toast.fire({ icon: 'success', title: `Stock 419 (${talla}): ${cantNum} pzas` });
         } else {
             throw new Error(data.message || 'No se pudo actualizar el stock en Local 419');
         }
     } catch (err) {
         console.error('Error al actualizar stock 419:', err);
-        Swal.fire({ icon: 'error', title: 'Error al actualizar', text: err.message, background: '#151515', color: '#fff' });
+        throw err;
     }
 }
 window.updateLocal419SizeStock = updateLocal419SizeStock;
 
-async function editLocal419SizeStockPrompt(id_playera, talla, cantActual) {
-    const { value: nuevaCant } = await Swal.fire({
-        title: `Editar Stock Talla ${talla} (Local 419)`,
-        input: 'number',
-        inputLabel: 'Ingresa la nueva cantidad en existencia:',
-        inputValue: cantActual,
-        inputAttributes: { min: '0', step: '1' },
-        showCancelButton: true,
-        confirmButtonText: 'Actualizar Stock',
-        cancelButtonText: 'Cancelar',
-        confirmButtonColor: '#2563eb',
-        cancelButtonColor: '#3f3f46',
-        background: '#151515', color: '#fff'
-    });
+// =========================================================================
+// MÓDULO LOCAL 419: GESTIÓN DE TALLAS EN LOTE (MODAL ESTILO INVENTARIO GENERAL)
+// =========================================================================
 
-    if (nuevaCant !== undefined && nuevaCant !== null && nuevaCant !== "") {
-        await updateLocal419SizeStock(id_playera, talla, nuevaCant);
-        fetchProducts419(true);
+let currentJersey419ToManage = null;
+
+function updateNewTalla419Select(producto) {
+    const selectNew = document.getElementById('new-talla-419-val');
+    if (!selectNew || !producto) return;
+
+    const genero = producto.genero || 'Hombre';
+    const tallasGenericas = getTallasForGender(genero);
+
+    // Obtener tallas ya agregadas a este jersey (en memoria o registradas)
+    const existentes = (producto.tallas || []).map(t => String(t.talla || '').trim().toUpperCase());
+
+    // Filtrar para dejar SOLAMENTE las tallas que AÚN NO se han agregado
+    const disponibles = tallasGenericas.filter(t => !existentes.includes(String(t || '').trim().toUpperCase()));
+
+    if (disponibles.length === 0) {
+        selectNew.innerHTML = `<option value="" disabled selected>Todas las tallas agregadas</option>`;
+    } else {
+        selectNew.innerHTML = `<option value="" disabled selected>Elige talla...</option>` +
+            disponibles.map(t => `<option value="${t}">${t}</option>`).join('');
     }
 }
-window.editLocal419SizeStockPrompt = editLocal419SizeStockPrompt;
+window.updateNewTalla419Select = updateNewTalla419Select;
 
-async function addNewLocal419SizePrompt(id_playera, genero) {
-    const listTallas = (typeof getTallasForGender === 'function') ? getTallasForGender(genero) : ['S', 'M', 'L', 'XL', 'XXL', '2XL', '3XL', '14', '16', '18', '20', '22', '24', '26', '28'];
-    const optionsHtml = listTallas.map(t => `<option value="${t}">${t}</option>`).join('');
+function openLocal419InventoryModal(idOrObj) {
+    let prod = null;
+    if (typeof idOrObj === 'object' && idOrObj !== null) {
+        prod = idOrObj;
+    } else {
+        prod = (allProducts419 || []).find(p => String(p.id || p.id_articulo).toUpperCase() === String(idOrObj).toUpperCase());
+    }
 
-    const { value: formValues } = await Swal.fire({
-        title: 'Agregar Talla al Local 419',
-        html: `
-            <div class="flex flex-col gap-3 text-left">
-                <div>
-                    <label class="text-xs text-gray-400 font-semibold mb-1 block">Selecciona la Talla:</label>
-                    <select id="swal-talla-select" class="w-full bg-dark-100 border border-white/10 rounded-lg p-2 text-sm text-white focus:outline-none focus:border-amber-400">${optionsHtml}</select>
+    if (!prod) return;
+
+    // Clonar para permitir modificaciones locales antes de guardar
+    currentJersey419ToManage = JSON.parse(JSON.stringify(prod));
+
+    const modal = document.getElementById('local419-inventory-manage-modal');
+    if (!modal) return;
+
+    const imgEl = document.getElementById('local419-inv-modal-img');
+    const titleEl = document.getElementById('local419-inv-modal-title');
+    const subEl = document.getElementById('local419-inv-modal-sub');
+    const idEl = document.getElementById('local419-inv-modal-id');
+
+    const rawImg = getFirstImage(currentJersey419ToManage.foto || currentJersey419ToManage.imagen);
+    if (imgEl) imgEl.src = rawImg ? getOptimizedImageUrl(rawImg, 150) : 'https://via.placeholder.com/150';
+    if (titleEl) titleEl.textContent = (currentJersey419ToManage.nombre || currentJersey419ToManage.equipo || 'JERSEY').toUpperCase();
+    if (subEl) subEl.textContent = `Local 419 | ${currentJersey419ToManage.tipo || ''} ${currentJersey419ToManage.version || ''} (${currentJersey419ToManage.genero || 'Adulto'})`.trim();
+    if (idEl) idEl.textContent = `ID: ${currentJersey419ToManage.id || currentJersey419ToManage.id_articulo}`;
+
+    // Actualizar select de tallas con filtrado por género y exclusión de agregadas
+    updateNewTalla419Select(currentJersey419ToManage);
+
+    renderLocal419InventorySizes(currentJersey419ToManage);
+
+    document.body.style.overflow = 'hidden';
+    modal.classList.remove('hidden');
+    void modal.offsetWidth;
+    modal.classList.remove('opacity-0');
+    modal.querySelector('.transform').classList.remove('scale-95');
+    modal.querySelector('.transform').classList.add('scale-100');
+}
+window.openLocal419InventoryModal = openLocal419InventoryModal;
+window.editLocal419SizeStockPrompt = openLocal419InventoryModal;
+window.addNewLocal419SizePrompt = openLocal419InventoryModal;
+
+function closeLocal419InventoryModal() {
+    const modal = document.getElementById('local419-inventory-manage-modal');
+    if (!modal) return;
+
+    modal.classList.add('opacity-0');
+    modal.querySelector('.transform').classList.remove('scale-100');
+    modal.querySelector('.transform').classList.add('scale-95');
+    setTimeout(() => {
+        modal.classList.add('hidden');
+        document.body.style.overflow = '';
+        currentJersey419ToManage = null;
+    }, 300);
+}
+window.closeLocal419InventoryModal = closeLocal419InventoryModal;
+
+function renderLocal419InventorySizes(prod) {
+    const container = document.getElementById('local419-inv-tallas-list');
+    if (!container) return;
+
+    container.innerHTML = '';
+
+    if (!prod.tallas || prod.tallas.length === 0) {
+        container.innerHTML = `<p class="text-xs text-gray-500 py-3 text-center italic bg-dark-200/20 rounded-xl border border-white/5">No hay tallas registradas en Local 419.</p>`;
+        return;
+    }
+
+    prod.tallas.forEach((t, idx) => {
+        const stockActual = t.stock !== undefined ? t.stock : (t.inventario || 0);
+        const isNewTag = t.isNew || (t.id_inventario && String(t.id_inventario).startsWith('TEMP_'));
+        const displayTalla = String(t.talla || '');
+        const div = document.createElement('div');
+        div.className = 'flex items-center justify-between gap-3 bg-dark-200/30 p-2.5 rounded-xl border border-white/5 hover:border-amber-500/20 transition-colors';
+        div.innerHTML = `
+            <div class="flex items-center gap-3">
+                <div class="w-12 h-10 bg-dark-200/60 border border-white/10 rounded-lg flex items-center justify-center font-bold text-amber-400 text-sm relative shadow-sm">
+                    ${displayTalla}
+                    ${isNewTag ? '<span class="absolute -top-1.5 -right-1.5 bg-amber-500 text-black text-[7px] font-extrabold px-1 rounded-full shadow">NUEVA</span>' : ''}
                 </div>
                 <div>
-                    <label class="text-xs text-gray-400 font-semibold mb-1 block">Cantidad Inicial en Local 419:</label>
-                    <input id="swal-cant-input" type="number" min="0" value="1" class="w-full bg-dark-100 border border-white/10 rounded-lg p-2 text-sm text-white focus:outline-none focus:border-amber-400">
+                    <div class="text-xs text-gray-200 font-semibold">${prod.nombre || prod.equipo || ''}</div>
+                    <div class="text-[10px] text-gray-400">Categoría: ${t.categoria || prod.genero || 'Adultos'}</div>
                 </div>
             </div>
-        `,
-        focusConfirm: false,
-        showCancelButton: true,
-        confirmButtonText: 'Guardar Talla',
-        cancelButtonText: 'Cancelar',
-        confirmButtonColor: '#f59e0b',
-        cancelButtonColor: '#3f3f46',
-        background: '#151515', color: '#fff',
-        preConfirm: () => {
-            return {
-                talla: document.getElementById('swal-talla-select').value,
-                cantidad: document.getElementById('swal-cant-input').value
-            };
+            <div class="flex items-center gap-3">
+                <div class="flex items-center gap-2">
+                    <label class="text-[10px] text-gray-400 font-bold uppercase tracking-wider">STOCK 419:</label>
+                    <input type="number" min="0" value="${stockActual}" class="w-24 bg-dark-200/80 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs font-bold text-center focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400 text-amber-300 input-stock-419-local-val" data-idx="${idx}">
+                </div>
+                <button type="button" onclick="window.removeLocal419SizeFromMemory(${idx})" class="p-1.5 text-gray-500 hover:text-red-400 hover:bg-white/5 rounded-lg transition-colors" title="Eliminar talla">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                </button>
+            </div>
+        `;
+        container.appendChild(div);
+    });
+
+    // Escuchar cambios locales en los inputs
+    document.querySelectorAll('.input-stock-419-local-val').forEach(input => {
+        input.addEventListener('input', (e) => {
+            const idx = parseInt(e.target.getAttribute('data-idx'));
+            const val = parseInt(e.target.value);
+            if (!isNaN(idx) && currentJersey419ToManage && currentJersey419ToManage.tallas && currentJersey419ToManage.tallas[idx]) {
+                currentJersey419ToManage.tallas[idx].stock = isNaN(val) || val < 0 ? 0 : val;
+            }
+        });
+    });
+}
+
+function removeLocal419SizeFromMemory(idx) {
+    if (!currentJersey419ToManage || !currentJersey419ToManage.tallas) return;
+    currentJersey419ToManage.tallas.splice(idx, 1);
+    renderLocal419InventorySizes(currentJersey419ToManage);
+    updateNewTalla419Select(currentJersey419ToManage);
+}
+window.removeLocal419SizeFromMemory = removeLocal419SizeFromMemory;
+
+function handleAddNewTalla419(e) {
+    if (e) e.preventDefault();
+    if (!currentJersey419ToManage) return;
+
+    const selectEl = document.getElementById('new-talla-419-val');
+    const inputStockEl = document.getElementById('new-stock-419-val');
+
+    const tallaVal = selectEl && selectEl.value ? String(selectEl.value).trim() : '';
+    const stockVal = parseInt(inputStockEl ? inputStockEl.value : 0);
+
+    if (!tallaVal) return;
+    const finalStock = isNaN(stockVal) || stockVal < 0 ? 0 : stockVal;
+
+    if (!currentJersey419ToManage.tallas) currentJersey419ToManage.tallas = [];
+
+    // Verificar si la talla ya existe
+    const existing = currentJersey419ToManage.tallas.find(t => String(t.talla).trim().toUpperCase() === tallaVal.toUpperCase());
+    if (existing) {
+        existing.stock = finalStock;
+        existing.isNew = true;
+    } else {
+        currentJersey419ToManage.tallas.push({
+            id_inventario: 'TEMP_419_' + Date.now(),
+            id_producto: currentJersey419ToManage.id,
+            talla: tallaVal,
+            categoria: currentJersey419ToManage.genero || 'Adultos',
+            stock: finalStock,
+            isNew: true
+        });
+    }
+
+    if (document.getElementById('form-add-talla-419')) {
+        document.getElementById('form-add-talla-419').reset();
+    }
+
+    renderLocal419InventorySizes(currentJersey419ToManage);
+    updateNewTalla419Select(currentJersey419ToManage);
+
+    const Toast = Swal.mixin({
+        toast: true,
+        position: 'bottom-end',
+        showConfirmButton: false,
+        timer: 2500,
+        background: '#141416',
+        color: '#fff'
+    });
+    Toast.fire({
+        icon: 'info',
+        title: `Talla ${tallaVal} agregada. Presiona "Actualizar Datos" para guardar.`
+    });
+}
+
+async function handleSaveBatchTallas419() {
+    if (!currentJersey419ToManage) return;
+
+    // Sincronizar existencias leídas de los inputs
+    document.querySelectorAll('.input-stock-419-local-val').forEach(input => {
+        const idx = parseInt(input.getAttribute('data-idx'));
+        const val = parseInt(input.value);
+        if (!isNaN(idx) && currentJersey419ToManage && currentJersey419ToManage.tallas && currentJersey419ToManage.tallas[idx]) {
+            currentJersey419ToManage.tallas[idx].stock = isNaN(val) || val < 0 ? 0 : val;
         }
     });
 
-    if (formValues && formValues.talla) {
-        await updateLocal419SizeStock(id_playera, formValues.talla, formValues.cantidad);
+    const btnSubmit = document.getElementById('btn-submit-save-tallas-419');
+    if (!btnSubmit) return;
+
+    const originalText = btnSubmit.innerHTML;
+    btnSubmit.disabled = true;
+    btnSubmit.innerHTML = `
+        <div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin inline-block mr-1"></div>
+        <span>Guardando Datos...</span>
+    `;
+
+    try {
+        const idPlayera = currentJersey419ToManage.id || currentJersey419ToManage.id_articulo;
+        const tallasToSave = currentJersey419ToManage.tallas || [];
+
+        // Guardar cada talla en backend usando el servicio updateLocal419SizeStock
+        for (const t of tallasToSave) {
+            await updateLocal419SizeStock(idPlayera, t.talla, t.stock);
+        }
+
+        Swal.fire({
+            icon: 'success',
+            title: '¡Inventario 419 Guardado!',
+            text: 'Los cambios de existencias en Local 419 se actualizaron correctamente.',
+            background: '#151515', color: '#fff',
+            timer: 1800, showConfirmButton: false
+        });
+
+        closeLocal419InventoryModal();
         fetchProducts419(true);
+    } catch (err) {
+        console.error("Error al guardar inventario batch 419:", err);
+        Swal.fire({
+            icon: 'error',
+            title: 'Error al Guardar',
+            text: err.message || 'No se pudieron actualizar las existencias.',
+            background: '#151515', color: '#fff'
+        });
+    } finally {
+        btnSubmit.disabled = false;
+        btnSubmit.innerHTML = originalText;
     }
 }
-window.addNewLocal419SizePrompt = addNewLocal419SizePrompt;
 
 function openInventario419View() {
     const modal = document.getElementById('local419-inventario-modal');
@@ -8968,6 +9230,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const closeBtn = document.getElementById('close-local419-inventario-modal');
     if (closeBtn) {
         closeBtn.onclick = () => closeInventario419View();
+    }
+
+    const closeManage419Btn = document.getElementById('close-local419-inventory-manage-modal');
+    if (closeManage419Btn) {
+        closeManage419Btn.onclick = () => closeLocal419InventoryModal();
+    }
+
+    const formAddTalla419 = document.getElementById('form-add-talla-419');
+    if (formAddTalla419) {
+        formAddTalla419.onsubmit = (e) => handleAddNewTalla419(e);
+    }
+
+    const btnSaveBatch419 = document.getElementById('btn-submit-save-tallas-419');
+    if (btnSaveBatch419) {
+        btnSaveBatch419.onclick = () => handleSaveBatchTallas419();
     }
 
     const closePosBtn = document.getElementById('close-pos-local419-modal');
@@ -9230,7 +9507,7 @@ function renderPos419Catalog() {
         // Botones de selección rápida por talla
         let sizeButtonsHtml = '';
         tallasArray.forEach(tObj => {
-            const sz = (tObj.talla || '').toUpperCase();
+            const sz = String(tObj.talla || '').toUpperCase();
             const avail419 = Number(tObj.stock || 0);
             
             const inCartItem = pos419Cart.find(ci => ci.id_playera === prod.id && ci.talla === sz);
