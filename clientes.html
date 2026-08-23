@@ -2243,8 +2243,8 @@
     </div>
 
     <!-- Modal: Punto de Venta / Venta Exprés Local 419 -->
-    <div id="modal-pos-local419" class="fixed inset-0 z-[80] flex items-center justify-center hidden bg-dark/95 backdrop-blur-md transition-opacity duration-300 opacity-0 p-2 sm:p-6 overflow-hidden">
-        <div class="bg-dark-100 border border-amber-500/30 rounded-2xl w-full max-w-6xl h-[92vh] flex flex-col shadow-2xl shadow-amber-500/10 overflow-hidden relative">
+    <div id="modal-pos-local419" class="fixed inset-0 z-[80] flex items-center justify-center hidden bg-dark/95 backdrop-blur-md transition-opacity duration-300 opacity-0 p-1.5 sm:p-4 overflow-hidden">
+        <div class="bg-dark-100 border border-amber-500/30 rounded-2xl w-full max-w-[98vw] xl:max-w-[1680px] h-[96vh] flex flex-col shadow-2xl shadow-amber-500/10 overflow-hidden relative">
             
             <!-- Encabezado del Modal -->
             <div class="p-3.5 sm:p-5 border-b border-white/10 bg-black/40 flex justify-between items-center flex-shrink-0">
@@ -2265,13 +2265,20 @@
             </div>
 
             <!-- Barra de Selección de Cliente -->
-            <div class="bg-dark-200/60 p-3 sm:p-4 border-b border-white/5 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 flex-shrink-0">
+            <div class="bg-dark-200/60 p-3 sm:p-4 border-b border-white/5 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 flex-shrink-0">
                 <!-- Conmutadores de Cliente -->
-                <div class="flex items-center gap-2">
+                <div class="flex flex-wrap items-center gap-2">
                     <button type="button" id="btn-pos419-client-mostrador" class="px-3.5 py-2 rounded-xl bg-amber-500 text-black font-bold text-xs shadow-md transition-all flex items-center gap-1.5 border border-amber-400">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path></svg>
                         Cliente Mostrador (Menudeo)
                     </button>
+                    
+                    <!-- Campo para Nombre Personalizado del Cliente Mostrador -->
+                    <div id="pos419-mostrador-name-container" class="flex items-center gap-1.5 bg-black/40 border border-white/10 rounded-xl px-3 py-1.5 focus-within:border-amber-400 transition-colors">
+                        <span class="text-[11px] text-gray-400 font-semibold flex items-center gap-1">👤 Nombre:</span>
+                        <input type="text" id="pos419-mostrador-name-input" placeholder="Nombre cliente (opcional)..." class="bg-transparent text-xs text-amber-300 font-bold placeholder-gray-500 focus:outline-none w-44 sm:w-56">
+                    </div>
+
                     <button type="button" id="btn-pos419-toggle-search-client" class="px-3.5 py-2 rounded-xl bg-dark-100 hover:bg-white/10 text-gray-300 hover:text-white font-semibold text-xs border border-white/10 transition-all flex items-center gap-1.5">
                         <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
                         Buscar Cliente Registrado
@@ -2285,18 +2292,31 @@
                 </div>
 
                 <!-- Insignia del Cliente Actual -->
-                <div id="pos419-active-client-badge" class="flex items-center gap-2 bg-black/30 px-3 py-1.5 rounded-xl border border-white/10">
+                <div id="pos419-active-client-badge" class="flex items-center gap-2 bg-black/30 px-3 py-1.5 rounded-xl border border-white/10 flex-shrink-0">
                     <span class="text-[10px] text-gray-400 font-semibold uppercase">Cliente:</span>
                     <span id="pos419-active-client-name" class="text-xs font-bold text-amber-400">Cliente Mostrador</span>
                     <span id="pos419-active-client-profile" class="px-2 py-0.5 rounded text-[9px] font-extrabold uppercase bg-white/10 text-gray-300">Menudeo</span>
                 </div>
             </div>
 
+            <!-- Barra de Pestañas Móvil (< 768px) -->
+            <div class="flex md:hidden border-b border-white/10 bg-black/40 p-1.5 gap-1.5 flex-shrink-0">
+                <button type="button" id="btn-pos419-tab-catalog" onclick="if(window.switchPOS419MobileTab) window.switchPOS419MobileTab('catalog');" class="flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 bg-amber-500 text-black shadow-md border border-amber-400">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path></svg>
+                    <span>👕 Catálogo 419</span>
+                </button>
+                <button type="button" id="btn-pos419-tab-cart" onclick="if(window.switchPOS419MobileTab) window.switchPOS419MobileTab('cart');" class="flex-1 py-2 px-3 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 bg-white/5 text-gray-300 border border-white/10">
+                    <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                    <span>🛒 Carrito (<span id="pos419-mobile-tab-count">0</span>)</span>
+                    <span id="pos419-mobile-tab-total" class="font-mono text-amber-400 font-bold ml-1">$0.00</span>
+                </button>
+            </div>
+
             <!-- Cuerpo Principal: Grid de Catálogo 419 + Panel Lateral POS -->
             <div class="flex-grow flex flex-col md:flex-row overflow-hidden">
                 
                 <!-- Columna Izquierda: Catálogo de Tallas de Local 419 -->
-                <div class="flex-grow flex flex-col overflow-hidden p-3 sm:p-5 border-b md:border-b-0 md:border-r border-white/5">
+                <div id="pos419-col-catalog" class="w-full flex-grow flex flex-col overflow-hidden p-3 sm:p-5 border-b md:border-b-0 md:border-r border-white/5">
                     <!-- Buscador de Jerseys en POS -->
                     <div class="mb-3 relative flex-shrink-0">
                         <svg class="w-4 h-4 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
@@ -2310,7 +2330,7 @@
                 </div>
 
                 <!-- Columna Derecha: Panel de Carrito POS & Cobro Presencial -->
-                <div class="w-full md:w-96 flex flex-col bg-dark-200/40 p-3 sm:p-5 overflow-hidden flex-shrink-0">
+                <div id="pos419-col-cart" class="w-full md:w-[420px] lg:w-[480px] xl:w-[520px] hidden md:flex flex-col bg-dark-200/40 p-3.5 sm:p-5 overflow-hidden flex-shrink-0">
                     <h3 class="text-xs font-bold text-gray-300 uppercase tracking-wider mb-3 flex items-center justify-between flex-shrink-0">
                         <span>Resumen de Venta Presencial</span>
                         <span id="pos419-cart-count-badge" class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 font-mono font-bold text-[10px]">0 pcs</span>
@@ -2340,6 +2360,31 @@
                                 <option value="Transferencia">📱 Transferencia Bancaria</option>
                                 <option value="Tarjeta">💳 Tarjeta (Terminal)</option>
                             </select>
+                        </div>
+
+                        <!-- Ajuste de Descuento Especial ($) -->
+                        <div class="pt-2 border-t border-white/5 space-y-1.5">
+                            <div class="flex items-center justify-between text-xs">
+                                <label class="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1">
+                                    <span>🏷️ Descuento ($):</span>
+                                </label>
+                                <div class="relative w-28">
+                                    <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-amber-400 font-bold text-xs">$</span>
+                                    <input type="number" min="0" step="0.01" id="pos419-discount-val" placeholder="0.00" class="w-full bg-dark-200 border border-white/10 rounded-lg pl-6 pr-2 py-1 text-xs font-bold text-amber-300 focus:outline-none focus:border-amber-400">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Resumen de Subtotal y Descuento (Si Aplica) -->
+                        <div id="pos419-discount-summary-container" class="hidden text-xs space-y-1 pt-1 border-t border-white/5 font-mono">
+                            <div class="flex justify-between text-gray-400 text-[10px]">
+                                <span>Subtotal prendas:</span>
+                                <span id="pos419-subtotal-val">$0.00</span>
+                            </div>
+                            <div class="flex justify-between text-emerald-400 text-[10px] font-bold">
+                                <span>Descuento aplicado:</span>
+                                <span id="pos419-discount-applied-val">-$0.00</span>
+                            </div>
                         </div>
 
                         <!-- Gran Total -->
@@ -2561,7 +2606,7 @@
     <!-- Configuración Global API -->
     <script src="./js/config.js?v=6.9.0"></script>
     <!-- Módulo Principal JS -->
-    <script src="./js/app2.js?v=17.8.0"></script>
+    <script src="./js/app2.js?v=18.2.0"></script>
 </body>
 </html>
 

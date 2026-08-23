@@ -9307,6 +9307,24 @@ document.addEventListener('DOMContentLoaded', () => {
     if (btnSubmitPOS) {
         btnSubmitPOS.onclick = () => submitPos419Order();
     }
+
+    const inputMostradorName = document.getElementById('pos419-mostrador-name-input');
+    if (inputMostradorName) {
+        inputMostradorName.oninput = (e) => {
+            if (pos419Client.id_cliente === 'CLI-MOSTRADOR') {
+                pos419Client.nombre_mostrador_custom = e.target.value.trim();
+                const nameEl = document.getElementById('pos419-active-client-name');
+                if (nameEl) {
+                    nameEl.textContent = pos419Client.nombre_mostrador_custom
+                        ? `Cliente Mostrador (${pos419Client.nombre_mostrador_custom})`
+                        : 'Cliente Mostrador';
+                }
+            }
+        };
+    }
+
+    const discountValEl = document.getElementById('pos419-discount-val');
+    if (discountValEl) discountValEl.oninput = () => recalculatePos419Cart();
 });
 
 // =========================================================================
@@ -9316,6 +9334,38 @@ document.addEventListener('DOMContentLoaded', () => {
 let pos419Cart = [];
 let pos419Client = { id_cliente: 'CLI-MOSTRADOR', nombre_completo: 'Cliente Mostrador', perfil: 'Menudeo' };
 let allClientsPOSCache = [];
+
+function switchPOS419MobileTab(tab) {
+    const colCatalog = document.getElementById('pos419-col-catalog');
+    const colCart = document.getElementById('pos419-col-cart');
+    const btnTabCatalog = document.getElementById('btn-pos419-tab-catalog');
+    const btnTabCart = document.getElementById('btn-pos419-tab-cart');
+
+    if (!colCatalog || !colCart) return;
+
+    if (tab === 'cart') {
+        colCatalog.classList.add('hidden');
+        colCatalog.classList.remove('flex');
+        colCart.classList.remove('hidden');
+        colCart.classList.add('flex');
+
+        if (btnTabCatalog && btnTabCart) {
+            btnTabCatalog.className = 'flex-1 py-2 px-3 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 bg-white/5 text-gray-300 border border-white/10';
+            btnTabCart.className = 'flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 bg-amber-500 text-black shadow-md border border-amber-400';
+        }
+    } else {
+        colCatalog.classList.remove('hidden');
+        colCatalog.classList.add('flex');
+        colCart.classList.add('hidden');
+        colCart.classList.remove('flex');
+
+        if (btnTabCatalog && btnTabCart) {
+            btnTabCatalog.className = 'flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 bg-amber-500 text-black shadow-md border border-amber-400';
+            btnTabCart.className = 'flex-1 py-2 px-3 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 bg-white/5 text-gray-300 border border-white/10';
+        }
+    }
+}
+window.switchPOS419MobileTab = switchPOS419MobileTab;
 
 async function openPos419Modal() {
     const modal = document.getElementById('modal-pos-local419');
@@ -9328,6 +9378,9 @@ async function openPos419Modal() {
     // Ocultar buscador de clientes por defecto
     const searchContainer = document.getElementById('pos419-client-search-container');
     if (searchContainer) searchContainer.classList.add('hidden');
+
+    // Activar pestaña Catálogo por defecto en móvil
+    switchPOS419MobileTab('catalog');
 
     // 2. Cargar existencias de Local 419 si no están en memoria
     if (!allProducts419 || allProducts419.length === 0) {
@@ -9381,8 +9434,31 @@ function selectPos419Client(clientObj) {
     
     const nameEl = document.getElementById('pos419-active-client-name');
     const profileEl = document.getElementById('pos419-active-client-profile');
+    const containerMostrador = document.getElementById('pos419-mostrador-name-container');
+    const inputMostradorName = document.getElementById('pos419-mostrador-name-input');
     
-    if (nameEl) nameEl.textContent = pos419Client.nombre_completo || pos419Client.nombre || 'Cliente Mostrador';
+    const isMostrador = pos419Client.id_cliente === 'CLI-MOSTRADOR';
+
+    if (containerMostrador) {
+        if (isMostrador) {
+            containerMostrador.classList.remove('hidden');
+            containerMostrador.classList.add('flex');
+        } else {
+            containerMostrador.classList.add('hidden');
+            containerMostrador.classList.remove('flex');
+            if (inputMostradorName) inputMostradorName.value = '';
+            pos419Client.nombre_mostrador_custom = '';
+        }
+    }
+
+    if (nameEl) {
+        if (isMostrador && pos419Client.nombre_mostrador_custom) {
+            nameEl.textContent = `Cliente Mostrador (${pos419Client.nombre_mostrador_custom})`;
+        } else {
+            nameEl.textContent = pos419Client.nombre_completo || pos419Client.nombre || 'Cliente Mostrador';
+        }
+    }
+
     if (profileEl) {
         const perf = pos419Client.perfil || 'Menudeo';
         profileEl.textContent = perf;
@@ -9756,6 +9832,55 @@ async function configurePos419Personalizacion(idx) {
 }
 window.configurePos419Personalizacion = configurePos419Personalizacion;
 
+async function editPos419ItemPrice(idx) {
+    const item = pos419Cart[idx];
+    if (!item) return;
+
+    const currentPrice = item.precio_manual !== undefined ? item.precio_manual : (item.precio_unitario_aplicado || 0);
+
+    const { value: formValues, isDenied } = await Swal.fire({
+        title: `Modificar Precio Unitario`,
+        html: `
+            <div class="flex flex-col gap-3 text-left">
+                <div class="bg-dark-200 p-2.5 rounded-xl border border-white/5 space-y-1 text-xs">
+                    <div class="font-bold text-white">${item.nombre}</div>
+                    <div class="text-[11px] text-gray-400">Talla: <strong class="text-amber-400">${item.talla}</strong> | Sistema (${item.appliedTier || 'Menudeo'}): <strong class="text-emerald-400">$${(item.precio_sistema || item.precio_menudeo || 0).toFixed(2)}</strong></div>
+                </div>
+                <div>
+                    <label class="text-xs text-gray-400 font-semibold mb-1 block">Nuevo Precio Unitario ($):</label>
+                    <input id="swal-edit-price-input" type="number" step="0.01" min="0" value="${currentPrice}" class="w-full bg-dark-100 border border-white/10 rounded-xl p-2.5 text-sm text-amber-300 font-bold font-mono focus:outline-none focus:border-amber-400">
+                </div>
+            </div>
+        `,
+        showCancelButton: true,
+        showDenyButton: item.precio_manual !== undefined,
+        confirmButtonText: 'Aplicar Precio',
+        denyButtonText: 'Restablecer Precio Sistema',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#f59e0b',
+        denyButtonColor: '#3f3f46',
+        cancelButtonColor: '#1f2937',
+        background: '#151515', color: '#fff',
+        preConfirm: () => {
+            const val = parseFloat(document.getElementById('swal-edit-price-input').value);
+            if (isNaN(val) || val < 0) {
+                Swal.showValidationMessage('Ingresa un precio válido (mayor o igual a 0)');
+                return false;
+            }
+            return val;
+        }
+    });
+
+    if (isDenied) {
+        delete item.precio_manual;
+        recalculatePos419Cart();
+    } else if (formValues !== undefined && typeof formValues === 'number') {
+        item.precio_manual = formValues;
+        recalculatePos419Cart();
+    }
+}
+window.editPos419ItemPrice = editPos419ItemPrice;
+
 function recalculatePos419Cart() {
     let totalPieces = 0;
     pos419Cart.forEach(i => totalPieces += i.cantidad);
@@ -9788,17 +9913,21 @@ function recalculatePos419Cart() {
                 : 'px-2 py-0.5 rounded font-extrabold text-[10px] uppercase bg-white/10 text-gray-300');
     }
     
-    let granTotal = 0;
+    let subtotalItems = 0;
     const isMay = (appliedTier === 'Mayoreo' || appliedTier === 'Súper Mayoreo');
 
     pos419Cart.forEach(item => {
         item.appliedTier = appliedTier;
-        let pUnit = item.precio_menudeo || 0;
+        let pSystem = item.precio_menudeo || 0;
         if (appliedTier === 'Súper Mayoreo' && item.precio_mayoreo_super > 0) {
-            pUnit = item.precio_mayoreo_super;
+            pSystem = item.precio_mayoreo_super;
         } else if ((appliedTier === 'Mayoreo' || appliedTier === 'Súper Mayoreo') && item.precio_mayoreo > 0) {
-            pUnit = item.precio_mayoreo;
+            pSystem = item.precio_mayoreo;
         }
+        item.precio_sistema = pSystem;
+
+        // Usar precio manual si fue modificado manualmente por el usuario
+        let pUnit = item.precio_manual !== undefined ? item.precio_manual : pSystem;
 
         // Calcular costo de personalización
         let rawOficial = item.personalizaciones_oficiales;
@@ -9820,13 +9949,42 @@ function recalculatePos419Cart() {
         item.costo_personalizacion = costoPersUnit;
         item.precio_unitario_aplicado = pUnit;
         item.subtotal = (pUnit + costoPersUnit) * item.cantidad;
-        granTotal += item.subtotal;
+        subtotalItems += item.subtotal;
     });
+
+    // Calcular descuento especial global ($)
+    const discountValEl = document.getElementById('pos419-discount-val');
+    const discountInputVal = discountValEl ? parseFloat(discountValEl.value || 0) : 0;
+
+    let descuentoMonto = 0;
+    if (!isNaN(discountInputVal) && discountInputVal > 0) {
+        descuentoMonto = Math.min(subtotalItems, discountInputVal);
+    }
+
+    const granTotal = Math.max(0, subtotalItems - descuentoMonto);
+
+    // Actualizar elementos de resumen en pantalla
+    const summaryContainer = document.getElementById('pos419-discount-summary-container');
+    const subtotalValEl = document.getElementById('pos419-subtotal-val');
+    const discountAppliedValEl = document.getElementById('pos419-discount-applied-val');
+
+    if (descuentoMonto > 0) {
+        if (summaryContainer) summaryContainer.classList.remove('hidden');
+        if (subtotalValEl) subtotalValEl.textContent = `$${subtotalItems.toFixed(2)}`;
+        if (discountAppliedValEl) discountAppliedValEl.textContent = `-$${descuentoMonto.toFixed(2)}`;
+    } else {
+        if (summaryContainer) summaryContainer.classList.add('hidden');
+    }
     
     const totalEl = document.getElementById('pos419-gran-total');
     const badgeCountEl = document.getElementById('pos419-cart-count-badge');
     const btnSubmit = document.getElementById('btn-submit-pos419');
     
+    const mobileTabCount = document.getElementById('pos419-mobile-tab-count');
+    const mobileTabTotal = document.getElementById('pos419-mobile-tab-total');
+    if (mobileTabCount) mobileTabCount.textContent = `${totalPieces}`;
+    if (mobileTabTotal) mobileTabTotal.textContent = `$${granTotal.toFixed(2)}`;
+
     if (totalEl) totalEl.textContent = `$${granTotal.toFixed(2)}`;
     if (badgeCountEl) badgeCountEl.textContent = `${totalPieces} pcs`;
     if (btnSubmit) btnSubmit.disabled = (pos419Cart.length === 0);
@@ -9859,6 +10017,11 @@ function renderPos419Cart() {
             persBadgeHtml = `<button type="button" onclick="window.configurePos419Personalizacion(${idx})" class="mt-1 text-[9px] bg-white/5 hover:bg-white/10 text-gray-400 border border-white/10 px-1.5 py-0.5 rounded-md font-semibold flex items-center gap-1 transition-all"><span>+ Agregar Personalizado</span></button>`;
         }
 
+        const isManual = item.precio_manual !== undefined;
+        const priceDisplayHtml = isManual
+            ? `<button type="button" onclick="window.editPos419ItemPrice(${idx})" class="text-[10px] font-bold text-amber-300 bg-amber-500/20 hover:bg-amber-500/30 px-1.5 py-0.5 rounded flex items-center gap-1 border border-amber-500/30" title="Precio modificado manualmente (Click para cambiar)">✏️ $${item.precio_manual.toFixed(2)} c/u</button>`
+            : `<button type="button" onclick="window.editPos419ItemPrice(${idx})" class="text-gray-400 font-mono hover:text-amber-400 hover:underline flex items-center gap-1 cursor-pointer" title="Modificar precio unitario"><span>$${(item.precio_unitario_aplicado || 0).toFixed(2)} c/u</span><span class="text-[9px] text-amber-400/80">✏️</span></button>`;
+
         return `
         <div class="bg-dark-100 p-2.5 rounded-xl border border-white/5 flex flex-col gap-1.5">
             <div class="flex items-center justify-between gap-2.5">
@@ -9869,7 +10032,7 @@ function renderPos419Cart() {
                     <h5 class="text-xs font-bold text-white truncate">${item.nombre}</h5>
                     <div class="flex items-center gap-2 mt-0.5 text-[10px]">
                         <span class="bg-amber-500/20 text-amber-400 font-bold px-1.5 rounded">${item.talla}</span>
-                        <span class="text-gray-400 font-mono">$${(item.precio_unitario_aplicado || 0).toFixed(2)} c/u</span>
+                        ${priceDisplayHtml}
                     </div>
                 </div>
                 <div class="flex items-center gap-1.5 flex-shrink-0">
@@ -9897,11 +10060,21 @@ async function submitPos419Order() {
     
     const metodoPago = document.getElementById('pos419-payment-method')?.value || 'Efectivo';
     
-    let granTotal = 0;
-    pos419Cart.forEach(i => granTotal += (i.subtotal || 0));
+    let subtotalItems = 0;
+    pos419Cart.forEach(i => subtotalItems += (i.subtotal || 0));
     
     let totalPieces = 0;
     pos419Cart.forEach(i => totalPieces += i.cantidad);
+
+    const discountValEl = document.getElementById('pos419-discount-val');
+    const discountInputVal = discountValEl ? parseFloat(discountValEl.value || 0) : 0;
+
+    let descuentoMonto = 0;
+    if (!isNaN(discountInputVal) && discountInputVal > 0) {
+        descuentoMonto = Math.min(subtotalItems, discountInputVal);
+    }
+
+    const granTotal = Math.max(0, subtotalItems - descuentoMonto);
     
     let appliedTier = 'Menudeo';
     const clientPerfil = pos419Client.perfil || 'Menudeo';
@@ -9916,15 +10089,28 @@ async function submitPos419Order() {
         else if (clientPerfil === 'Mayoreo' || totalPieces >= 6) appliedTier = 'Mayoreo';
         else appliedTier = 'Menudeo';
     }
+
+    const finalClientName = (isMostrador && pos419Client.nombre_mostrador_custom)
+        ? `Cliente Mostrador - ${pos419Client.nombre_mostrador_custom}`
+        : pos419Client.nombre_completo;
+
+    let discountSummaryHtml = '';
+    if (descuentoMonto > 0) {
+        discountSummaryHtml = `
+            <p>Subtotal prendas: <strong class="text-gray-300 font-mono">$${subtotalItems.toFixed(2)}</strong></p>
+            <p>Descuento especial: <strong class="text-emerald-400 font-mono">-$${descuentoMonto.toFixed(2)}</strong></p>
+        `;
+    }
     
     const confirmRes = await Swal.fire({
         title: '¿Confirmar Venta en Local 419?',
         html: `
             <div class="text-left space-y-2 text-xs text-gray-300 py-2">
-                <p>Cliente: <strong class="text-white">${pos419Client.nombre_completo}</strong></p>
+                <p>Cliente: <strong class="text-white">${finalClientName}</strong></p>
                 <p>Piezas: <strong class="text-white">${totalPieces} pzas</strong></p>
                 <p>Nivel de Precio: <strong class="text-amber-400">${appliedTier}</strong></p>
                 <p>Método de Pago: <strong class="text-emerald-400">${metodoPago}</strong></p>
+                ${discountSummaryHtml}
                 <p class="text-sm font-bold text-white pt-2 border-t border-white/10">Total a Cobrar: <span class="text-amber-400 font-mono">$${granTotal.toFixed(2)}</span></p>
             </div>
         `,
@@ -9951,15 +10137,20 @@ async function submitPos419Order() {
         const payload = {
             action: 'create_pos_419_order',
             id_cliente: pos419Client.id_cliente,
-            nombre_cliente: pos419Client.nombre_completo,
+            nombre_cliente: finalClientName,
             tipo_precio_aplicado: appliedTier,
             metodo_pago: metodoPago,
+            subtotal: subtotalItems,
+            descuento: descuentoMonto,
+            descuento_tipo: discountType,
+            total_cobrado: granTotal,
             items: pos419Cart.map(i => ({
                 id_playera: i.id_playera,
                 talla: i.talla,
                 cantidad: i.cantidad,
                 categoria: i.genero || 'Adulto',
                 precio_unitario: i.precio_unitario_aplicado,
+                precio_manual: i.precio_manual !== undefined ? i.precio_manual : null,
                 tipo_personalizacion: i.tipo_personalizacion || 'PERS-NONE',
                 detalles_personalizacion: i.personalizacion_texto || '',
                 subtotal: i.subtotal
