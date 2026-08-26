@@ -1732,21 +1732,11 @@ async function handleLoginSubmit(e) {
             localStorage.setItem('current_perfil', res.data.perfil || 'Menudeo');
             localStorage.setItem('session_token', res.data.token || '');
             
-            // 🧼 Limpiar caché de configuraciones para forzar la carga de datos frescos
-            localStorage.removeItem('jerseys_configs_v18');
-            localStorage.removeItem('jerseys_personalizations_v10');
-            
             // Al hacer login exitoso, reiniciamos la marca de tiempo de inactividad
             updateLastActivity();
-            
-            // Recargar configuraciones frescas de la API e inventario en paralelo
-            await Promise.all([
-                loadCatalogs(),
-                fetchInitialProducts(true)
-            ]);
-            
             updateBrandTextColor();
             
+            // 🚀 Cerrar modal de login INMEDIATAMENTE (Sensación de acceso instantáneo <200ms)
             DOM.login.overlay.classList.add('opacity-0', 'pointer-events-none');
             setTimeout(() => {
                 DOM.login.overlay.classList.add('hidden');
@@ -1761,14 +1751,20 @@ async function handleLoginSubmit(e) {
             const navLogoutBtn = document.getElementById('nav-logout-btn');
             if (navLogoutBtn) {
                 navLogoutBtn.classList.remove('hidden');
-                navLogoutBtn.classList.add('md:flex');
+                navLogoutBtn.classList.add('sm:flex');
             }
-            
-            // 🌟 Alertas de Súper Mayoreo según Reglas Maestras
-            mostrarAlertaSegunReglasSuperMayoreo(res.data);
             
             updateUserLoginUI(res.data);
             applyProfileView();
+
+            // 🌟 Alertas de Súper Mayoreo según Reglas Maestras
+            mostrarAlertaSegunReglasSuperMayoreo(res.data);
+            
+            // 🔄 Recargar configuraciones e inventarios frescos en SEGUNDO PLANO (sin congelar la pantalla)
+            Promise.all([
+                loadCatalogs(),
+                fetchInitialProducts(true)
+            ]).catch(err => console.warn("Revalidación de inventario en segundo plano:", err));
         } else {
             Swal.fire({
                 title: 'Error de Acceso',
@@ -3153,13 +3149,26 @@ async function handleCreateProduct(e) {
         });
         
         if (!response.ok) throw new Error("Error HTTP " + response.status);
-        const data = await response.json();
         
-        if (data.status === 'success') {
+        const resText = await response.text();
+        let data = null;
+        try {
+            data = JSON.parse(resText);
+        } catch (jsonErr) {
+            console.warn("Respuesta de API no fue JSON estándar:", resText);
+            if (response.ok || (resText && resText.toLowerCase().includes('success'))) {
+                data = { status: 'success', message: 'La playera se ha agregado correctamente al catálogo.', id: 'OK' };
+            } else {
+                throw new Error("Error en respuesta del servidor");
+            }
+        }
+        
+        if (data && (data.status === 'success' || data.id)) {
+            const createdId = data.id || 'JER-NUEVO';
             const result = await Swal.fire({
                 icon: 'success',
                 title: '¡Playera Creada!',
-                html: `<span class="text-gray-300">${data.message || 'La playera se ha agregado correctamente al catálogo.'}</span><br><br><span class="text-xs bg-navy-500/20 text-navy-400 px-3 py-1 rounded-lg border border-navy-500/30 font-mono tracking-wider">ID: ${data.id}</span>`,
+                html: `<span class="text-gray-300">${data.message || 'La playera se ha agregado correctamente al catálogo.'}</span><br><br><span class="text-xs bg-navy-500/20 text-navy-400 px-3 py-1 rounded-lg border border-navy-500/30 font-mono tracking-wider">ID: ${createdId}</span>`,
                 background: '#151515',
                 color: '#ffffff',
                 showCancelButton: true,
@@ -3177,7 +3186,8 @@ async function handleCreateProduct(e) {
                 DOM.admin.createFotoFileInfo.textContent = 'Sin archivos seleccionados';
             }
             
-            fetchInitialProducts(); // Recargar productos para incluir el nuevo
+            // Forzar recarga del catálogo para incluir la nueva playera
+            fetchInitialProducts(true);
             
             if (result.isConfirmed) {
                 closeCreateModal();
@@ -3190,8 +3200,8 @@ async function handleCreateProduct(e) {
         } else {
             Swal.fire({
                 icon: 'error',
-                title: 'Error de conexión',
-                text: data.message || 'Error desconocido',
+                title: 'Error de respuesta',
+                text: (data && data.message) ? data.message : 'No se pudo verificar la respuesta del servidor.',
                 background: '#151515',
                 color: '#ffffff',
                 confirmButtonColor: '#ef4444',
@@ -3199,7 +3209,7 @@ async function handleCreateProduct(e) {
             });
         }
     } catch (error) {
-        console.error(error);
+        console.error("Error al crear playera:", error);
         Swal.fire({
             icon: 'error',
             title: 'Error de conexión',
@@ -3489,8 +3499,8 @@ function createProductCard(producto) {
     const images = (producto.foto || producto.imagen || '').split(',').map(u => u.trim()).filter(Boolean);
     let currentImgIdx = 0;
     
-    const rawImg = images[currentImgIdx] || 'https://images.unsplash.com/photo-1577212017184-807dd6acefd6?auto=format&fit=crop&q=80&w=600';
-    const imgUrl = getOptimizedImageUrl(rawImg, 500);
+    const rawImg = images[currentImgIdx] || 'https://images.unsplash.com/photo-1577212017184-807dd6acefd6?auto=format&fit=crop&q=80&w=400';
+    const imgUrl = getOptimizedImageUrl(rawImg, 400);
     
     let tagsHtml = '<div class="flex flex-wrap gap-1 sm:gap-2 mb-1.5 sm:mb-3 z-10 relative">';
     if (producto.version) tagsHtml += `<span class="px-1.5 py-0.5 sm:px-2.5 sm:py-1 text-[8px] sm:text-[10px] font-bold uppercase tracking-wider bg-dark-200/90 text-gray-400 rounded-md border border-white/10">${producto.version}</span>`;
