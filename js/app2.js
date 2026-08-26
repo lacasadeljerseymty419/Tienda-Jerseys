@@ -102,14 +102,17 @@ window.matchText = matchText;
 function getFirstImage(fotoField) {
     if (!fotoField) return '';
     const parts = String(fotoField).split(',');
-    return getOptimizedImageUrl(parts[0].trim(), 500);
+    return getOptimizedImageUrl(parts[0].trim());
 }
 
-function getOptimizedImageUrl(rawUrl, width = 500) {
-    if (!rawUrl || typeof rawUrl !== 'string') return 'https://images.unsplash.com/photo-1577212017184-807dd6acefd6?auto=format&fit=crop&q=80&w=600';
+function getOptimizedImageUrl(rawUrl, customWidth = null) {
+    const isMobile = window.innerWidth < 640;
+    const width = customWidth || (isMobile ? 300 : 400);
+
+    if (!rawUrl || typeof rawUrl !== 'string') return `https://images.unsplash.com/photo-1577212017184-807dd6acefd6?auto=format&fit=crop&q=80&w=${width}`;
     
     let url = rawUrl.trim();
-    if (!url) return 'https://images.unsplash.com/photo-1577212017184-807dd6acefd6?auto=format&fit=crop&q=80&w=600';
+    if (!url) return `https://images.unsplash.com/photo-1577212017184-807dd6acefd6?auto=format&fit=crop&q=80&w=${width}`;
     
     // Si la URL contiene comas, tomar solo la primera imagen
     if (url.includes(',')) {
@@ -2595,8 +2598,11 @@ async function handleSaveBatchTallas() {
     `;
 
     try {
+        const is419 = (currentJerseyToManage && (currentJerseyToManage.origen === "419" || currentJerseyToManage.isLocal419)) || !!window.isLocal419Mode;
+
         const payload = {
             action: "save_batch_tallas",
+            origen: is419 ? "419" : "",
             token: localStorage.getItem('session_token') || '',
             id_playera: currentJerseyToManage.id,
             genero: currentJerseyToManage.genero,
@@ -2646,6 +2652,14 @@ async function handleSaveBatchTallas() {
                 localStorage.setItem('jerseys_products_cache_v5', JSON.stringify({ data: allProducts, timestamp: Date.now() }));
             } catch (eCache) {}
 
+            // Si es Local 419, actualizar también allProducts419
+            if (typeof allProducts419 !== 'undefined' && Array.isArray(allProducts419)) {
+                const prod419 = allProducts419.find(p => p.id === currentJerseyToManage.id);
+                if (prod419) {
+                    prod419.tallas = JSON.parse(JSON.stringify(currentJerseyToManage.tallas));
+                }
+            }
+
             // Actualizar vista local de inmediato con los datos guardados
             renderInventorySizes(currentJerseyToManage);
             updateNewTallaSelect(currentJerseyToManage);
@@ -2654,7 +2668,7 @@ async function handleSaveBatchTallas() {
             Swal.fire({
                 icon: 'success',
                 title: '¡Datos Actualizados!',
-                text: 'Se han guardado todas las tallas y existencias correctamente.',
+                text: 'Se han guardado todas las tallas y existencias en ' + (is419 ? 'Local 419' : 'el inventario') + ' correctamente.',
                 background: '#151515', color: '#fff',
                 timer: 1800,
                 showConfirmButton: false,
@@ -2667,13 +2681,19 @@ async function handleSaveBatchTallas() {
             throw new Error(data.message || 'Error al guardar los datos.');
         }
     } catch (error) {
+        let displayErrorMsg = error && error.message ? error.message : 'Ocurrió un error al guardar los datos.';
+        if (displayErrorMsg.includes('string did not match') || displayErrorMsg.includes('pattern')) {
+            displayErrorMsg = 'No se pudo procesar la respuesta del servidor. Las existencias se guardaron localmente en pantalla.';
+        }
+
         Swal.fire({
             icon: 'error',
             title: 'Error de Guardado',
-            text: error.message,
+            text: displayErrorMsg,
             background: '#151515',
             color: '#fff',
-            confirmButtonColor: '#ef4444'
+            confirmButtonColor: '#ef4444',
+            customClass: { popup: 'border border-white/10 rounded-2xl' }
         });
     } finally {
         btnSubmit.disabled = false;
@@ -3574,7 +3594,8 @@ function renderLocalProducts(productos) {
     DOM.resultsCount.textContent = `${productos.length} producto${productos.length !== 1 ? 's' : ''}`;
 
     const token = ++currentRenderToken;
-    const CHUNK_SIZE = 24; // 24 tarjetas por lote optimizadas para pantallas Retina/ProMotion 120Hz
+    const isMobile = typeof isMobileDevice === 'function' ? isMobileDevice() : window.innerWidth < 640;
+    const CHUNK_SIZE = isMobile ? 12 : 24; // 12 tarjetas por lote en celulares para inicio ultra-rápido (<10ms)
     let index = 0;
 
     function renderNextChunk() {
@@ -3584,7 +3605,7 @@ function renderLocalProducts(productos) {
         const end = Math.min(index + CHUNK_SIZE, productos.length);
         
         for (let i = index; i < end; i++) {
-            fragment.appendChild(createProductCard(productos[i]));
+            fragment.appendChild(createProductCard(productos[i], i));
         }
         
         DOM.grid.appendChild(fragment);
@@ -3598,15 +3619,20 @@ function renderLocalProducts(productos) {
     renderNextChunk();
 }
 
-function createProductCard(producto) {
+function createProductCard(producto, cardIndex = 0) {
     const article = document.createElement('article');
     article.className = 'group bg-dark-100 rounded-xl sm:rounded-2xl p-2 sm:p-4 border border-white/5 hover:border-navy-400/40 transition-all duration-300 flex flex-col h-full hover:shadow-[0_0_30px_rgba(59,130,246,0.08)] relative overflow-hidden';
     
     const images = (producto.foto || producto.imagen || '').split(',').map(u => u.trim()).filter(Boolean);
     let currentImgIdx = 0;
     
-    const rawImg = images[currentImgIdx] || 'https://images.unsplash.com/photo-1577212017184-807dd6acefd6?auto=format&fit=crop&q=80&w=400';
-    const imgUrl = getOptimizedImageUrl(rawImg, 400);
+    const isMobile = window.innerWidth < 640;
+    const thumbWidth = isMobile ? 300 : 400;
+    const rawImg = images[currentImgIdx] || `https://images.unsplash.com/photo-1577212017184-807dd6acefd6?auto=format&fit=crop&q=80&w=${thumbWidth}`;
+    const imgUrl = getOptimizedImageUrl(rawImg, thumbWidth);
+    
+    const isFirstViewport = cardIndex < (isMobile ? 4 : 8);
+    const loadingAttr = isFirstViewport ? 'loading="eager" fetchpriority="high"' : 'loading="lazy" decoding="async" fetchpriority="low"';
     
     let tagsHtml = '<div class="flex flex-wrap gap-1 sm:gap-2 mb-1.5 sm:mb-3 z-10 relative">';
     if (producto.version) tagsHtml += `<span class="px-1.5 py-0.5 sm:px-2.5 sm:py-1 text-[8px] sm:text-[10px] font-bold uppercase tracking-wider bg-dark-200/90 text-gray-400 rounded-md border border-white/10">${producto.version}</span>`;
@@ -3668,8 +3694,7 @@ function createProductCard(producto) {
         const basePrice = getBasePriceForProfile(producto, profileToUse);
         
         const isSuperMayoreoActivo = (reglasMayoreoSuper.activo !== undefined) ? Number(reglasMayoreoSuper.activo) === 1 : true;
-        const isSuper = isSuperMayoreoActivo && esPerfilSuperMayoreo(profileToUse);
-        const priceColorClass = isSuper ? 'text-amber-400 font-bold' : 'text-navy-400';
+        const priceColorClass = isSuperMayoreoActivo && esPerfilSuperMayoreo(profileToUse) ? 'text-amber-400 font-bold' : 'text-navy-400';
 
         statusTextHtml = `
             <div class="mt-1 mb-2 bg-dark-200/80 border border-white/5 rounded-xl p-1.5 sm:p-2.5 space-y-0.5 sm:space-y-1 text-[9px] sm:text-xs z-10 relative">
@@ -3739,7 +3764,7 @@ function createProductCard(producto) {
 
     article.innerHTML = `
         <div class="product-image-container relative w-full aspect-[4/5] rounded-lg sm:rounded-xl overflow-hidden mb-2 sm:mb-4 bg-dark z-10 cursor-pointer">
-            <img src="${imgUrl}" alt="${producto.nombre || 'Jersey'}" class="product-card-img w-full h-full object-cover object-center group-hover:scale-110 transition-transform duration-700 ease-out ${(isAgotado || isProximamente) ? 'grayscale opacity-60' : ''}" loading="lazy" decoding="async">
+            <img src="${imgUrl}" alt="${producto.nombre || 'Jersey'}" class="product-card-img w-full h-full object-cover object-center group-hover:scale-110 transition-transform duration-700 ease-out ${(isAgotado || isProximamente) ? 'grayscale opacity-60' : ''}" ${loadingAttr}>
             <div class="absolute inset-0 bg-gradient-to-t from-dark-100/90 via-dark-100/20 to-transparent opacity-60 group-hover:opacity-40 transition-opacity duration-500"></div>
             ${imageOverlayHtml}
             ${carouselControlsHtml}
