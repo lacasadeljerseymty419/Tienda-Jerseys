@@ -445,11 +445,12 @@ function renderLocalProducts(products) {
             p.tallas.forEach(t => {
                 const stockVal = Number(t.stock !== undefined ? t.stock : (t.inventario || 0));
                 const sz = (t.talla || '').toUpperCase();
+                const shortSz = sz.includes('(') ? (sz.split('(')[0].trim() || sz) : sz;
                 if (stockVal > 0) {
                     stockTotal419 += stockVal;
                     tallasHtml += `
-                        <span class="px-2 py-0.5 border border-blue-500/30 rounded-md text-[10px] font-extrabold text-blue-400 bg-blue-500/10 shadow-sm">
-                            ${sz}
+                        <span class="px-2 py-0.5 border border-blue-500/30 rounded-md text-[10px] font-extrabold text-blue-400 bg-blue-500/10 shadow-sm whitespace-nowrap" title="Talla ${sz}">
+                            ${shortSz}
                         </span>`;
                 }
             });

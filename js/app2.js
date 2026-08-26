@@ -293,6 +293,7 @@ const DOM = {
     btnOpenCart: document.getElementById('btn-open-cart'),
     btnAdminOrdersNav: document.getElementById('btn-admin-orders-nav'),
     cartCount: document.getElementById('cart-count'),
+    cartCountMobile: document.getElementById('cart-count-mobile'),
     actions: {
         logout: document.querySelectorAll('.action-logout'),
         navCatalogo: document.querySelectorAll('.action-nav-catalogo'),
@@ -461,7 +462,7 @@ const DOM = {
             filtros: {
                 nombre: document.getElementById('admin-ordenes-filtro-nombre'),
                 id: document.getElementById('admin-ordenes-filtro-id'),
-                estatus: document.getElementById('admin-ordenes-filtro-estatus')
+                estatusLabel: document.getElementById('admin-ordenes-estatus-label')
             },
             listContainer: document.getElementById('admin-ordenes-list'),
             emptyState: document.getElementById('admin-ordenes-empty'),
@@ -1921,7 +1922,50 @@ function mostrarAlertaSegunReglasSuperMayoreo(userData) {
     }
 }
 
+function updateAdminMenuVisibility() {
+    const loggedUserStr = localStorage.getItem('logged_user');
+    let isAdmin = false;
+    if (loggedUserStr) {
+        try {
+            const loggedUser = JSON.parse(loggedUserStr);
+            isAdmin = (loggedUser.perfil === 'Administrador' || loggedUser.usuario === 'admin');
+        } catch (e) {}
+    }
+
+    const adminMenuWrapper = document.getElementById('admin-menu-wrapper');
+    const local419MenuWrapper = document.getElementById('local419-menu-wrapper');
+    const btnAdminOrdersNav = document.getElementById('btn-admin-orders-nav');
+
+    if (adminMenuWrapper) {
+        if (isAdmin) {
+            adminMenuWrapper.classList.remove('hidden');
+        } else {
+            adminMenuWrapper.classList.add('hidden');
+        }
+    }
+    if (local419MenuWrapper) {
+        if (isAdmin) {
+            local419MenuWrapper.classList.remove('hidden');
+        } else {
+            local419MenuWrapper.classList.add('hidden');
+        }
+    }
+    if (btnAdminOrdersNav) {
+        if (isAdmin) {
+            btnAdminOrdersNav.classList.remove('hidden');
+            btnAdminOrdersNav.classList.add('2xl:flex');
+        } else {
+            btnAdminOrdersNav.classList.add('hidden');
+            btnAdminOrdersNav.classList.remove('2xl:flex');
+        }
+    }
+}
+window.updateAdminMenuVisibility = updateAdminMenuVisibility;
+
 function applyProfileView() {
+    // Actualizar visibilidad de elementos exclusivos de Administrador
+    updateAdminMenuVisibility();
+
     // Si allProducts está vacío pero hay productos en la caché local, cargarlos de inmediato
     if (!allProducts || allProducts.length === 0) {
         try {
@@ -2254,6 +2298,13 @@ function updateNewTallaSelect(producto) {
 
 function openInventoryModal(producto) {
     currentJerseyToManage = producto;
+    if (currentJerseyToManage && Array.isArray(currentJerseyToManage.tallas)) {
+        currentJerseyToManage.tallas.forEach(t => {
+            if (t.stockOriginal === undefined) {
+                t.stockOriginal = t.stock !== undefined ? t.stock : (t.inventario || 0);
+            }
+        });
+    }
     DOM.admin.invTitle.textContent = producto.nombre;
     DOM.admin.invId.textContent = `ID: ${producto.id}`;
     DOM.admin.invImg.src = getFirstImage(producto.foto || producto.imagen) || '';
@@ -2396,6 +2447,7 @@ function renderInventorySizes(producto) {
     
     producto.tallas.forEach((t, idx) => {
         const stockActual = t.stock !== undefined ? t.stock : (t.inventario || 0);
+        const stockOriginal = t.stockOriginal !== undefined ? t.stockOriginal : stockActual;
         const isNewTag = t.isNew || (t.id_inventario && String(t.id_inventario).startsWith('TEMP_'));
         const displayTalla = String(t.talla || '');
         const div = document.createElement('div');
@@ -2408,24 +2460,62 @@ function renderInventorySizes(producto) {
                 </div>
                 <div>
                     <div class="text-xs text-gray-200 font-semibold">${producto.nombre || ''}</div>
-                    <div class="text-[10px] text-gray-500">Categoría: ${t.categoria || producto.genero || 'Adultos'}</div>
+                    <div class="text-[10px] text-gray-500 flex items-center gap-1.5">
+                        <span>Categoría: ${t.categoria || producto.genero || 'Adultos'}</span>
+                        ${!isNewTag ? `<span class="text-gray-400 font-mono bg-white/5 px-1.5 py-0.5 rounded border border-white/5" title="Cantidad antes de modificar">(Anterior: ${stockOriginal})</span>` : ''}
+                    </div>
                 </div>
             </div>
-            <div class="flex items-center gap-2">
-                <label class="text-[11px] text-gray-400 font-medium uppercase tracking-wider">Stock:</label>
-                <input type="number" min="0" value="${stockActual}" class="w-24 bg-dark-200/80 border border-white/10 rounded-lg px-2.5 py-1.5 text-sm text-center focus:outline-none focus:border-navy-400 focus:ring-1 focus:ring-navy-400 text-white font-semibold input-stock-local-val" data-idx="${idx}">
+            <div class="flex items-center gap-1.5">
+                <label class="text-[11px] text-gray-400 font-medium uppercase tracking-wider mr-1">Stock:</label>
+                <button type="button" class="btn-stock-minus-gen w-7 h-7 bg-red-500/20 hover:bg-red-500 text-red-400 hover:text-white rounded-lg border border-red-500/30 flex items-center justify-center font-bold text-sm transition-all" data-idx="${idx}" title="Restar 1 pieza">-</button>
+                <input type="number" min="0" value="${stockActual}" class="w-16 bg-dark-200/80 border border-white/10 rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:border-navy-400 focus:ring-1 focus:ring-navy-400 text-white font-semibold input-stock-local-val" data-idx="${idx}">
+                <button type="button" class="btn-stock-plus-gen w-7 h-7 bg-emerald-500/20 hover:bg-emerald-500 text-emerald-400 hover:text-white rounded-lg border border-emerald-500/30 flex items-center justify-center font-bold text-sm transition-all" data-idx="${idx}" title="Sumar 1 pieza">+</button>
             </div>
         `;
         DOM.admin.invTallasList.appendChild(div);
     });
     
-    // Escuchar cambios locales en las cantidades de existencias
+    // Escuchar cambios locales en las cantidades de existencias (input directo)
     document.querySelectorAll('.input-stock-local-val').forEach(input => {
         input.addEventListener('input', (e) => {
             const idx = parseInt(e.target.getAttribute('data-idx'));
             const val = parseInt(e.target.value);
             if (!isNaN(idx) && currentJerseyToManage && currentJerseyToManage.tallas && currentJerseyToManage.tallas[idx]) {
                 currentJerseyToManage.tallas[idx].stock = isNaN(val) || val < 0 ? 0 : val;
+            }
+        });
+    });
+
+    // Botones + y - para Inventario General
+    document.querySelectorAll('.btn-stock-minus-gen').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const idx = parseInt(e.currentTarget.getAttribute('data-idx'));
+            const containerEl = DOM.admin.invTallasList;
+            const input = containerEl.querySelector(`.input-stock-local-val[data-idx="${idx}"]`);
+            if (input) {
+                let currentVal = parseInt(input.value) || 0;
+                let newVal = Math.max(0, currentVal - 1);
+                input.value = newVal;
+                if (currentJerseyToManage && currentJerseyToManage.tallas && currentJerseyToManage.tallas[idx]) {
+                    currentJerseyToManage.tallas[idx].stock = newVal;
+                }
+            }
+        });
+    });
+
+    document.querySelectorAll('.btn-stock-plus-gen').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const idx = parseInt(e.currentTarget.getAttribute('data-idx'));
+            const containerEl = DOM.admin.invTallasList;
+            const input = containerEl.querySelector(`.input-stock-local-val[data-idx="${idx}"]`);
+            if (input) {
+                let currentVal = parseInt(input.value) || 0;
+                let newVal = currentVal + 1;
+                input.value = newVal;
+                if (currentJerseyToManage && currentJerseyToManage.tallas && currentJerseyToManage.tallas[idx]) {
+                    currentJerseyToManage.tallas[idx].stock = newVal;
+                }
             }
         });
     });
@@ -3424,13 +3514,15 @@ function createProductCard(producto) {
             const adminStockHtml = isAdmin ? `<span class="absolute -top-2 -right-2 bg-navy-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full shadow-lg border border-dark z-20">${stockVal}</span>` : '';
 
             const displayTalla = String(t.talla || '');
+            const shortLabel = displayTalla.includes('(') ? (displayTalla.split('(')[0].trim() || displayTalla) : displayTalla;
+            const fullTitle = `${displayTalla} | ${hasStock ? `Stock: ${stockVal}` : 'Agotado'}`;
             tallasHtml += `
                 <div class="relative">
-                    <button type="button" class="talla-btn w-6 h-6 sm:w-9 sm:h-9 rounded-md sm:rounded-lg flex items-center justify-center text-[8px] sm:text-xs font-semibold border transition-all duration-200 ${btnClass}" 
+                    <button type="button" class="talla-btn min-w-[1.75rem] px-1.5 h-7 sm:min-w-[2.25rem] sm:px-2 sm:h-9 rounded-md sm:rounded-lg flex items-center justify-center text-[9px] sm:text-xs font-bold leading-none border transition-all duration-200 ${btnClass} whitespace-nowrap" 
                             data-talla="${displayTalla}"
                             ${!hasStock ? 'disabled' : ''} 
-                            title="${hasStock ? `Stock: ${stockVal}` : 'Agotado'}">
-                        ${displayTalla}
+                            title="${fullTitle}">
+                        ${shortLabel}
                     </button>
                     ${adminStockHtml}
                 </div>
@@ -3894,6 +3986,11 @@ function renderClientsTable() {
                 <div>
                     <div class="font-bold text-white text-xs cursor-default leading-tight">${client.nombre_completo || 'Sin Nombre'}</div>
                     <div class="text-[9px] font-mono text-gray-500 mt-0.5">Usuario: ${client.usuario || 'N/A'} | ID: ${client.id_cliente || 'N/A'}</div>
+                    ${(client.fecha_registro || client.fecha_actualizacion) ? `
+                    <div class="text-[9px] text-gray-400 mt-0.5 flex flex-wrap gap-x-2">
+                        ${client.fecha_registro ? `<span><strong class="text-gray-500">Reg:</strong> ${client.fecha_registro}</span>` : ''}
+                        ${client.fecha_actualizacion ? `<span><strong class="text-gray-500">Act:</strong> ${client.fecha_actualizacion}</span>` : ''}
+                    </div>` : ''}
                 </div>
             </td>
             <td class="px-3 py-2 text-xs text-gray-300">
@@ -3954,7 +4051,8 @@ async function handleSaveClient(e) {
     
     const btnSubmit = document.getElementById('btn-submit-client');
     const originalText = btnSubmit.innerHTML;
-    
+    const nowStr = new Date().toISOString().replace('T', ' ').substring(0, 19);
+
     const payload = {
         action: editingClientId ? "update_client" : "create_client",
         nombre_completo: DOM.admin.clientInputs.nombre.value.trim(),
@@ -3967,11 +4065,14 @@ async function handleSaveClient(e) {
         colonia: DOM.admin.clientInputs.colonia.value.trim(),
         municipio: DOM.admin.clientInputs.municipio.value.trim(),
         cp: DOM.admin.clientInputs.cp.value.trim(),
-        referencias: DOM.admin.clientInputs.referencias.value.trim()
+        referencias: DOM.admin.clientInputs.referencias.value.trim(),
+        fecha_actualizacion: nowStr
     };
     
     if (editingClientId) {
         payload.id_cliente = editingClientId;
+    } else {
+        payload.fecha_registro = nowStr;
     }
     
     btnSubmit.disabled = true;
@@ -4103,7 +4204,8 @@ async function handleToggleClientStatus(id) {
             const payload = {
                 ...client,
                 action: "update_client",
-                activo: nuevoEstado
+                activo: nuevoEstado,
+                fecha_actualizacion: new Date().toISOString().replace('T', ' ').substring(0, 19)
             };
             
             const response = await fetch(API_URL, {
@@ -4671,22 +4773,33 @@ window.handleAddToPedidoSubmit = handleAddToPedidoSubmit;
 function updateCartBadge() {
     let totalItems = 0;
     cart.forEach(item => {
-        totalItems += item.cantidad;
+        totalItems += Number(item.cantidad) || 0;
     });
     
-    if (DOM.cartCount) {
-        DOM.cartCount.textContent = totalItems;
+    // Actualizar todos los contadores de carrito (Escritorio, Laptops, Celulares y Tablets)
+    const cartCountEls = document.querySelectorAll('#cart-count, #cart-count-mobile, .cart-count-badge');
+    cartCountEls.forEach(el => {
+        if (el) {
+            el.textContent = totalItems;
+            if (totalItems > 0) {
+                el.classList.remove('scale-0', 'hidden');
+                el.classList.add('scale-100');
+            } else {
+                el.classList.remove('scale-100');
+                el.classList.add('scale-0');
+            }
+        }
+    });
+
+    if (DOM.btnOpenCart) {
         if (totalItems > 0) {
-            DOM.cartCount.classList.remove('scale-0');
-            DOM.cartCount.classList.add('scale-100');
             DOM.btnOpenCart.classList.add('text-navy-400');
         } else {
-            DOM.cartCount.classList.remove('scale-100');
-            DOM.cartCount.classList.add('scale-0');
             DOM.btnOpenCart.classList.remove('text-navy-400');
         }
     }
 }
+window.updateCartBadge = updateCartBadge;
 
 function openCartModal() {
     DOM.cart.modal.classList.remove('hidden');
@@ -5401,9 +5514,9 @@ function openOrdenesModal() {
         DOM.admin.Ordenes.modal.querySelector('.bg-dark-100').classList.remove('scale-95');
     }, 10);
     // Limpiar filtros al abrir
-    DOM.admin.Ordenes.filtros.nombre.value = '';
-    DOM.admin.Ordenes.filtros.id.value = '';
-    DOM.admin.Ordenes.filtros.estatus.value = '';
+    if (DOM.admin.Ordenes.filtros.nombre) DOM.admin.Ordenes.filtros.nombre.value = '';
+    if (DOM.admin.Ordenes.filtros.id) DOM.admin.Ordenes.filtros.id.value = '';
+    if (window.toggleAllEstatusCheckboxes) window.toggleAllEstatusCheckboxes(true);
     
     // Buscar historial completo inicialmente
     fetchOrdenes();
@@ -5417,18 +5530,81 @@ function closeOrdenesModal() {
     }, 300);
 }
 
+window.toggleEstatusMultiselectDropdown = function() {
+    const dropdown = document.getElementById('admin-ordenes-estatus-dropdown');
+    if (dropdown) {
+        dropdown.classList.toggle('hidden');
+    }
+};
+
+window.toggleAllEstatusCheckboxes = function(isChecked) {
+    const optionChks = document.querySelectorAll('.estatus-option-chk');
+    optionChks.forEach(chk => chk.checked = isChecked);
+    updateEstatusMultiselectLabel();
+};
+
+window.updateEstatusMultiselectLabel = function() {
+    const allChks = document.querySelectorAll('.estatus-option-chk');
+    const checkedChks = document.querySelectorAll('.estatus-option-chk:checked');
+    const masterChk = document.getElementById('estatus-chk-todos');
+    const label = document.getElementById('admin-ordenes-estatus-label');
+
+    if (checkedChks.length === allChks.length) {
+        if (masterChk) masterChk.checked = true;
+        if (label) label.textContent = 'Todos los Estatus';
+    } else if (checkedChks.length === 0) {
+        if (masterChk) masterChk.checked = false;
+        if (label) label.textContent = 'Ninguno seleccionado';
+    } else {
+        if (masterChk) masterChk.checked = false;
+        const selectedNames = Array.from(checkedChks).map(c => c.value);
+        if (selectedNames.length <= 2) {
+            if (label) label.textContent = selectedNames.join(', ');
+        } else {
+            if (label) label.textContent = `${selectedNames.length} estatus selec.`;
+        }
+    }
+    handleSearchOrdenes();
+};
+
+document.addEventListener('click', function(e) {
+    const btn = document.getElementById('btn-admin-ordenes-estatus-toggle');
+    const dropdown = document.getElementById('admin-ordenes-estatus-dropdown');
+    if (btn && dropdown && !btn.contains(e.target) && !dropdown.contains(e.target)) {
+        dropdown.classList.add('hidden');
+    }
+});
+
 function handleSearchOrdenes() {
-    const nombre = DOM.admin.Ordenes.filtros.nombre.value;
-    const id = DOM.admin.Ordenes.filtros.id.value;
-    const estatus = DOM.admin.Ordenes.filtros.estatus.value;
+    const nombre = DOM.admin.Ordenes.filtros.nombre ? DOM.admin.Ordenes.filtros.nombre.value : '';
+    const id = DOM.admin.Ordenes.filtros.id ? DOM.admin.Ordenes.filtros.id.value : '';
     
+    // Obtener estatus seleccionados en el filtro múltiple
+    const checkedChks = document.querySelectorAll('.estatus-option-chk:checked');
+    const allChks = document.querySelectorAll('.estatus-option-chk');
+    const selectedStatuses = Array.from(checkedChks).map(c => c.value);
+    const masterChk = document.getElementById('estatus-chk-todos');
+    const isAllSelected = (masterChk && masterChk.checked) || checkedChks.length === allChks.length || checkedChks.length === 0;
+
     currentOrdenes = allFetchedOrdenes.filter(orden => {
         const clientObj = window.allClients ? window.allClients.find(c => String(c.id_cliente) === String(orden.id_cliente)) : null;
         const nombreCliente = orden.nombre_cliente || (clientObj ? clientObj.nombre_completo : null) || orden.id_cliente || '';
         
         const matchNombre = !nombre || matchText(nombreCliente, nombre);
         const matchId = !id || matchText(orden.id_orden, id);
-        const matchEstatus = !estatus || orden.estatus === estatus;
+        
+        let matchEstatus = false;
+        if (isAllSelected) {
+            matchEstatus = true;
+        } else {
+            matchEstatus = selectedStatuses.some(st => {
+                if (orden.estatus === st) return true;
+                if (st === 'Enviado - Paqueteria' && (orden.estatus === 'Enviado' || orden.estatus === 'Enviado - Paqueteria')) return true;
+                if (st === 'Finalizada' && (orden.estatus === 'Finalizada' || orden.estatus === 'Entregado' || orden.estatus === 'Entregada - Paqueteria')) return true;
+                if (st === 'Cancelada' && (orden.estatus === 'Cancelada' || orden.estatus === 'Cancelado')) return true;
+                return false;
+            });
+        }
         
         return matchNombre && matchId && matchEstatus;
     });
@@ -5781,7 +5957,14 @@ window.openOrderDetailsModal = function(id_orden) {
         const isDisponibleParaRecoger = (orden.estatus && String(orden.estatus).toLowerCase().includes('disponible') && String(orden.estatus).toLowerCase().includes('recoger'));
         const isTraspasado = orden.estatus === 'Traspasado a Local 419';
         
-        if (isDisponibleParaRecoger) {
+        // Verificar si el usuario que REALIZÓ el pedido tiene perfil de Administrador
+        const clientObj = window.allClients ? window.allClients.find(c => String(c.id_cliente) === String(orden.id_cliente)) : null;
+        const isCreadoPorAdmin = (clientObj && clientObj.perfil === 'Administrador') || 
+                                 orden.perfil_cliente === 'Administrador' || 
+                                 orden.perfil === 'Administrador' ||
+                                 (orden.id_cliente && String(orden.id_cliente).toUpperCase().includes('ADMIN'));
+
+        if (isDisponibleParaRecoger && isCreadoPorAdmin) {
             footerContainer.innerHTML = `
                 <div class="text-xs text-amber-400 font-medium flex items-center gap-1.5">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
@@ -6365,7 +6548,8 @@ setTimeout(() => {
             cp: DOM.perfil.inputs.cp.value.trim(),
             referencias: DOM.perfil.inputs.referencias.value.trim(),
             activo: user.activo !== undefined ? user.activo : 1,
-            foto: tempPerfilFotoUrl
+            foto: tempPerfilFotoUrl,
+            fecha_actualizacion: new Date().toISOString().replace('T', ' ').substring(0, 19)
         };
         
         try {
@@ -8777,6 +8961,7 @@ function renderInventario419Grid(products) {
         if (tallasArray.length > 0) {
             sizeBoxesHtml = tallasArray.map(tObj => {
                 const sz = String(tObj.talla || '').toUpperCase();
+                const shortSz = sz.includes('(') ? (sz.split('(')[0].trim() || sz) : sz;
                 const cant = Number(tObj.stock || 0);
                 totalStock419 += cant;
                 const hasStock = cant > 0;
@@ -8789,8 +8974,8 @@ function renderInventario419Grid(products) {
 
                 return `
                 <div class="relative group/size cursor-pointer" onclick="openLocal419InventoryModal('${prod.id}')" title="Gestionar existencias 419 (Talla ${sz})">
-                    <div class="w-10 h-10 sm:w-11 sm:h-11 rounded-xl border flex items-center justify-center font-bold text-xs ${boxStyle} transition-all shadow-sm">
-                        ${sz}
+                    <div class="min-w-[2.5rem] px-1.5 h-10 sm:min-w-[2.75rem] sm:h-11 rounded-xl border flex items-center justify-center font-bold text-xs ${boxStyle} transition-all shadow-sm whitespace-nowrap">
+                        ${shortSz}
                     </div>
                     <span class="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1 rounded-full ${badgeBg} text-[10px] flex items-center justify-center shadow-md border border-dark-100">
                         ${cant}
@@ -8949,6 +9134,12 @@ function openLocal419InventoryModal(idOrObj) {
 
     // Clonar para permitir modificaciones locales antes de guardar
     currentJersey419ToManage = JSON.parse(JSON.stringify(prod));
+    if (currentJersey419ToManage && Array.isArray(currentJersey419ToManage.tallas)) {
+        currentJersey419ToManage.tallas.forEach((t, i) => {
+            const origSource = (prod.tallas && prod.tallas[i]) ? prod.tallas[i] : t;
+            t.stockOriginal = origSource.stockOriginal !== undefined ? origSource.stockOriginal : (origSource.stock !== undefined ? origSource.stock : (origSource.inventario || 0));
+        });
+    }
 
     const modal = document.getElementById('local419-inventory-manage-modal');
     if (!modal) return;
@@ -9008,6 +9199,7 @@ function renderLocal419InventorySizes(prod) {
 
     prod.tallas.forEach((t, idx) => {
         const stockActual = t.stock !== undefined ? t.stock : (t.inventario || 0);
+        const stockOriginal = t.stockOriginal !== undefined ? t.stockOriginal : stockActual;
         const isNewTag = t.isNew || (t.id_inventario && String(t.id_inventario).startsWith('TEMP_'));
         const displayTalla = String(t.talla || '');
         const div = document.createElement('div');
@@ -9020,13 +9212,18 @@ function renderLocal419InventorySizes(prod) {
                 </div>
                 <div>
                     <div class="text-xs text-gray-200 font-semibold">${prod.nombre || prod.equipo || ''}</div>
-                    <div class="text-[10px] text-gray-400">Categoría: ${t.categoria || prod.genero || 'Adultos'}</div>
+                    <div class="text-[10px] text-gray-400 flex items-center gap-1.5">
+                        <span>Categoría: ${t.categoria || prod.genero || 'Adultos'}</span>
+                        ${!isNewTag ? `<span class="text-amber-300/90 font-mono bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20" title="Cantidad 419 antes de modificar">(Anterior: ${stockOriginal})</span>` : ''}
+                    </div>
                 </div>
             </div>
             <div class="flex items-center gap-3">
-                <div class="flex items-center gap-2">
-                    <label class="text-[10px] text-gray-400 font-bold uppercase tracking-wider">STOCK 419:</label>
-                    <input type="number" min="0" value="${stockActual}" class="w-24 bg-dark-200/80 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs font-bold text-center focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400 text-amber-300 input-stock-419-local-val" data-idx="${idx}">
+                <div class="flex items-center gap-1.5">
+                    <label class="text-[10px] text-gray-400 font-bold uppercase tracking-wider mr-1">STOCK 419:</label>
+                    <button type="button" class="btn-stock-minus-419 w-7 h-7 bg-red-500/20 hover:bg-red-500 text-red-400 hover:text-white rounded-lg border border-red-500/30 flex items-center justify-center font-bold text-sm transition-all" data-idx="${idx}" title="Restar 1 pieza">-</button>
+                    <input type="number" min="0" value="${stockActual}" class="w-16 bg-dark-200/80 border border-white/10 rounded-lg px-2 py-1.5 text-xs font-bold text-center focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400 text-amber-300 input-stock-419-local-val" data-idx="${idx}">
+                    <button type="button" class="btn-stock-plus-419 w-7 h-7 bg-emerald-500/20 hover:bg-emerald-500 text-emerald-400 hover:text-white rounded-lg border border-emerald-500/30 flex items-center justify-center font-bold text-sm transition-all" data-idx="${idx}" title="Sumar 1 pieza">+</button>
                 </div>
                 <button type="button" onclick="window.removeLocal419SizeFromMemory(${idx})" class="p-1.5 text-gray-500 hover:text-red-400 hover:bg-white/5 rounded-lg transition-colors" title="Eliminar talla">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
@@ -9036,13 +9233,44 @@ function renderLocal419InventorySizes(prod) {
         container.appendChild(div);
     });
 
-    // Escuchar cambios locales en los inputs
+    // Escuchar cambios locales en los inputs (input directo)
     document.querySelectorAll('.input-stock-419-local-val').forEach(input => {
         input.addEventListener('input', (e) => {
             const idx = parseInt(e.target.getAttribute('data-idx'));
             const val = parseInt(e.target.value);
             if (!isNaN(idx) && currentJersey419ToManage && currentJersey419ToManage.tallas && currentJersey419ToManage.tallas[idx]) {
                 currentJersey419ToManage.tallas[idx].stock = isNaN(val) || val < 0 ? 0 : val;
+            }
+        });
+    });
+
+    // Botones + y - para Inventario Local 419
+    document.querySelectorAll('.btn-stock-minus-419').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const idx = parseInt(e.currentTarget.getAttribute('data-idx'));
+            const input = container.querySelector(`.input-stock-419-local-val[data-idx="${idx}"]`);
+            if (input) {
+                let currentVal = parseInt(input.value) || 0;
+                let newVal = Math.max(0, currentVal - 1);
+                input.value = newVal;
+                if (currentJersey419ToManage && currentJersey419ToManage.tallas && currentJersey419ToManage.tallas[idx]) {
+                    currentJersey419ToManage.tallas[idx].stock = newVal;
+                }
+            }
+        });
+    });
+
+    document.querySelectorAll('.btn-stock-plus-419').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const idx = parseInt(e.currentTarget.getAttribute('data-idx'));
+            const input = container.querySelector(`.input-stock-419-local-val[data-idx="${idx}"]`);
+            if (input) {
+                let currentVal = parseInt(input.value) || 0;
+                let newVal = currentVal + 1;
+                input.value = newVal;
+                if (currentJersey419ToManage && currentJersey419ToManage.tallas && currentJersey419ToManage.tallas[idx]) {
+                    currentJersey419ToManage.tallas[idx].stock = newVal;
+                }
             }
         });
     });
@@ -9584,6 +9812,7 @@ function renderPos419Catalog() {
         let sizeButtonsHtml = '';
         tallasArray.forEach(tObj => {
             const sz = String(tObj.talla || '').toUpperCase();
+            const shortSz = sz.includes('(') ? (sz.split('(')[0].trim() || sz) : sz;
             const avail419 = Number(tObj.stock || 0);
             
             const inCartItem = pos419Cart.find(ci => ci.id_playera === prod.id && ci.talla === sz);
@@ -9596,8 +9825,8 @@ function renderPos419Catalog() {
                     : 'bg-red-500/10 text-red-400 border-red-500/20 cursor-not-allowed opacity-50';
                 
                 sizeButtonsHtml += `
-                    <button type="button" ${remAvail <= 0 ? 'disabled' : ''} onclick="window.addPos419Item('${prod.id}', '${sz}')" class="px-2 py-1 rounded-lg border text-center font-bold text-[10px] transition-all flex items-center justify-between gap-1 ${btnColor}">
-                        <span>${sz}</span>
+                    <button type="button" ${remAvail <= 0 ? 'disabled' : ''} onclick="window.addPos419Item('${prod.id}', '${sz}')" class="px-2 py-1 rounded-lg border text-center font-bold text-[10px] transition-all flex items-center justify-between gap-1 ${btnColor} whitespace-nowrap" title="Talla ${sz}">
+                        <span>${shortSz}</span>
                         <span class="text-[9px] opacity-80">(${remAvail})</span>
                     </button>
                 `;

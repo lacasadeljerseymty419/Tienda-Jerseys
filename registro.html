@@ -35,48 +35,12 @@
         ::-webkit-scrollbar-track { background: #0b0b0b; }
         ::-webkit-scrollbar-thumb { background: #222222; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #3b82f6; }
-
-        @keyframes drift-1 {
-            0% { transform: translate(0, 0) scale(1); }
-            33% { transform: translate(8vw, 4vh) scale(1.1); }
-            66% { transform: translate(-4vw, 12vh) scale(0.95); }
-            100% { transform: translate(0, 0) scale(1); }
-        }
-        @keyframes drift-2 {
-            0% { transform: translate(0, 0) scale(1); }
-            50% { transform: translate(-10vw, -8vh) scale(0.95); }
-            100% { transform: translate(0, 0) scale(1); }
-        }
-        @keyframes drift-3 {
-            0% { transform: translate(0, 0) scale(1); }
-            33% { transform: translate(-6vw, 6vh) scale(1.12); }
-            66% { transform: translate(4vw, -4vh) scale(0.92); }
-            100% { transform: translate(0, 0) scale(1); }
-        }
     </style>
 </head>
-<body class="font-sans antialiased min-h-screen flex flex-col justify-between selection:bg-navy-400/30 selection:text-navy-400">
+<body class="font-sans antialiased min-h-screen flex flex-col justify-between selection:bg-navy-400/30 selection:text-navy-400 bg-[#0b0b0b]">
     
-    <!-- Fondo del Registro Principal - Mesh Gradient Orgánico -->
-    <div class="fixed inset-0 pointer-events-none z-[-1] overflow-hidden bg-[#0b0b0b]">
-        <!-- Blob 1: Azul Cobalto -->
-        <div class="absolute w-[70vw] h-[70vw] sm:w-[55vw] sm:h-[55vw] rounded-full bg-navy-500/10 blur-[130px] opacity-75" style="
-            top: -20%; left: -10%;
-            animation: drift-1 30s ease-in-out infinite;
-        "></div>
-        
-        <!-- Blob 2: Violeta Profundo -->
-        <div class="absolute w-[60vw] h-[60vw] sm:w-[50vw] sm:h-[50vw] rounded-full bg-purple-600/8 blur-[120px] opacity-70" style="
-            bottom: -15%; right: -5%;
-            animation: drift-2 35s ease-in-out infinite;
-        "></div>
-        
-        <!-- Blob 3: Verde Esmeralda sutil -->
-        <div class="absolute w-[50vw] h-[50vw] sm:w-[40vw] sm:h-[40vw] rounded-full bg-emerald-500/4 blur-[145px] opacity-50" style="
-            top: 35%; right: 25%;
-            animation: drift-3 40s ease-in-out infinite;
-        "></div>
-    </div>
+    <!-- Fondo Solido sin Animaciones -->
+    <div class="fixed inset-0 pointer-events-none z-[-1] bg-[#0b0b0b]"></div>
 
     <!-- Header simple -->
     <header class="bg-dark/80 backdrop-blur-xl border-b border-white/5 py-4 flex-shrink-0">
@@ -207,6 +171,7 @@
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             const originalText = btnSubmit.innerHTML;
+            const nowStr = new Date().toISOString().replace('T', ' ').substring(0, 19);
             
             const payload = {
                 action: "create_client",
@@ -221,7 +186,9 @@
                 colonia: document.getElementById('client-colonia').value.trim(),
                 municipio: document.getElementById('client-municipio').value.trim(),
                 cp: document.getElementById('client-cp').value.trim(),
-                referencias: document.getElementById('client-referencias').value.trim()
+                referencias: document.getElementById('client-referencias').value.trim(),
+                fecha_registro: nowStr,
+                fecha_actualizacion: nowStr
             };
 
             btnSubmit.disabled = true;

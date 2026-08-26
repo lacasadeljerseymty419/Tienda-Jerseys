@@ -342,7 +342,9 @@ function renderLocalProducts(products) {
                 const stockVal = t.stock !== undefined ? t.stock : t.inventario;
                 if (stockVal > 0) {
                     stockTotal += stockVal;
-                    tallasHtml += `<span class="px-1.5 py-0.5 border border-gray-200 rounded text-[9px] sm:text-[10px] font-bold text-gray-600 bg-gray-50">${t.talla}</span>`;
+                    const displayTalla = String(t.talla || '');
+                    const shortLabel = displayTalla.includes('(') ? (displayTalla.split('(')[0].trim() || displayTalla) : displayTalla;
+                    tallasHtml += `<span class="px-1.5 py-0.5 border border-gray-200 rounded text-[9px] sm:text-[10px] font-bold text-gray-600 bg-gray-50 whitespace-nowrap" title="${displayTalla}">${shortLabel}</span>`;
                 }
             });
         }
