@@ -2692,9 +2692,9 @@ async function handleUpdatePrecios(e) {
     const btnSubmit = document.getElementById('btn-submit-update-precios');
     const originalContent = btnSubmit.innerHTML;
     
-    const pMenudeo = parseFloat(DOM.admin.updatePrecioMenudeo.value) || 0;
-    const pMayoreo = parseFloat(DOM.admin.updatePrecioMayoreo.value) || 0;
-    const pMayoreoSuper = parseFloat(DOM.admin.updatePrecioMayoreoSuper.value) || 0;
+    const pMenudeo = parseFloat(document.getElementById('update-precio-menudeo')?.value) || parseFloat(DOM.admin.updatePrecioMenudeo?.value) || 0;
+    const pMayoreo = parseFloat(document.getElementById('update-precio-mayoreo')?.value) || parseFloat(DOM.admin.updatePrecioMayoreo?.value) || 0;
+    const pMayoreoSuper = parseFloat(document.getElementById('update-precio-mayoreo-super')?.value) || parseFloat(DOM.admin.updatePrecioMayoreoSuper?.value) || 0;
     
     const nombreVal = DOM.admin.updateNombre ? DOM.admin.updateNombre.value.trim() : '';
     const tipoVal = DOM.admin.updateSelects && DOM.admin.updateSelects.tipo ? DOM.admin.updateSelects.tipo.value : '';
@@ -2714,6 +2714,7 @@ async function handleUpdatePrecios(e) {
         version: versionVal,
         genero: generoVal,
         personalizacion: personalizacionVal,
+        precio_menudeo: pMenudeo,
         precio_Menudeo: pMenudeo,
         precio_mayoreo: pMayoreo,
         precio_mayoreo_super: pMayoreoSuper,
@@ -3112,6 +3113,10 @@ async function handleCreateProduct(e) {
         return;
     }
 
+    const pMenudeo = parseFloat(document.getElementById('create-precio-menudeo')?.value) || (DOM.admin.precioMenudeo ? parseFloat(DOM.admin.precioMenudeo.value) : 0) || 0;
+    const pMayoreo = parseFloat(document.getElementById('create-precio-mayoreo')?.value) || (DOM.admin.precioMayoreo ? parseFloat(DOM.admin.precioMayoreo.value) : 0) || 0;
+    const pMayoreoSuper = parseFloat(document.getElementById('create-precio-mayoreo-super')?.value) || (DOM.admin.precioMayoreoSuper ? parseFloat(DOM.admin.precioMayoreoSuper.value) : 0) || 0;
+
     const payload = {
         action: "create",
         nombre: document.getElementById('create-nombre').value.trim(),
@@ -3120,9 +3125,10 @@ async function handleCreateProduct(e) {
         genero: DOM.admin.createSelects.genero.value,
         personalizacion: document.getElementById('create-personalizacion').value,
         foto: fotoUrl,
-        precio_Menudeo: parseFloat(DOM.admin.precioMenudeo.value) || 0,
-        precio_mayoreo: parseFloat(DOM.admin.precioMayoreo.value) || 0,
-        precio_mayoreo_super: parseFloat(DOM.admin.precioMayoreoSuper.value) || 0,
+        precio_menudeo: pMenudeo,
+        precio_Menudeo: pMenudeo,
+        precio_mayoreo: pMayoreo,
+        precio_mayoreo_super: pMayoreoSuper,
         personalizaciones_oficiales: {
             basica_activa: !!(document.getElementById('create-chk-basica') && document.getElementById('create-chk-basica').checked),
             basica_precio_menudeo: parseFloat(document.getElementById('create-basica-precio-menudeo')?.value) || 0,
