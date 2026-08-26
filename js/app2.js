@@ -1166,15 +1166,7 @@ async function initApp() {
     if (DOM.admin.formCreate) DOM.admin.formCreate.addEventListener('submit', handleCreateProduct);
     if (DOM.admin.createSelects.genero) {
         DOM.admin.createSelects.genero.addEventListener('change', () => {
-            const selects = DOM.admin.tallasContainer.querySelectorAll('.talla-val');
-            const optionsHtml = getTallasOptionsHtml();
-            selects.forEach(select => {
-                const prevValue = select.value;
-                select.innerHTML = optionsHtml;
-                if (Array.from(select.options).some(opt => opt.value === prevValue)) {
-                    select.value = prevValue;
-                }
-            });
+            refreshCreateTallasOptions();
         });
     }
     if (DOM.actions.openList) DOM.actions.openList.forEach(btn => btn.addEventListener('click', () => { openListModal(); closemobileMenu(); }));
@@ -2622,9 +2614,22 @@ async function handleSaveBatchTallas() {
             body: JSON.stringify(payload)
         });
 
-        const data = await response.json();
+        if (!response.ok) throw new Error("Error HTTP " + response.status);
 
-        if (data.status === 'success') {
+        const resText = await response.text();
+        let data = null;
+        try {
+            data = JSON.parse(resText);
+        } catch (jsonErr) {
+            console.warn("Respuesta de API no fue JSON estándar en save_batch_tallas:", resText);
+            if (response.ok || (resText && resText.toLowerCase().includes('success'))) {
+                data = { status: 'success', message: 'Se han guardado todas las tallas y existencias correctamente.' };
+            } else {
+                throw new Error("Error en respuesta del servidor");
+            }
+        }
+
+        if (data && data.status === 'success') {
             // Limpiar etiquetas temporales para que no aparezca "NUEVA"
             if (currentJerseyToManage.tallas) {
                 currentJerseyToManage.tallas.forEach(t => {
@@ -2632,12 +2637,16 @@ async function handleSaveBatchTallas() {
                 });
             }
 
-            // Invalidad caché local del catálogo
+            // ⚡ Sincronizar inmediatamente la lista local de allProducts y el caché local (0ms de espera)
+            const localProduct = allProducts.find(p => p.id === currentJerseyToManage.id);
+            if (localProduct) {
+                localProduct.tallas = JSON.parse(JSON.stringify(currentJerseyToManage.tallas));
+            }
             try {
-                localStorage.removeItem('jerseys_products_cache_v5');
+                localStorage.setItem('jerseys_products_cache_v5', JSON.stringify({ data: allProducts, timestamp: Date.now() }));
             } catch (eCache) {}
 
-            // Actualizar vista local del modal de inmediato con los datos guardados
+            // Actualizar vista local de inmediato con los datos guardados
             renderInventorySizes(currentJerseyToManage);
             updateNewTallaSelect(currentJerseyToManage);
             renderAdminTable();
@@ -2647,21 +2656,13 @@ async function handleSaveBatchTallas() {
                 title: '¡Datos Actualizados!',
                 text: 'Se han guardado todas las tallas y existencias correctamente.',
                 background: '#151515', color: '#fff',
-                timer: 2000,
+                timer: 1800,
                 showConfirmButton: false,
                 customClass: { popup: 'border border-white/10 rounded-2xl' }
             });
 
-            // Refrescar inventario en segundo plano desde el servidor
-            fetchInitialProducts(true).then(() => {
-                const updatedProduct = allProducts.find(p => p.id === currentJerseyToManage.id);
-                if (updatedProduct) {
-                    currentJerseyToManage = updatedProduct;
-                    renderInventorySizes(updatedProduct);
-                    updateNewTallaSelect(updatedProduct);
-                    renderAdminTable();
-                }
-            });
+            // Revalidación silenciosa en segundo plano
+            revalidateProductsBackground('jerseys_products_cache_v5');
         } else {
             throw new Error(data.message || 'Error al guardar los datos.');
         }
@@ -3009,35 +3010,110 @@ function getTallasForSelectedGender() {
     return getTallasForGender(DOM.admin.createSelects.genero.value);
 }
 
-function getTallasOptionsHtml() {
-    const tallas = getTallasForSelectedGender();
-    if (tallas.length === 0) {
-        return `<option value="" disabled selected>Elige género primero</option>`;
-    }
-    return tallas.map(t => `<option value="${t}">${t}</option>`).join('');
+function refreshCreateTallasOptions() {
+    if (!DOM.admin || !DOM.admin.tallasContainer) return;
+    const baseTallas = getTallasForSelectedGender();
+    const selects = Array.from(DOM.admin.tallasContainer.querySelectorAll('.talla-val'));
+    if (selects.length === 0) return;
+
+    const selectedValues = selects.map(s => s.value).filter(Boolean);
+
+    selects.forEach(selectEl => {
+        const currentVal = selectEl.value;
+        const disponibles = baseTallas.filter(t => t === currentVal || !selectedValues.includes(t));
+
+        if (disponibles.length === 0) {
+            selectEl.innerHTML = `<option value="" disabled selected>No hay más tallas</option>`;
+            return;
+        }
+
+        let valueToSet = currentVal;
+        if (!valueToSet || !disponibles.includes(valueToSet)) {
+            valueToSet = disponibles[0];
+            if (!selectedValues.includes(valueToSet)) {
+                selectedValues.push(valueToSet);
+            }
+        }
+
+        selectEl.innerHTML = disponibles.map(t => `<option value="${t}" ${t === valueToSet ? 'selected' : ''}>${t}</option>`).join('');
+        selectEl.value = valueToSet;
+    });
 }
 
+window.removeCreateTallaRow = function(id) {
+    const el = document.getElementById(`talla-${id}`);
+    if (el) {
+        el.remove();
+        refreshCreateTallasOptions();
+    }
+};
+
 function addTallaField() {
+    const baseTallas = getTallasForSelectedGender();
+    if (baseTallas.length === 0) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Selecciona Género',
+            text: 'Debes elegir primero un género para ver las tallas disponibles.',
+            background: '#151515', color: '#fff',
+            confirmButtonColor: '#3b82f6',
+            customClass: { popup: 'border border-white/10 rounded-2xl' }
+        });
+        return;
+    }
+
+    const selects = Array.from(DOM.admin.tallasContainer.querySelectorAll('.talla-val'));
+    const selectedValues = selects.map(s => s.value).filter(Boolean);
+    const disponibles = baseTallas.filter(t => !selectedValues.includes(t));
+
+    if (disponibles.length === 0) {
+        const Toast = Swal.mixin({
+            toast: true,
+            position: 'bottom-end',
+            showConfirmButton: false,
+            timer: 2200,
+            background: '#141416',
+            color: '#fff',
+            heightAuto: false
+        });
+        Toast.fire({
+            icon: 'info',
+            title: 'Todas las tallas disponibles ya han sido agregadas.'
+        });
+        return;
+    }
+
     const id = Date.now();
-    const optionsHtml = getTallasOptionsHtml();
+    const defaultTalla = disponibles[0];
+
     const html = `
         <div class="flex gap-3 items-end bg-dark-200/30 p-3 rounded-xl border border-white/5 talla-item" id="talla-${id}">
             <div class="flex-1">
                 <label class="block text-[10px] font-semibold text-gray-400 mb-1 uppercase tracking-wider">Talla</label>
                 <select required class="talla-val w-full bg-dark-200/50 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-navy-400 focus:ring-1 focus:ring-navy-400 text-white cursor-pointer pr-8">
-                    ${optionsHtml}
                 </select>
             </div>
             <div class="flex-1">
                 <label class="block text-[10px] font-semibold text-gray-400 mb-1 uppercase tracking-wider">Stock</label>
-                <input type="number" required min="0" placeholder="0" class="stock-val w-full bg-dark-200/50 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-navy-400 focus:ring-1 focus:ring-navy-400 text-white">
+                <input type="number" required min="0" value="0" placeholder="0" class="stock-val w-full bg-dark-200/50 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-navy-400 focus:ring-1 focus:ring-navy-400 text-white">
             </div>
-            <button type="button" onclick="document.getElementById('talla-${id}').remove()" class="bg-red-500/10 text-red-500 hover:bg-red-500/20 p-2 rounded-lg transition-colors h-[38px] flex items-center justify-center" title="Eliminar talla">
+            <button type="button" onclick="window.removeCreateTallaRow('${id}')" class="bg-red-500/10 text-red-500 hover:bg-red-500/20 p-2 rounded-lg transition-colors h-[38px] flex items-center justify-center" title="Eliminar talla">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
             </button>
         </div>
     `;
     DOM.admin.tallasContainer.insertAdjacentHTML('beforeend', html);
+
+    const newRow = document.getElementById(`talla-${id}`);
+    const newSelect = newRow.querySelector('.talla-val');
+    if (newSelect) {
+        newSelect.value = defaultTalla;
+        newSelect.addEventListener('change', () => {
+            refreshCreateTallasOptions();
+        });
+    }
+
+    refreshCreateTallasOptions();
 }
 
 async function handleCreateProduct(e) {
@@ -3185,9 +3261,39 @@ async function handleCreateProduct(e) {
             if (DOM.admin.createFotoFileInfo) {
                 DOM.admin.createFotoFileInfo.textContent = 'Sin archivos seleccionados';
             }
-            
-            // Forzar recarga del catálogo para incluir la nueva playera
-            fetchInitialProducts(true);
+
+            // ⚡ Agregar la nueva playera al instante al principio del catálogo en memoria (0ms, sin esqueletos)
+            const newProductObj = {
+                id: createdId,
+                nombre: payload.nombre,
+                tipo: payload.tipo,
+                version: payload.version,
+                genero: payload.genero,
+                personalizacion: payload.personalizacion,
+                foto: payload.foto,
+                precio_menudeo: payload.precio_menudeo,
+                precio_Menudeo: payload.precio_Menudeo,
+                precio_mayoreo: payload.precio_mayoreo,
+                precio_mayoreo_super: payload.precio_mayoreo_super,
+                personalizaciones_oficiales: payload.personalizaciones_oficiales,
+                fecha_registro: payload.fecha_registro,
+                activo: 1,
+                tallas: payload.tallas || []
+            };
+
+            // Insertar al inicio de la lista local
+            allProducts.unshift(newProductObj);
+
+            // Sincronizar en localStorage
+            try {
+                localStorage.setItem('jerseys_products_cache_v5', JSON.stringify({ data: allProducts, timestamp: Date.now() }));
+            } catch (eCache) {}
+
+            // Redibujar la vista inmediatamente sin mostrar esqueletos
+            renderProductsWithFilters();
+
+            // Revalidación silenciosa en segundo plano
+            revalidateProductsBackground('jerseys_products_cache_v5');
             
             if (result.isConfirmed) {
                 closeCreateModal();

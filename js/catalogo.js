@@ -309,6 +309,34 @@ function renderSkeletons(count = 6) {
     }
 }
 
+function getOptimizedImageUrl(rawUrl, width = 400) {
+    if (!rawUrl || typeof rawUrl !== 'string') return 'https://images.unsplash.com/photo-1577212017184-807dd6acefd6?auto=format&fit=crop&q=80&w=400';
+    let url = rawUrl.trim();
+    if (!url) return 'https://images.unsplash.com/photo-1577212017184-807dd6acefd6?auto=format&fit=crop&q=80&w=400';
+    if (url.includes(',')) url = url.split(',')[0].trim();
+
+    let driveId = '';
+    const matchId = url.match(/id=([a-zA-Z0-9_-]+)/) || url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+    if (matchId && matchId[1]) {
+        driveId = matchId[1];
+        return `https://drive.google.com/thumbnail?id=${driveId}&sz=w${width}`;
+    }
+
+    if (url.includes('googleusercontent.com')) {
+        const clean = url.split('=')[0];
+        return `${clean}=w${width}`;
+    }
+
+    if (url.includes('images.unsplash.com')) {
+        if (url.includes('w=')) {
+            return url.replace(/w=\d+/, `w=${width}`).replace(/q=\d+/, 'q=75');
+        }
+        return `${url}&w=${width}&q=75&auto=format`;
+    }
+
+    return url;
+}
+
 function renderLocalProducts(products) {
     DOM.grid.innerHTML = '';
     DOM.resultsCount.textContent = products.length;
@@ -327,7 +355,8 @@ function renderLocalProducts(products) {
         const images = (p.foto || p.imagen || '').split(',').map(u => u.trim()).filter(Boolean);
         let currentImgIdx = 0;
         
-        const imgUrl = images[currentImgIdx] || 'https://images.unsplash.com/photo-1577212017184-807dd6acefd6?auto=format&fit=crop&q=80&w=400';
+        const rawImg = images[currentImgIdx] || 'https://images.unsplash.com/photo-1577212017184-807dd6acefd6?auto=format&fit=crop&q=80&w=400';
+        const imgUrl = getOptimizedImageUrl(rawImg, 400);
         const genero = p.genero || '-';
         const tipo = p.tipo || '-';
         const version = p.version || '-';
@@ -411,7 +440,7 @@ function renderLocalProducts(products) {
         
         const updateImage = (newIdx) => {
             currentImgIdx = newIdx;
-            imgEl.src = images[currentImgIdx];
+            imgEl.src = getOptimizedImageUrl(images[currentImgIdx], 400);
             dots.forEach((dot, idx) => {
                 if (idx === currentImgIdx) {
                     dot.className = 'carousel-dot w-1.5 h-1.5 rounded-full bg-white transition-all duration-300';
