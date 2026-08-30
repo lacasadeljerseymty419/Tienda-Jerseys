@@ -1492,7 +1492,7 @@ function closeModal() {
 async function loadCatalogs() {
     let configs = null;
     let pers = null;
-    const CACHE_KEY = 'jerseys_configs_v18';
+    const CACHE_KEY = 'jerseys_configs_v19';
     const PERS_CACHE_KEY = 'jerseys_personalizations_v10';
     const CACHE_TTL = 60 * 60 * 1000; // 1 hora
     
@@ -1582,6 +1582,15 @@ async function loadCatalogs() {
             reglas_mayoreo_super = { piezas_jugador: Number(candidate.Piezas_Jugador_Mayoreo_Super) || 10, piezas_fan: 15, activo: 1 };
         }
         const reglas_talla_extra = candidate.reglas_talla_extra || null;
+        let cierre_pedidos = candidate.CierrePedidos || candidate.cierre_pedidos || candidate.cierrePedidos || candidate.Cierre || candidate.cierre || "10:30";
+        if (typeof candidate === 'object') {
+            Object.keys(candidate).forEach(k => {
+                if (k.toLowerCase().replace(/_/g, '') === 'cierrepedidos' || k.toLowerCase() === 'cierre') {
+                    if (candidate[k]) cierre_pedidos = String(candidate[k]).trim();
+                }
+            });
+        }
+
         const estatus_ordenes = candidate.estatus_ordenes || candidate.estatus_Ordenes || candidate.estatus || null;
         const tallas_hombre = candidate.tallas_hombre || [];
         const tallas_dama = candidate.tallas_dama || [];
@@ -1589,7 +1598,7 @@ async function loadCatalogs() {
         const reglas_envio = candidate.reglas_envio || [];
         
         if (Array.isArray(tipos) && Array.isArray(versiones) && Array.isArray(generos)) {
-            return { tipos, versiones, generos, perfiles, categorias, personalizaciones, reglas_mayoreo_super, reglas_talla_extra, estatus_ordenes, reglas_envio, tallas_hombre, tallas_dama, tallas_nino };
+            return { tipos, versiones, generos, perfiles, categorias, personalizaciones, reglas_mayoreo_super, reglas_talla_extra, estatus_ordenes, reglas_envio, tallas_hombre, tallas_dama, tallas_nino, cierre_pedidos };
         }
         return null;
     };
@@ -1599,11 +1608,69 @@ async function loadCatalogs() {
         if (validData.reglas_mayoreo_super) reglasMayoreoSuper = validData.reglas_mayoreo_super;
         if (validData.reglas_talla_extra) reglasTallaExtra = validData.reglas_talla_extra;
         if (validData.reglas_envio) reglasEnvio = validData.reglas_envio;
+        if (validData.cierre_pedidos) window.cierrePedidos = validData.cierre_pedidos;
         populateSelects(validData);
     } else {
         console.error("No se pudieron cargar las configuraciones de los filtros desde la API ni del caché local.");
     }
 }
+
+window.cierrePedidos = "10:30";
+
+function getEstimadoRecojoInfo(customCierre = null) {
+    const cierreStr = customCierre || window.cierrePedidos || "10:30";
+    let cleanStr = String(cierreStr).trim();
+    if (cleanStr.includes('T')) {
+        const d = new Date(cleanStr);
+        if (!isNaN(d.getTime())) {
+            const h = d.getHours().toString().padStart(2, '0');
+            const m = d.getMinutes().toString().padStart(2, '0');
+            cleanStr = `${h}:${m}`;
+        }
+    }
+
+    const partes = cleanStr.split(':');
+    const horaCierre = parseInt(partes[0]) || 10;
+    const minutoCierre = parseInt(partes[1]) || 30;
+
+    const ahora = new Date();
+    const minutosActuales = ahora.getHours() * 60 + ahora.getMinutes();
+    const minutosCierre = horaCierre * 60 + minutoCierre;
+
+    const esMismoDia = minutosActuales <= minutosCierre;
+
+    const fechaMeta = new Date(ahora);
+    if (!esMismoDia) {
+        fechaMeta.setDate(fechaMeta.getDate() + 1);
+    }
+
+    const opcionesFecha = { weekday: 'long', day: 'numeric', month: 'long' };
+    let fechaFormateada = fechaMeta.toLocaleDateString('es-MX', opcionesFecha);
+    fechaFormateada = fechaFormateada.charAt(0).toUpperCase() + fechaFormateada.slice(1);
+
+    const hora12 = (horaCierre % 12) || 12;
+    const ampm = horaCierre >= 12 ? 'PM' : 'AM';
+    const horaCierreNice = `${hora12}:${minutoCierre.toString().padStart(2, '0')} ${ampm}`;
+
+    if (esMismoDia) {
+        return {
+            esMismoDia: true,
+            fechaFormateada: fechaFormateada,
+            horaCierreNice: horaCierreNice,
+            mensajeHtml: `📍 <strong>Estimado cliente:</strong> Al realizar tu pedido antes de las <strong>${horaCierreNice}</strong>, tu pedido estará listo para recoger <strong class="text-emerald-400">HOY (${fechaFormateada})</strong> en tienda.`,
+            mensajeWa: `📍 *Aviso de Recojo:* Al realizar tu pedido antes de las ${horaCierreNice}, estará listo para recoger *HOY (${fechaFormateada})* en tienda.`
+        };
+    } else {
+        return {
+            esMismoDia: false,
+            fechaFormateada: fechaFormateada,
+            horaCierreNice: horaCierreNice,
+            mensajeHtml: `📍 <strong>Estimado cliente:</strong> Al realizar tu pedido después de las <strong>${horaCierreNice}</strong>, tu pedido estará listo para recoger <strong class="text-amber-400">MAÑANA (${fechaFormateada})</strong> en tienda.`,
+            mensajeWa: `📍 *Aviso de Recojo:* Al realizar tu pedido después de las ${horaCierreNice}, estará listo para recoger *MAÑANA (${fechaFormateada})* en tienda.`
+        };
+    }
+}
+window.getEstimadoRecojoInfo = getEstimadoRecojoInfo;
 function populateDropdown(selectEl, items, defaultText) {
     if (!selectEl) return;
     selectEl.innerHTML = `<option value="">${defaultText}</option>`;
@@ -5264,6 +5331,19 @@ function renderCartItems() {
     DOM.cart.subtotalVal.textContent = `$${subtotal.toFixed(2)}`;
     DOM.cart.personalizacionesVal.textContent = `$${personalizacionesTotal.toFixed(2)}`;
     DOM.cart.totalVal.textContent = `$${grandTotal.toFixed(2)}`;
+
+    // Banner Estimado de Recojo en Tienda (Solo si NO es Envío a Domicilio)
+    const pickupBanner = document.getElementById('cart-pickup-estimate-banner');
+    const pickupText = document.getElementById('cart-pickup-estimate-text');
+    if (envio_domicilio) {
+        if (pickupBanner) pickupBanner.classList.add('hidden');
+    } else {
+        if (pickupBanner) {
+            const infoRecojo = getEstimadoRecojoInfo();
+            pickupBanner.classList.remove('hidden');
+            if (pickupText) pickupText.innerHTML = infoRecojo.mensajeHtml;
+        }
+    }
 }
 
 window.removeCartItem = function(index) {
@@ -5292,7 +5372,7 @@ function emptyCart(confirm = true) {
     if (confirm === true) {
         Swal.fire({
             title: '¿Vaciar el pedido?',
-            text: 'Se ¿¿¿Eliminarán todos los jerseys de tu carrito.',
+            text: 'Se eliminarán todos los jerseys de tu carrito.',
             icon: 'warning',
             showCancelButton: true,
             confirmButtonColor: '#ef4444',
@@ -5474,6 +5554,19 @@ async function submitOrder() {
                 `;
             });
             
+            const infoRecojo = getEstimadoRecojoInfo();
+            let recojoReceiptHtml = '';
+            let recojoWaExtra = '';
+
+            if (!envio_domicilio) {
+                recojoReceiptHtml = `
+                    <div class="mt-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300 leading-relaxed text-left">
+                        ${infoRecojo.mensajeHtml}
+                    </div>
+                `;
+                recojoWaExtra = `\n${infoRecojo.mensajeWa}\n`;
+            }
+
             const orderIdStr = data.id_orden || data.id || data.order_id || 'Generado';
             const receiptHtml = `
                 <div class="text-center text-gray-400 font-mono text-sm tracking-wider mb-4 border border-white/10 rounded-lg py-2 bg-dark-200/50">
@@ -5504,6 +5597,7 @@ async function submitOrder() {
                         <span>Total de la Orden:</span>
                         <span class="text-emerald-400">$${(subtotal + shippingCost).toFixed(2)}</span>
                     </div>
+                    ${recojoReceiptHtml}
                 </div>
             `;
             const waText = encodeURIComponent(
@@ -5511,7 +5605,8 @@ async function submitOrder() {
                 `*ID de Orden:* ${orderIdStr}\n` +
                 `*Total de Jerseys:* ${totalQty} piezas\n` +
                 (envio_domicilio ? `*Costo de Envío:* ${shippingCost === 0 ? 'Gratis' : '$' + shippingCost.toFixed(2)}\n` : '') +
-                `*Total a Pagar:* $${(subtotal + shippingCost).toFixed(2)}\n\n` +
+                `*Total a Pagar:* $${(subtotal + shippingCost).toFixed(2)}\n` +
+                recojoWaExtra + `\n` +
                 `Quedo en espera de la confirmación. ¡Muchas gracias!`
             );
             const waUrl = `https://wa.me/5218132698182?text=${waText}`;
@@ -6021,7 +6116,7 @@ window.openOrderDetailsModal = function(id_orden) {
 
             return `
     <div class="flex items-center gap-3 bg-dark-200/40 p-3 rounded-xl border border-white/10 mb-3 last:mb-0 relative group">
-        <img src="${imgUrl}" alt="Foto" class="w-16 h-16 rounded-lg object-cover bg-dark flex-shrink-0">
+        <img src="${imgUrl}" alt="Foto" onclick="window.openModal('${imgUrl}')" class="w-16 h-16 rounded-lg object-cover bg-dark flex-shrink-0 cursor-pointer hover:scale-105 transition-transform border border-white/10" title="Clic para ver foto en tamaño completo">
         <div class="flex-grow min-w-0 pr-2">
             <h4 class="font-bold text-white text-sm truncate leading-tight">${nombre}</h4>
             <div class="text-[10px] text-gray-400 mt-1 font-medium uppercase tracking-wider">
@@ -6431,58 +6526,77 @@ async function updateOrderStatus(id_orden, nuevo_estatus) {
                 await Swal.fire({ icon: 'success', title: '¡Actualizado!', text: data.message, background: '#151515', color: '#fff', timer: 1500, showConfirmButton: false });
             }
             
-            const targetOrden = currentOrdenes.find(o => String(o.id_orden).trim() === id) 
-                || allFetchedOrdenes.find(o => String(o.id_orden).trim() === id)
-                || ordenOriginal;
-            
-            // El teléfono viene directamente en la orden como telefono_cliente o telefono
-            let rawPhone = targetOrden?.telefono_cliente || targetOrden?.telefono || targetOrden?.celular;
-            
-            // Si no está, intentamos el catálogo de clientes
-            if (!rawPhone) {
-                const clientObj = window.allClients ? window.allClients.find(c => String(c.id_cliente) === String(targetOrden?.id_cliente)) : null;
-                rawPhone = clientObj ? (clientObj.telefono_cliente || clientObj.telefono || clientObj.celular) : null;
-            }
-            
-            let finalPhone = rawPhone ? String(rawPhone).replace(/\D/g, '') : null;
-            if (finalPhone && finalPhone.length === 10) {
-                finalPhone = '52' + finalPhone;
-            }
-            
-            // Si no se encontró teléfono registrado, solicitarlo al administrador
-            if (!finalPhone) {
-                const { value: manualPhone } = await Swal.fire({
-                    title: 'Notificar por WhatsApp',
-                    text: `No se encontró teléfono registrado para la orden ${id_orden}. Ingresa el número de WhatsApp del cliente:`,
-                    input: 'text',
-                    inputPlaceholder: 'Ej. 5512345678',
+            const loggedUserStr = localStorage.getItem('logged_user');
+            const loggedUser = loggedUserStr ? JSON.parse(loggedUserStr) : null;
+            const currentProfile = localStorage.getItem('current_perfil') || (loggedUser ? loggedUser.perfil : '');
+            const isAdmin = (currentProfile === 'Administrador' || currentProfile === 'Admin' || (loggedUser && (loggedUser.perfil === 'Administrador' || loggedUser.perfil === 'Admin')));
+
+            // Solo preguntar si el perfil del usuario activo es Administrador
+            if (isAdmin) {
+                const targetOrden = currentOrdenes.find(o => String(o.id_orden).trim() === String(id_orden).trim()) 
+                    || allFetchedOrdenes.find(o => String(o.id_orden).trim() === String(id_orden).trim())
+                    || ordenOriginal;
+                
+                const clientName = targetOrden?.nombre_cliente || 'Cliente';
+
+                const confirmWa = await Swal.fire({
+                    title: '📱 Notificación por WhatsApp',
+                    text: `¿Deseas enviar una notificación por WhatsApp a "${clientName}" sobre la actualización del pedido ${id_orden}?`,
+                    icon: 'question',
                     showCancelButton: true,
+                    confirmButtonText: 'Sí, Enviar WhatsApp',
+                    cancelButtonText: 'No Enviar',
                     confirmButtonColor: '#25D366',
-                    confirmButtonText: 'Enviar WhatsApp',
-                    cancelButtonText: 'Omitir Notificación',
+                    cancelButtonColor: '#4b5563',
                     background: '#151515', color: '#fff'
                 });
-                if (manualPhone) {
-                    let clean = manualPhone.replace(/\D/g, '');
-                    if (clean.length === 10) clean = '52' + clean;
-                    if (clean) finalPhone = clean;
+
+                if (confirmWa.isConfirmed) {
+                    let rawPhone = targetOrden?.telefono_cliente || targetOrden?.telefono || targetOrden?.celular;
+                    if (!rawPhone) {
+                        const clientObj = window.allClients ? window.allClients.find(c => String(c.id_cliente) === String(targetOrden?.id_cliente)) : null;
+                        rawPhone = clientObj ? (clientObj.telefono_cliente || clientObj.telefono || clientObj.celular) : null;
+                    }
+
+                    let finalPhone = rawPhone ? String(rawPhone).replace(/\D/g, '') : null;
+                    if (finalPhone && finalPhone.length === 10) {
+                        finalPhone = '52' + finalPhone;
+                    }
+
+                    if (!finalPhone) {
+                        const { value: manualPhone } = await Swal.fire({
+                            title: 'WhatsApp no encontrado',
+                            text: `No se encontró número registrado para la orden ${id_orden}. Ingresa el número de WhatsApp del cliente:`,
+                            input: 'text',
+                            inputPlaceholder: 'Ej. 8132698182',
+                            showCancelButton: true,
+                            confirmButtonColor: '#25D366',
+                            confirmButtonText: 'Enviar WhatsApp',
+                            cancelButtonText: 'Cancelar',
+                            background: '#151515', color: '#fff'
+                        });
+                        if (manualPhone) {
+                            let clean = manualPhone.replace(/\D/g, '');
+                            if (clean.length === 10) clean = '52' + clean;
+                            if (clean) finalPhone = clean;
+                        }
+                    }
+
+                    if (finalPhone) {
+                        const nombreCorto = clientName.split(' ')[0];
+                        const mensajeGuia = trackingGuide ? `\n\n📦 *Número de Guía / Rastreo:* ${trackingGuide}` : '';
+                        const waText = encodeURIComponent(`*Actualización de Pedido* 🚚\n\nHola ${nombreCorto},\nTe informamos que el estatus de tu orden *${id_orden}* ha cambiado a: *${nuevo_estatus}*.${mensajeGuia}\n\n¡Gracias por tu preferencia en Jerseys 419!`);
+                        const waUrl = `https://wa.me/${finalPhone}?text=${waText}`;
+
+                        if (typeof abrirWhatsAppAutomatico === 'function') {
+                            abrirWhatsAppAutomatico(waUrl);
+                        } else {
+                            window.open(waUrl, '_blank');
+                        }
+                    }
                 }
             }
-            
-            if (finalPhone) {
-                let nombreCorto = 'Cliente';
-                if (targetOrden?.nombre_cliente) {
-                    nombreCorto = targetOrden.nombre_cliente.split(' ')[0];
-                }
-                
-                const mensajeGuia = trackingGuide ? `\n\n📦 *Número de Guía / Rastreo:* ${trackingGuide}` : '';
-                const waText = encodeURIComponent(`*Actualización de Pedido* 🚚\n\nHola ${nombreCorto},\nEl estatus de tu orden *${id_orden}* ha cambiado a: *${nuevo_estatus}*.${mensajeGuia}\n\n¡Gracias por tu preferencia!`);
-                const waUrl = `https://wa.me/${finalPhone}?text=${waText}`;
-                
-                // 🚀 Abrir WhatsApp automáticamente
-                abrirWhatsAppAutomatico(waUrl);
-            }
-            
+
             const idx = currentOrdenes.findIndex(o => o.id_orden === id_orden);
             if (idx !== -1) {
                 currentOrdenes[idx].estatus = nuevo_estatus;
@@ -7028,9 +7142,10 @@ function renderUserOrderDetailsUI() {
             `;
         }
         
+        const itemFotoUrl = getFirstImage(item.id_playera ? item.id_playera.foto : (item.foto || ''));
         art.innerHTML = `
-            <div class="w-16 h-16 sm:w-20 sm:h-20 bg-dark-200 rounded-lg overflow-hidden flex-shrink-0 relative border border-white/5">
-                <img src="${getFirstImage(item.id_playera.foto)}" class="w-full h-full object-cover" alt="Jersey">
+            <div class="w-16 h-16 sm:w-20 sm:h-20 bg-dark-200 rounded-lg overflow-hidden flex-shrink-0 relative border border-white/5 cursor-pointer hover:scale-105 transition-transform" onclick="window.openModal('${itemFotoUrl}')" title="Clic para ver foto en tamaño completo">
+                <img src="${itemFotoUrl}" class="w-full h-full object-cover" alt="Jersey">
             </div>
             <div class="flex-grow min-w-0 pr-6 sm:pr-0">
                 <h4 class="text-white font-bold text-sm sm:text-base leading-tight truncate">${item.id_playera.nombre}</h4>
@@ -10163,7 +10278,6 @@ async function configurePos419Personalizacion(idx) {
             const selType = document.getElementById('swal-pos-pers-type');
             const basicaDiv = document.getElementById('swal-pos-pers-basica-fields');
             const oficialDiv = document.getElementById('swal-pos-pers-oficial-fields');
-
             selType.onchange = () => {
                 const v = selType.value;
                 if (v === 'PERS-BASICA') {
@@ -10208,9 +10322,20 @@ async function configurePos419Personalizacion(idx) {
 }
 window.configurePos419Personalizacion = configurePos419Personalizacion;
 
-async function editPos419ItemPrice(idx) {
-    const item = pos419Cart[idx];
+async function editPos419ItemPrice(index) {
+    const item = pos419Cart[index];
     if (!item) return;
+
+    const isMostrador = (pos419Client.id_cliente === 'CLI-MOSTRADOR');
+    if (!isMostrador) {
+        Swal.fire({
+            icon: 'info',
+            title: 'Precio Fijo por Perfil',
+            text: `Para clientes registrados (${pos419Client.perfil || 'Mayoreo'}), el precio de la prenda se aplica estrictamente según la tarifa oficial de su perfil.`,
+            background: '#151515', color: '#fff'
+        });
+        return;
+    }
 
     const currentPrice = item.precio_manual !== undefined ? item.precio_manual : (item.precio_unitario_aplicado || 0);
 
@@ -10294,6 +10419,11 @@ function recalculatePos419Cart() {
 
     pos419Cart.forEach(item => {
         item.appliedTier = appliedTier;
+
+        if (!isMostrador) {
+            delete item.precio_manual;
+        }
+
         let pSystem = item.precio_menudeo || 0;
         if (appliedTier === 'Súper Mayoreo' && item.precio_mayoreo_super > 0) {
             pSystem = item.precio_mayoreo_super;
@@ -10302,8 +10432,8 @@ function recalculatePos419Cart() {
         }
         item.precio_sistema = pSystem;
 
-        // Usar precio manual si fue modificado manualmente por el usuario
-        let pUnit = item.precio_manual !== undefined ? item.precio_manual : pSystem;
+        // Usar precio manual solo si es cliente mostrador y fue modificado
+        let pUnit = (isMostrador && item.precio_manual !== undefined) ? item.precio_manual : pSystem;
 
         // Calcular costo de personalización
         let rawOficial = item.personalizaciones_oficiales;
@@ -10337,17 +10467,73 @@ function recalculatePos419Cart() {
         descuentoMonto = Math.min(subtotalItems, discountInputVal);
     }
 
-    const granTotal = Math.max(0, subtotalItems - descuentoMonto);
+    const basePrendas = Math.max(0, subtotalItems - descuentoMonto);
+
+    // Método de pago y comisión por uso de Terminal (5% = factor 0.05)
+    const metodoPagoEl = document.getElementById('pos419-payment-method');
+    const metodoPagoVal = metodoPagoEl ? metodoPagoEl.value : 'Efectivo';
+    const isTerminal = (metodoPagoVal.toLowerCase().indexOf('tarjeta') !== -1 || metodoPagoVal.toLowerCase().indexOf('terminal') !== -1);
+
+    const comisionTerminalMonto = isTerminal ? (basePrendas * 0.05) : 0;
+    const granTotal = basePrendas + comisionTerminalMonto;
+
+    // Calculadora de pago en efectivo y cambio a entregar
+    const cashCalcContainer = document.getElementById('pos419-cash-calculator-container');
+    const cashReceivedInput = document.getElementById('pos419-cash-received-val');
+    const cashChangeValEl = document.getElementById('pos419-cash-change-val');
+
+    const isEfectivo = metodoPagoVal.toLowerCase().includes('efectivo');
+
+    if (isEfectivo) {
+        if (cashCalcContainer) cashCalcContainer.classList.remove('hidden');
+        const cashReceived = cashReceivedInput ? parseFloat(cashReceivedInput.value || 0) : 0;
+        
+        if (cashChangeValEl) {
+            if (cashReceived > 0) {
+                if (cashReceived >= granTotal) {
+                    const cambio = cashReceived - granTotal;
+                    cashChangeValEl.textContent = `$${cambio.toFixed(2)}`;
+                    cashChangeValEl.className = 'text-xs font-black text-emerald-300 font-mono';
+                } else {
+                    const falta = granTotal - cashReceived;
+                    cashChangeValEl.textContent = `Falta: $${falta.toFixed(2)}`;
+                    cashChangeValEl.className = 'text-xs font-bold text-amber-400 font-mono';
+                }
+            } else {
+                cashChangeValEl.textContent = `$0.00`;
+                cashChangeValEl.className = 'text-xs font-black text-emerald-300 font-mono';
+            }
+        }
+    } else {
+        if (cashCalcContainer) cashCalcContainer.classList.add('hidden');
+        if (cashReceivedInput) cashReceivedInput.value = '';
+    }
 
     // Actualizar elementos de resumen en pantalla
     const summaryContainer = document.getElementById('pos419-discount-summary-container');
     const subtotalValEl = document.getElementById('pos419-subtotal-val');
+    const discountRowEl = document.getElementById('pos419-discount-row');
     const discountAppliedValEl = document.getElementById('pos419-discount-applied-val');
+    const terminalRowEl = document.getElementById('pos419-terminal-fee-row');
+    const terminalFeeValEl = document.getElementById('pos419-terminal-fee-val');
 
-    if (descuentoMonto > 0) {
+    if (descuentoMonto > 0 || comisionTerminalMonto > 0) {
         if (summaryContainer) summaryContainer.classList.remove('hidden');
         if (subtotalValEl) subtotalValEl.textContent = `$${subtotalItems.toFixed(2)}`;
-        if (discountAppliedValEl) discountAppliedValEl.textContent = `-$${descuentoMonto.toFixed(2)}`;
+
+        if (descuentoMonto > 0) {
+            if (discountRowEl) discountRowEl.classList.remove('hidden');
+            if (discountAppliedValEl) discountAppliedValEl.textContent = `-$${descuentoMonto.toFixed(2)}`;
+        } else {
+            if (discountRowEl) discountRowEl.classList.add('hidden');
+        }
+
+        if (comisionTerminalMonto > 0) {
+            if (terminalRowEl) terminalRowEl.classList.remove('hidden');
+            if (terminalFeeValEl) terminalFeeValEl.textContent = `+$${comisionTerminalMonto.toFixed(2)}`;
+        } else {
+            if (terminalRowEl) terminalRowEl.classList.add('hidden');
+        }
     } else {
         if (summaryContainer) summaryContainer.classList.add('hidden');
     }
@@ -10450,7 +10636,110 @@ async function submitPos419Order() {
         descuentoMonto = Math.min(subtotalItems, discountInputVal);
     }
 
-    const granTotal = Math.max(0, subtotalItems - descuentoMonto);
+    const basePrendas = Math.max(0, subtotalItems - descuentoMonto);
+    const metodoPagoEl = document.getElementById('pos419-payment-method');
+    const metodoPagoVal = metodoPagoEl ? metodoPagoEl.value : 'Efectivo';
+    const isTerminal = (metodoPagoVal.toLowerCase().indexOf('tarjeta') !== -1 || metodoPagoVal.toLowerCase().indexOf('terminal') !== -1);
+    const comisionTerminalMonto = isTerminal ? (basePrendas * 0.05) : 0;
+
+    const granTotal = basePrendas + comisionTerminalMonto;
+
+    // Obtener datos de pago en efectivo
+    const isEfectivo = metodoPagoVal.toLowerCase().includes('efectivo');
+    const cashReceivedInput = document.getElementById('pos419-cash-received-val');
+    let cashReceivedVal = (cashReceivedInput && isEfectivo) ? parseFloat(cashReceivedInput.value || 0) : 0;
+
+    // Ventana Emergente Obligatoria para Cobro en Efectivo
+    if (isEfectivo) {
+        const cashModalRes = await Swal.fire({
+            title: '💵 Cobro en Efectivo',
+            html: `
+                <div class="text-left space-y-3 py-1">
+                    <div class="bg-black/40 p-3 rounded-xl border border-white/10 flex items-center justify-between">
+                        <span class="text-xs text-gray-400 font-bold uppercase">Total a Cobrar:</span>
+                        <span class="text-lg font-black text-amber-400 font-mono">$${granTotal.toFixed(2)}</span>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-gray-300 mb-1">¿Con cuánto dinero paga el cliente? ($):</label>
+                        <div class="relative">
+                            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-400 font-extrabold text-sm">$</span>
+                            <input type="number" id="swal-pos419-cash-input" step="0.01" value="${cashReceivedVal > 0 ? cashReceivedVal : ''}" placeholder="${granTotal.toFixed(2)}" class="w-full bg-dark-200 border-2 border-emerald-500/50 rounded-xl pl-7 pr-3 py-2.5 text-base font-black text-emerald-300 focus:outline-none focus:border-emerald-400 font-mono">
+                        </div>
+                    </div>
+
+                    <!-- Botones de Acceso Rápido -->
+                    <div class="flex flex-wrap gap-1.5 pt-1">
+                        <button type="button" onclick="const inp = document.getElementById('swal-pos419-cash-input'); if(inp){ inp.value = ${granTotal.toFixed(2)}; inp.dispatchEvent(new Event('input')); }" class="px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 rounded-lg text-xs font-bold transition-all cursor-pointer">Exacto ($${granTotal.toFixed(2)})</button>
+                        <button type="button" onclick="const inp = document.getElementById('swal-pos419-cash-input'); if(inp){ inp.value = 100; inp.dispatchEvent(new Event('input')); }" class="px-2.5 py-1 bg-white/5 hover:bg-white/10 text-white border border-white/10 rounded-lg text-xs font-bold transition-all cursor-pointer">$100</button>
+                        <button type="button" onclick="const inp = document.getElementById('swal-pos419-cash-input'); if(inp){ inp.value = 200; inp.dispatchEvent(new Event('input')); }" class="px-2.5 py-1 bg-white/5 hover:bg-white/10 text-white border border-white/10 rounded-lg text-xs font-bold transition-all cursor-pointer">$200</button>
+                        <button type="button" onclick="const inp = document.getElementById('swal-pos419-cash-input'); if(inp){ inp.value = 500; inp.dispatchEvent(new Event('input')); }" class="px-2.5 py-1 bg-white/5 hover:bg-white/10 text-white border border-white/10 rounded-lg text-xs font-bold transition-all cursor-pointer">$500</button>
+                        <button type="button" onclick="const inp = document.getElementById('swal-pos419-cash-input'); if(inp){ inp.value = 1000; inp.dispatchEvent(new Event('input')); }" class="px-2.5 py-1 bg-white/5 hover:bg-white/10 text-white border border-white/10 rounded-lg text-xs font-bold transition-all cursor-pointer">$1,000</button>
+                    </div>
+
+                    <div id="swal-pos419-change-box" class="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl flex items-center justify-between transition-colors">
+                        <span class="text-xs font-bold text-emerald-400 uppercase">Cambio a Entregar:</span>
+                        <span id="swal-pos419-change-val" class="text-lg font-black text-emerald-300 font-mono">$0.00</span>
+                    </div>
+                </div>
+            `,
+            icon: 'info',
+            showCancelButton: true,
+            confirmButtonText: 'Confirmar Pago y Cobrar',
+            cancelButtonText: 'Cancelar',
+            confirmButtonColor: '#10b981',
+            cancelButtonColor: '#374151',
+            background: '#151515', color: '#fff',
+            didOpen: () => {
+                const inp = document.getElementById('swal-pos419-cash-input');
+                const changeBox = document.getElementById('swal-pos419-change-val');
+                const changeContainer = document.getElementById('swal-pos419-change-box');
+
+                const updateCalc = () => {
+                    const val = parseFloat(inp.value || 0);
+                    if (val >= granTotal) {
+                        const cambio = val - granTotal;
+                        changeBox.textContent = `$${cambio.toFixed(2)}`;
+                        changeContainer.className = 'p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl flex items-center justify-between';
+                        changeBox.className = 'text-lg font-black text-emerald-300 font-mono';
+                    } else if (val > 0) {
+                        const falta = granTotal - val;
+                        changeBox.textContent = `Falta: $${falta.toFixed(2)}`;
+                        changeContainer.className = 'p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-center justify-between';
+                        changeBox.className = 'text-base font-bold text-amber-400 font-mono';
+                    } else {
+                        changeBox.textContent = '$0.00';
+                        changeContainer.className = 'p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl flex items-center justify-between';
+                        changeBox.className = 'text-lg font-black text-emerald-300 font-mono';
+                    }
+                };
+
+                if (inp) {
+                    inp.focus();
+                    inp.addEventListener('input', updateCalc);
+                    updateCalc();
+                }
+            },
+            preConfirm: () => {
+                const inp = document.getElementById('swal-pos419-cash-input');
+                const val = parseFloat(inp ? inp.value : 0);
+                if (isNaN(val) || val < granTotal) {
+                    Swal.showValidationMessage(`El pago ingresado ($${(val || 0).toFixed(2)}) debe ser mayor o igual al Total ($${granTotal.toFixed(2)})`);
+                    return false;
+                }
+                return val;
+            }
+        });
+
+        if (!cashModalRes.isConfirmed) return;
+        cashReceivedVal = parseFloat(cashModalRes.value || 0);
+
+        // Sincronizar input en la barra lateral
+        if (cashReceivedInput) cashReceivedInput.value = cashReceivedVal.toFixed(2);
+        recalculatePos419Cart();
+    }
+
+    const cambioEntregadoVal = (isEfectivo && cashReceivedVal >= granTotal) ? (cashReceivedVal - granTotal) : 0;
     
     let appliedTier = 'Menudeo';
     const clientPerfil = pos419Client.perfil || 'Menudeo';
@@ -10470,12 +10759,16 @@ async function submitPos419Order() {
         ? `Cliente Mostrador - ${pos419Client.nombre_mostrador_custom}`
         : pos419Client.nombre_completo;
 
-    let discountSummaryHtml = '';
+    let discountSummaryHtml = `<p>Subtotal prendas: <strong class="text-gray-300 font-mono">$${subtotalItems.toFixed(2)}</strong></p>`;
     if (descuentoMonto > 0) {
-        discountSummaryHtml = `
-            <p>Subtotal prendas: <strong class="text-gray-300 font-mono">$${subtotalItems.toFixed(2)}</strong></p>
-            <p>Descuento especial: <strong class="text-emerald-400 font-mono">-$${descuentoMonto.toFixed(2)}</strong></p>
-        `;
+        discountSummaryHtml += `<p>Descuento especial: <strong class="text-emerald-400 font-mono">-$${descuentoMonto.toFixed(2)}</strong></p>`;
+    }
+    if (comisionTerminalMonto > 0) {
+        discountSummaryHtml += `<p>Comisión Terminal (5%): <strong class="text-sky-400 font-mono">+$${comisionTerminalMonto.toFixed(2)}</strong></p>`;
+    }
+    if (isEfectivo && cashReceivedVal > 0) {
+        discountSummaryHtml += `<p>Pago Recibido (Efectivo): <strong class="text-emerald-400 font-mono">$${cashReceivedVal.toFixed(2)}</strong></p>`;
+        discountSummaryHtml += `<p>Cambio a Entregar: <strong class="text-emerald-300 font-mono">$${cambioEntregadoVal.toFixed(2)}</strong></p>`;
     }
     
     const confirmRes = await Swal.fire({
@@ -10485,7 +10778,7 @@ async function submitPos419Order() {
                 <p>Cliente: <strong class="text-white">${finalClientName}</strong></p>
                 <p>Piezas: <strong class="text-white">${totalPieces} pzas</strong></p>
                 <p>Nivel de Precio: <strong class="text-amber-400">${appliedTier}</strong></p>
-                <p>Método de Pago: <strong class="text-emerald-400">${metodoPago}</strong></p>
+                <p>Método de Pago: <strong class="text-emerald-400">${metodoPagoVal}</strong></p>
                 ${discountSummaryHtml}
                 <p class="text-sm font-bold text-white pt-2 border-t border-white/10">Total a Cobrar: <span class="text-amber-400 font-mono">$${granTotal.toFixed(2)}</span></p>
             </div>
@@ -10509,16 +10802,24 @@ async function submitPos419Order() {
         didOpen: () => Swal.showLoading()
     });
     
+    const customName = (pos419Client.nombre_mostrador_custom || '').trim();
+    const clientIdToSend = isMostrador
+        ? (customName ? `CLI-MOSTRADOR-${customName}` : 'CLI-MOSTRADOR-Cliente Mostrador')
+        : pos419Client.id_cliente;
+    
     try {
         const payload = {
             action: 'create_pos_419_order',
-            id_cliente: pos419Client.id_cliente,
+            id_cliente: clientIdToSend,
             nombre_cliente: finalClientName,
             tipo_precio_aplicado: appliedTier,
-            metodo_pago: metodoPago,
+            metodo_pago: metodoPagoVal,
+            monto_recibido: cashReceivedVal,
+            cambio_entregado: cambioEntregadoVal,
             subtotal: subtotalItems,
             descuento: descuentoMonto,
-            descuento_tipo: discountType,
+            comision_terminal: comisionTerminalMonto,
+            descuento_tipo: descuentoMonto > 0 ? "Monto" : "Ninguno",
             total_cobrado: granTotal,
             items: pos419Cart.map(i => ({
                 id_playera: i.id_playera,
@@ -10548,19 +10849,52 @@ async function submitPos419Order() {
             fetchProducts419(true);
             if (typeof fetchInitialProducts === 'function') fetchInitialProducts(true);
             
+            const lastTicketData = {
+                id_orden: resData.id_orden,
+                fecha: new Date().toLocaleString('es-MX', { timeZone: 'America/Mexico_City' }),
+                cliente: finalClientName,
+                metodo_pago: metodoPagoVal,
+                monto_recibido: cashReceivedVal,
+                cambio_entregado: cambioEntregadoVal,
+                subtotal: subtotalItems,
+                descuento: descuentoMonto,
+                comision_terminal: comisionTerminalMonto,
+                gran_total: granTotal,
+                items: pos419Cart.map(i => ({
+                    id_playera: i.nombre || i.id_playera,
+                    talla: i.talla,
+                    cantidad: i.cantidad,
+                    precio_unitario: i.precio_unitario_aplicado,
+                    subtotal: i.subtotal,
+                    detalles_personalizacion: i.personalizacion_texto || ''
+                }))
+            };
+            window.lastPos419TicketData = lastTicketData;
+
             await Swal.fire({
                 icon: 'success',
                 title: '¡Venta Registrada con Éxito!',
                 html: `
-                    <div class="text-center space-y-2 py-2">
+                    <div class="text-center space-y-3 py-2">
                         <p class="text-xs text-gray-300">Folio Orden: <strong class="text-white font-mono">${resData.id_orden}</strong></p>
-                        <p class="text-sm font-bold text-amber-400 font-mono">Cobrado: $${granTotal.toFixed(2)} (${metodoPago})</p>
+                        <p class="text-sm font-bold text-amber-400 font-mono">Cobrado: $${granTotal.toFixed(2)} (${metodoPagoVal})</p>
+                        ${cashReceivedVal > 0 ? `<p class="text-xs text-emerald-400 font-bold font-mono">Recibido: $${cashReceivedVal.toFixed(2)} | Cambio: $${cambioEntregadoVal.toFixed(2)}</p>` : ''}
                         <p class="text-[11px] text-emerald-400">✓ Piezas descontadas del stock de Local 419</p>
+                        <button type="button" onclick="window.printPos419Ticket()" class="w-full py-2.5 px-4 bg-amber-500 hover:bg-amber-400 text-black font-extrabold text-xs uppercase tracking-wider rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                            Imprimir Ticket (Xprinter XP-N160I-BT)
+                        </button>
                     </div>
                 `,
                 confirmButtonColor: '#10b981',
+                confirmButtonText: 'Listo',
                 background: '#151515', color: '#fff'
             });
+            
+            pos419Cart = [];
+            if (discountValEl) discountValEl.value = '';
+            if (cashReceivedInput) cashReceivedInput.value = '';
+            recalculatePos419Cart();
             
             closePos419Modal();
             openInventario419View();
@@ -10578,6 +10912,527 @@ async function submitPos419Order() {
     }
 }
 window.submitPos419Order = submitPos419Order;
+
+const defaultTicketConfig = {
+    nombreTienda: 'JERSEYS 419',
+    direccion1: 'Alamillo # 501, Local 6 (Planta Alta)',
+    direccion2: 'Bosque Real, Apodaca.',
+    horario: 'Lun a Sáb: 11:00 AM - 8:00 PM | Dom: 12:00 PM - 5:00 PM',
+    qrUrl: 'https://wa.me/528132698182',
+    politicas: 'Cambios: Plazo máximo de 15 días naturales. La prenda debe estar sin uso, con etiquetas originales, sin manchas ni olores. Es obligatorio presentar esta nota.\nGarantía: Defectos de fábrica válidos por 15 días. No aplica por mal uso, lavado inadecuado o desgaste natural.\nDevoluciones: No se realiza reembolso de efectivo; se emitirá un crédito con el valor de la prenda comprada.\nRestricciones: Sólo se podrá realizar un cambio por prenda adquirida.',
+    mensajePie: '*** ¡GRACIAS POR TU COMPRA! ***'
+};
+
+window.generateTicketWhatsappQrUrl = function(baseConfigUrl, folioStr, clienteStr) {
+    let targetPhone = '528132698182';
+    
+    if (baseConfigUrl && typeof baseConfigUrl === 'string') {
+        const rawDigits = baseConfigUrl.replace(/\D/g, '');
+        if (rawDigits.length >= 10) {
+            targetPhone = rawDigits.startsWith('52') ? rawDigits : ('52' + rawDigits);
+        }
+    }
+    
+    let msg = `Hola, requiero atención sobre mi orden de compra ${folioStr || ''}`;
+    if (clienteStr && String(clienteStr).trim() !== '' && String(clienteStr).trim() !== 'Cliente Mostrador') {
+        msg += ` (Cliente: ${String(clienteStr).trim()})`;
+    }
+    
+    const waLink = `https://wa.me/${targetPhone}?text=${encodeURIComponent(msg.trim())}`;
+    return `https://api.qrserver.com/v1/create-qr-code/?size=130x130&data=${encodeURIComponent(waLink)}`;
+};
+
+window.getTicketConfig = function() {
+    try {
+        const saved = localStorage.getItem('jerseys_ticket_config_v1');
+        if (saved) {
+            return { ...defaultTicketConfig, ...JSON.parse(saved) };
+        }
+    } catch (e) {}
+    return defaultTicketConfig;
+};
+
+window.saveTicketConfig = function(cfg) {
+    try {
+        localStorage.setItem('jerseys_ticket_config_v1', JSON.stringify(cfg));
+    } catch (e) {}
+};
+
+window.fetchTicketConfigFromCloud = async function() {
+    try {
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'get_ticket_config' })
+        });
+        const resData = await response.json();
+        if (resData && (resData.status === 'success' || resData.config || resData.data)) {
+            const remoteCfg = resData.config || resData.data || resData;
+            const merged = { ...defaultTicketConfig, ...remoteCfg };
+            window.saveTicketConfig(merged);
+            return merged;
+        }
+    } catch (e) {
+        console.warn("No se pudo obtener la configuración del ticket desde Google Sheets:", e);
+    }
+    return window.getTicketConfig();
+};
+
+window.saveTicketConfigToCloud = async function(cfg) {
+    window.saveTicketConfig(cfg);
+    try {
+        await fetch(API_URL, {
+            method: 'POST',
+            body: JSON.stringify({
+                action: 'save_ticket_config',
+                ticket_config: cfg,
+                config: cfg
+            })
+        });
+    } catch (e) {
+        console.warn("No se pudo guardar la configuración del ticket en Google Sheets:", e);
+    }
+};
+
+window.updateLiveTicketPreview = function() {
+    const previewContainer = document.getElementById('ticket-live-preview-content');
+    if (!previewContainer) return;
+
+    const nombre = (document.getElementById('cfg-ticket-nombre')?.value || 'JERSEYS 419').trim();
+    const dir1 = (document.getElementById('cfg-ticket-dir1')?.value || 'Alamillo # 501, Local 6 (Planta Alta)').trim();
+    const dir2 = (document.getElementById('cfg-ticket-dir2')?.value || 'Bosque Real, Apodaca.').trim();
+    const horario = (document.getElementById('cfg-ticket-horario')?.value || 'Lun a Sáb: 11:00 AM - 8:00 PM | Dom: 12:00 PM - 5:00 PM').trim();
+    const qrUrl = (document.getElementById('cfg-ticket-qr')?.value || 'https://wa.me/528132698182').trim();
+    const politicas = (document.getElementById('cfg-ticket-politicas')?.value || '').trim();
+    const pie = (document.getElementById('cfg-ticket-pie')?.value || '*** ¡GRACIAS POR TU COMPRA! ***').trim();
+
+    const qrImgSrc = window.generateTicketWhatsappQrUrl(qrUrl, 'ORD-419-802389', 'Cliente Mostrador');
+
+    previewContainer.innerHTML = `
+        <div style="text-align: center; margin-bottom: 6px;">
+            <div style="font-size: 16px; font-weight: 900; letter-spacing: 1px; line-height: 1;">${nombre}</div>
+            ${dir1 ? `<div style="font-size: 9.5px; margin-top: 3px;">${dir1}</div>` : ''}
+            ${dir2 ? `<div style="font-size: 9.5px;">${dir2}</div>` : ''}
+            ${horario ? `<div style="font-size: 8.5px; margin-top: 2px; font-weight: bold;">Horarios: ${horario}</div>` : ''}
+        </div>
+
+        <div style="border-top: 1px dashed #000; border-bottom: 1px dashed #000; padding: 4px 0; margin-bottom: 6px; font-size: 10px;">
+            <div style="display: flex; justify-content: space-between;">
+                <strong>NOTA DE VENTA:</strong>
+                <strong style="font-size: 10.5px;">ORD-419-802389</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-top: 2px;">
+                <strong>FECHA:</strong>
+                <span>${new Date().toLocaleDateString('es-MX')} 7:30 PM</span>
+            </div>
+            <div style="margin-top: 2px;">
+                <strong>CLIENTE:</strong> Cliente Mostrador
+            </div>
+        </div>
+
+        <div style="border-bottom: 1px solid #000; padding-bottom: 2px; margin-bottom: 5px; font-weight: bold; display: flex; justify-content: space-between; font-size: 9.5px;">
+            <span>CANT / DESCRIPCION</span>
+            <span>IMPORTE</span>
+        </div>
+
+        <div style="margin-bottom: 6px;">
+            <div style="margin-bottom: 4px;">
+                <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 10.5px;">
+                    <span>1x MONTERREY / RAYADOS 80 ANI</span>
+                    <span>$200.00</span>
+                </div>
+                <div style="font-size: 9px; color: #111; padding-left: 6px;">
+                    Talla: S
+                </div>
+            </div>
+            <div style="margin-bottom: 4px;">
+                <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 10.5px;">
+                    <span>1x TIGRES 26/27</span>
+                    <span>$220.00</span>
+                </div>
+                <div style="font-size: 9px; color: #111; padding-left: 6px;">
+                    Talla: L
+                </div>
+            </div>
+        </div>
+
+        <div style="border-top: 1px dashed #000; padding-top: 4px; margin-bottom: 6px; font-size: 10px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 3px; font-weight: bold;">
+                <span>TOTAL DE PIEZAS:</span>
+                <span>2 PZS</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 3px;">
+                <strong>FORMA DE PAGO:</strong>
+                <span>(X) EFECTIVO ( ) TRANSF ( ) TC</span>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+                <span>SU PAGO (EFECTIVO):</span>
+                <span>$500.00</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-weight: bold;">
+                <span>SU CAMBIO:</span>
+                <span>$80.00</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 12px; font-weight: 900; border-top: 1.5px solid #000; padding-top: 3px; margin-top: 3px;">
+                <span>TOTAL $:</span>
+                <span>$420.00</span>
+            </div>
+        </div>
+
+        ${politicas ? `
+        <div style="font-size: 7.5px; border-top: 1px solid #000; padding-top: 4px; text-align: justify; line-height: 1.15; white-space: pre-line;">
+            ${politicas}
+        </div>
+        ` : ''}
+
+        ${pie ? `
+        <div style="text-align: center; font-size: 8.5px; font-weight: bold; margin-top: 6px;">
+            ${pie}
+        </div>
+        ` : ''}
+
+        <div style="width: 100%; text-align: center; margin-top: 6px; padding-top: 4px; border-top: 1px dashed #000; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+            <svg id="live-ticket-barcode-svg" style="margin: 0 auto; display: block; max-width: 85%;"></svg>
+        </div>
+
+        ${qrImgSrc ? `
+        <div style="text-align: center; margin-top: 6px; padding-top: 4px; border-top: 1px dashed #000;">
+            <img src="${qrImgSrc}" style="width: 24mm; height: 24mm; margin: 0 auto; display: block;" alt="QR Code">
+            <div style="font-size: 7.5px; font-weight: bold; margin-top: 2px;">ESCANEA PARA ATENCIÓN EN LÍNEA</div>
+        </div>
+        ` : ''}
+    `;
+
+    try {
+        if (typeof JsBarcode === 'function') {
+            JsBarcode("#live-ticket-barcode-svg", "ORD-419-802389", {
+                format: "CODE128",
+                width: 1.1,
+                height: 22,
+                displayValue: true,
+                fontSize: 8.5,
+                margin: 0
+            });
+        }
+    } catch(eB) {}
+};
+
+window.openTicketConfigModal = async function() {
+    const modal = document.getElementById('admin-ticket-config-modal');
+    if (!modal) return;
+
+    // 1. Mostrar de inmediato la configuración local guardada mientras se consulta la nube
+    const localCfg = window.getTicketConfig();
+    populateTicketFields(localCfg);
+    window.updateLiveTicketPreview();
+    modal.classList.remove('hidden');
+
+    // 2. Consultar Google Sheets API en segundo plano y actualizar campos
+    try {
+        const remoteCfg = await window.fetchTicketConfigFromCloud();
+        if (remoteCfg) {
+            populateTicketFields(remoteCfg);
+            window.updateLiveTicketPreview();
+        }
+    } catch (err) {
+        console.warn("Error al sincronizar ticket config con Google Sheets:", err);
+    }
+
+    ['cfg-ticket-nombre', 'cfg-ticket-dir1', 'cfg-ticket-dir2', 'cfg-ticket-horario', 'cfg-ticket-qr', 'cfg-ticket-politicas', 'cfg-ticket-pie'].forEach(id => {
+        const inp = document.getElementById(id);
+        if (inp && !inp.dataset.hasLivePreviewListener) {
+            inp.dataset.hasLivePreviewListener = "true";
+            inp.addEventListener('input', window.updateLiveTicketPreview);
+        }
+    });
+};
+
+function populateTicketFields(cfg) {
+    const elNom = document.getElementById('cfg-ticket-nombre');
+    const elDir1 = document.getElementById('cfg-ticket-dir1');
+    const elDir2 = document.getElementById('cfg-ticket-dir2');
+    const elHor = document.getElementById('cfg-ticket-horario');
+    const elQr = document.getElementById('cfg-ticket-qr');
+    const elPol = document.getElementById('cfg-ticket-politicas');
+    const elPie = document.getElementById('cfg-ticket-pie');
+
+    if (elNom) elNom.value = cfg.nombreTienda || '';
+    if (elDir1) elDir1.value = cfg.direccion1 || '';
+    if (elDir2) elDir2.value = cfg.direccion2 || '';
+    if (elHor) elHor.value = cfg.horario || '';
+    if (elQr) elQr.value = cfg.qrUrl || '';
+    if (elPol) elPol.value = cfg.politicas || '';
+    if (elPie) elPie.value = cfg.mensajePie || '';
+}
+
+window.closeTicketConfigModal = function() {
+    const modal = document.getElementById('admin-ticket-config-modal');
+    if (modal) modal.classList.add('hidden');
+};
+
+function printPos419Ticket(dataCustom) {
+    const data = dataCustom || window.lastPos419TicketData;
+    if (!data) {
+        Swal.fire({
+            icon: 'info',
+            title: 'Sin datos de ticket',
+            text: 'No hay datos de venta recientes para imprimir.',
+            background: '#151515', color: '#fff'
+        });
+        return;
+    }
+
+    const cfg = window.getTicketConfig();
+
+    const fechaStr = data.fecha || new Date().toLocaleString('es-MX', { timeZone: 'America/Mexico_City' });
+    const clienteStr = data.cliente || 'Cliente Mostrador';
+    const folioStr = data.id_orden || 'ORD-419-000000';
+    const metodoPagoStr = (data.metodo_pago || 'Efectivo').toUpperCase();
+    const items = data.items || [];
+    const subtotal = Number(data.subtotal || data.gran_total || 0);
+    const descuento = Number(data.descuento || 0);
+    const comisionTerminal = Number(data.comision_terminal || 0);
+    const total = Number(data.gran_total || 0);
+
+    const isEfectivo = metodoPagoStr.includes('EFECTIVO');
+    const isTransf = metodoPagoStr.includes('TRANSF');
+    const isTC = metodoPagoStr.includes('TC') || metodoPagoStr.includes('TARJETA');
+
+    let totalPiezas = 0;
+    let itemsHtml = '';
+    items.forEach(it => {
+        const cant = Number(it.cantidad || 1);
+        totalPiezas += cant;
+        const nombreStr = (it.id_playera || it.nombre || 'Playera').substring(0, 24);
+        const tallaStr = (it.talla || '').toUpperCase();
+        const pSub = Number(it.subtotal || (it.precio_unitario * cant)).toFixed(2);
+        
+        itemsHtml += `
+            <div style="margin-bottom: 5px;">
+                <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 11.5px; color: #000000;">
+                    <span>${cant}x ${nombreStr}</span>
+                    <span>$${pSub}</span>
+                </div>
+                <div style="font-size: 10px; font-weight: bold; color: #000000; padding-left: 6px;">
+                    Talla: ${tallaStr} ${it.detalles_personalizacion ? ` | Pers: ${it.detalles_personalizacion}` : ''}
+                </div>
+            </div>
+        `;
+    });
+
+    const montoRecibido = Number(data.monto_recibido || 0);
+    const cambioEntregado = Number(data.cambio_entregado !== undefined ? data.cambio_entregado : (montoRecibido > 0 ? montoRecibido - total : 0));
+
+    const qrImgSrc = window.generateTicketWhatsappQrUrl(cfg.qrUrl, folioStr, clienteStr);
+
+    const fullTicketContent = `
+        <div style="text-align: center; margin-bottom: 6px;">
+            <div style="font-size: 18px; font-weight: bold; letter-spacing: 0.5px; line-height: 1.1; color: #000000;">${cfg.nombreTienda}</div>
+            ${cfg.direccion1 ? `<div style="font-size: 10px; font-weight: bold; margin-top: 3px; color: #000000;">${cfg.direccion1}</div>` : ''}
+            ${cfg.direccion2 ? `<div style="font-size: 10px; font-weight: bold; color: #000000;">${cfg.direccion2}</div>` : ''}
+            ${cfg.horario ? `<div style="font-size: 9px; margin-top: 2px; font-weight: bold; color: #000000;">Horarios: ${cfg.horario}</div>` : ''}
+        </div>
+
+        <div style="border-top: 1.5px dashed #000; border-bottom: 1.5px dashed #000; padding: 4px 0; margin-bottom: 6px; font-size: 10.5px; font-weight: bold; color: #000000;">
+            <div style="display: flex; justify-content: space-between;">
+                <strong>NOTA DE VENTA:</strong>
+                <strong style="font-size: 11.5px;">${folioStr}</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-top: 2px;">
+                <strong>FECHA:</strong>
+                <span>${fechaStr}</span>
+            </div>
+            <div style="margin-top: 2px;">
+                <strong>CLIENTE:</strong> ${clienteStr}
+            </div>
+        </div>
+
+        <div style="border-bottom: 1.5px solid #000; padding-bottom: 2px; margin-bottom: 5px; font-weight: bold; display: flex; justify-content: space-between; font-size: 10.5px; color: #000000;">
+            <span>CANT / DESCRIPCION</span>
+            <span>IMPORTE</span>
+        </div>
+
+        <div style="margin-bottom: 6px; color: #000000;">
+            ${itemsHtml}
+        </div>
+
+        <div style="border-top: 1.5px dashed #000; padding-top: 4px; margin-bottom: 6px; font-size: 10.5px; font-weight: bold; color: #000000;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 3px; font-weight: bold;">
+                <span>TOTAL DE PIEZAS:</span>
+                <span>${totalPiezas} PZS</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 3px;">
+                <strong>FORMA DE PAGO:</strong>
+                <span>(${isEfectivo ? 'X' : ' '}) EFECTIVO (${isTransf ? 'X' : ' '}) TRANSF (${isTC ? 'X' : ' '}) TC</span>
+            </div>
+            ${isEfectivo && montoRecibido > 0 ? `
+            <div style="display: flex; justify-content: space-between;">
+                <span>SU PAGO (EFECTIVO):</span>
+                <span>$${montoRecibido.toFixed(2)}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-weight: bold;">
+                <span>SU CAMBIO:</span>
+                <span>$${cambioEntregado.toFixed(2)}</span>
+            </div>
+            ` : ''}
+            ${descuento > 0 ? `
+            <div style="display: flex; justify-content: space-between;">
+                <span>SUBTOTAL:</span>
+                <span>$${subtotal.toFixed(2)}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+                <span>DESCUENTO:</span>
+                <span>-$${descuento.toFixed(2)}</span>
+            </div>
+            ` : ''}
+            ${comisionTerminal > 0 ? `
+            <div style="display: flex; justify-content: space-between;">
+                <span>COMISION TERMINAL (5%):</span>
+                <span>+$${comisionTerminal.toFixed(2)}</span>
+            </div>
+            ` : ''}
+            <div style="display: flex; justify-content: space-between; font-size: 14px; font-weight: bold; border-top: 1.5px solid #000; padding-top: 3px; margin-top: 3px; color: #000000;">
+                <span>TOTAL $:</span>
+                <span>$${total.toFixed(2)}</span>
+            </div>
+        </div>
+
+        ${cfg.politicas ? `
+        <div style="font-size: 9px; font-weight: bold; border-top: 1px solid #000; padding-top: 4px; text-align: justify; line-height: 1.2; white-space: pre-line; color: #000000;">
+            ${cfg.politicas}
+        </div>
+        ` : ''}
+
+        ${cfg.mensajePie ? `
+        <div style="text-align: center; font-size: 9.5px; font-weight: bold; margin-top: 6px; color: #000000;">
+            ${cfg.mensajePie}
+        </div>
+        ` : ''}
+
+        <!-- Código de Barras Escaneable del Folio Centrado -->
+        <div style="width: 100%; text-align: center; margin-top: 6px; padding-top: 4px; border-top: 1.5px dashed #000; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+            <svg id="ticket-folio-barcode-svg" style="margin: 0 auto; display: block; max-width: 85%;"></svg>
+        </div>
+
+        <!-- Código QR de Atención / Enlace -->
+        ${qrImgSrc ? `
+        <div style="text-align: center; margin-top: 6px; padding-top: 4px; border-top: 1.5px dashed #000;">
+            <img src="${qrImgSrc}" style="width: 26mm; height: 26mm; margin: 0 auto; display: block;" alt="QR Code">
+            <div style="font-size: 9px; font-weight: bold; margin-top: 2px; color: #000000;">ESCANEA PARA ATENCIÓN EN LÍNEA</div>
+        </div>
+        ` : ''}
+    `;
+
+    // 1. Intentar impresión aislada vía iFrame (Garantiza vista previa limpia en móviles y tablets)
+    try {
+        let iframe = document.getElementById('ticket-print-iframe');
+        if (iframe) iframe.remove();
+
+        iframe = document.createElement('iframe');
+        iframe.id = 'ticket-print-iframe';
+        iframe.style.position = 'fixed';
+        iframe.style.right = '0';
+        iframe.style.bottom = '0';
+        iframe.style.width = '0px';
+        iframe.style.height = '0px';
+        iframe.style.border = '0';
+        document.body.appendChild(iframe);
+
+        const doc = iframe.contentWindow.document;
+        doc.open();
+        doc.write(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="utf-8">
+                <title>Ticket ${folioStr}</title>
+                <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+                <style>
+                    @page { size: 80mm auto; margin: 0; }
+                    body {
+                        width: 70mm;
+                        max-width: 70mm;
+                        margin: 0 auto;
+                        padding: 2mm 2mm;
+                        font-family: Arial, Helvetica, sans-serif;
+                        font-size: 11px;
+                        line-height: 1.2;
+                        color: #000000 !important;
+                        background: #ffffff !important;
+                    }
+                    * { box-sizing: border-box; color: #000000 !important; }
+                </style>
+            </head>
+            <body>
+                ${fullTicketContent}
+            </body>
+            </html>
+        `);
+        doc.close();
+
+        let printed = false;
+        const doPrint = () => {
+            if (printed) return;
+            printed = true;
+            try {
+                if (iframe.contentWindow.JsBarcode) {
+                    iframe.contentWindow.JsBarcode("#ticket-folio-barcode-svg", folioStr, {
+                        format: "CODE128",
+                        width: 1.3,
+                        height: 24,
+                        displayValue: true,
+                        fontSize: 9,
+                        margin: 0
+                    });
+                }
+            } catch(eB) {
+                console.warn("Barcode generation error in ticket iframe:", eB);
+            }
+
+            iframe.contentWindow.focus();
+            iframe.contentWindow.print();
+        };
+
+        const qrImgEl = doc.querySelector('img');
+        if (qrImgEl && !qrImgEl.complete) {
+            qrImgEl.onload = doPrint;
+            qrImgEl.onerror = doPrint;
+            setTimeout(doPrint, 1200);
+        } else {
+            setTimeout(doPrint, 250);
+        }
+        return;
+    } catch (eIFrame) {
+        console.warn("Iframe print error fallback:", eIFrame);
+    }
+
+    // 2. Fallback secundario a contenedor DOM
+    const printContainer = document.getElementById('ticket-419-print-area');
+    if (printContainer) {
+        printContainer.innerHTML = fullTicketContent;
+        printContainer.style.display = 'block';
+        printContainer.classList.remove('hidden');
+        try {
+            if (typeof JsBarcode === 'function') {
+                JsBarcode("#ticket-folio-barcode-svg", folioStr, {
+                    format: "CODE128",
+                    width: 1.3,
+                    height: 24,
+                    displayValue: true,
+                    fontSize: 9,
+                    margin: 0
+                });
+            }
+        } catch(eB) {}
+        setTimeout(() => {
+            window.print();
+            setTimeout(() => {
+                printContainer.style.display = '';
+                printContainer.classList.add('hidden');
+            }, 500);
+        }, 250);
+    }
+}
+window.printPos419Ticket = printPos419Ticket;
 
 // =========================================================================
 // MÓDULO FRONTEND: GESTIÓN Y VENTA DE ARTÍCULOS DEPORTIVOS GENERALES
@@ -11063,7 +11918,887 @@ document.addEventListener('DOMContentLoaded', () => {
             else inputVar.value = 'Unitalla';
         });
     }
+
+    const formTicketConfig = document.getElementById('form-ticket-config');
+    if (formTicketConfig) {
+        formTicketConfig.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const cfg = {
+                nombreTienda: document.getElementById('cfg-ticket-nombre').value.trim() || 'JERSEYS 419',
+                direccion1: document.getElementById('cfg-ticket-dir1').value.trim(),
+                direccion2: document.getElementById('cfg-ticket-dir2').value.trim(),
+                horario: document.getElementById('cfg-ticket-horario').value.trim(),
+                qrUrl: document.getElementById('cfg-ticket-qr').value.trim(),
+                politicas: document.getElementById('cfg-ticket-politicas').value.trim(),
+                mensajePie: document.getElementById('cfg-ticket-pie').value.trim()
+            };
+            
+            Swal.fire({
+                title: 'Guardando Configuración...',
+                text: 'Sincronizando con Google Sheets...',
+                allowOutsideClick: false,
+                background: '#151515', color: '#fff',
+                didOpen: () => Swal.showLoading()
+            });
+
+            await window.saveTicketConfigToCloud(cfg);
+            window.closeTicketConfigModal();
+
+            Swal.fire({
+                icon: 'success',
+                title: '¡Configuración Guardada en la Nube!',
+                text: 'La información del ticket ha sido actualizada y sincronizada en Google Sheets.',
+                background: '#151515', color: '#fff',
+                timer: 1800, showConfirmButton: false
+            });
+        });
+    }
+
+    initScrollToTop();
 });
+
+function initScrollToTop() {
+    const btnToTop = document.getElementById('btn-scroll-to-top');
+    if (!btnToTop) return;
+
+    const local419Grid = document.getElementById('local419-inventario-grid');
+    const pos419Grid = document.getElementById('pos419-catalog-grid');
+
+    const updateVisibility = () => {
+        let isScrolled = window.scrollY > 250;
+
+        // Verificar si la vista de pantalla completa del Inventario 419 está activa
+        const modal419 = document.getElementById('local419-inventario-modal');
+        if (modal419 && !modal419.classList.contains('hidden')) {
+            const grid419 = document.getElementById('local419-inventario-grid');
+            isScrolled = !!(grid419 && grid419.scrollTop > 150);
+        }
+
+        // Verificar si la vista del Punto de Venta 419 está activa
+        const modalPos419 = document.getElementById('modal-pos-local419');
+        if (modalPos419 && !modalPos419.classList.contains('hidden')) {
+            isScrolled = !!(pos419Grid && pos419Grid.scrollTop > 150);
+        }
+
+        if (isScrolled) {
+            btnToTop.classList.remove('opacity-0', 'pointer-events-none', 'translate-y-4');
+            btnToTop.classList.add('opacity-100', 'pointer-events-auto', 'translate-y-0');
+        } else {
+            btnToTop.classList.add('opacity-0', 'pointer-events-none', 'translate-y-4');
+            btnToTop.classList.remove('opacity-100', 'pointer-events-auto', 'translate-y-0');
+        }
+    };
+
+    window.addEventListener('scroll', updateVisibility, { passive: true });
+    if (local419Grid) local419Grid.addEventListener('scroll', updateVisibility, { passive: true });
+    if (pos419Grid) pos419Grid.addEventListener('scroll', updateVisibility, { passive: true });
+
+    btnToTop.addEventListener('click', () => {
+        const modal419 = document.getElementById('local419-inventario-modal');
+        if (modal419 && !modal419.classList.contains('hidden')) {
+            const grid419 = document.getElementById('local419-inventario-grid');
+            if (grid419) grid419.scrollTo({ top: 0, behavior: 'smooth' });
+            return;
+        }
+
+        const modalPos419 = document.getElementById('modal-pos-local419');
+        if (modalPos419 && !modalPos419.classList.contains('hidden')) {
+            if (pos419Grid) pos419Grid.scrollTo({ top: 0, behavior: 'smooth' });
+            return;
+        }
+
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+}
+
+// =========================================================================
+// MÓDULO DE ETIQUETADO CON CÓDIGO DE BARRAS (51x25mm) Y ESCANEO
+// =========================================================================
+let currentStickerData = null;
+let currentStickerAvailableSizes = [];
+let stickerBatchCounts = {};
+let html5QrScannerInstance = null;
+let currentStickerIsGeneralCatalog = false;
+
+window.openPrintStickerModal = function(itemData, isGeneralCatalog = false) {
+    currentStickerIsGeneralCatalog = (isGeneralCatalog === true);
+    currentStickerData = itemData || null;
+    const modal = document.getElementById('modal-print-barcode-labels');
+    if (!modal) return;
+
+    // Configurar listener para buscador interno de prendas si no está asignado
+    const searchInput = document.getElementById('sticker-product-search-input');
+    const searchResults = document.getElementById('sticker-product-search-results');
+    if (searchInput && !searchInput.dataset.hasStickerSearchListener) {
+        searchInput.dataset.hasStickerSearchListener = "true";
+        searchInput.oninput = (e) => filterStickerProductSearch(e.target.value);
+    }
+    if (searchInput) searchInput.value = '';
+    if (searchResults) { searchResults.innerHTML = ''; searchResults.classList.add('hidden'); }
+
+    if (!itemData) {
+        // Modal abierto de forma neutral sin prenda seleccionada
+        const infoContainer = document.getElementById('sticker-item-info');
+        if (infoContainer) {
+            infoContainer.innerHTML = `
+                <div class="flex items-center gap-2.5">
+                    <span class="p-2 bg-amber-500/20 text-amber-400 rounded-xl text-base">🏷️</span>
+                    <div>
+                        <h3 class="text-sm font-bold text-white">Imprimir Pegatinas Adhesivas</h3>
+                        <p class="text-[10px] text-gray-400">Formato Estándar 51 × 25 mm (Xprinter 365B)</p>
+                    </div>
+                </div>
+            `;
+        }
+        currentStickerAvailableSizes = [];
+        stickerBatchCounts = {};
+        renderStickerSizesBatchUI([]);
+        window.updateStickerPreviewFromUI();
+        modal.classList.remove('hidden');
+        return;
+    }
+
+    const nombreStr = itemData.nombre || itemData.equipo || itemData.id_playera || 'Playera Jerseys 419';
+    const tipoStr = (itemData.tipo || 'Regular').toUpperCase();
+    const versionStr = (itemData.version || 'Aficionado').toUpperCase();
+    const generoStr = (itemData.genero || 'Hombre').toUpperCase();
+    const precioNum = Number(itemData.precio_menudeo || itemData.precio || 550);
+
+    const rawImg = typeof getFirstImage === 'function' ? getFirstImage(itemData.foto || itemData.imagen) : (itemData.foto || itemData.imagen);
+    const imgUrl = typeof getOptimizedImageUrl === 'function' ? getOptimizedImageUrl(rawImg, 150) : (rawImg || 'https://images.unsplash.com/photo-1577212017184-807dd6acefd6?auto=format&fit=crop&q=80&w=150');
+
+    const infoContainer = document.getElementById('sticker-item-info');
+    if (infoContainer) {
+        infoContainer.innerHTML = `
+            <div class="flex items-center gap-3.5 p-1">
+                <img src="${imgUrl}" alt="${nombreStr}" class="w-14 h-16 object-cover rounded-xl border border-white/10 shadow-md bg-dark-300 shrink-0">
+                <div class="space-y-1.5 min-w-0">
+                    <h4 class="text-sm font-black text-white leading-tight uppercase tracking-wide truncate">${nombreStr}</h4>
+                    <div class="flex flex-wrap gap-1.5 items-center">
+                        <span class="px-2.5 py-0.5 bg-[#222226] text-gray-200 rounded-lg text-[10px] font-bold border border-white/10 uppercase tracking-wider">${tipoStr}</span>
+                        <span class="px-2.5 py-0.5 bg-[#222226] text-gray-200 rounded-lg text-[10px] font-bold border border-white/10 uppercase tracking-wider">${versionStr}</span>
+                        <span class="px-2.5 py-0.5 bg-blue-600/30 text-blue-300 rounded-lg text-[10px] font-black border border-blue-500/30 uppercase tracking-wider">${generoStr}</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    const priceBadgeEl = document.getElementById('sticker-price-badge-val');
+    if (priceBadgeEl) priceBadgeEl.textContent = `$${precioNum.toFixed(2)}`;
+
+    // Obtener lista de tallas disponibles
+    let availableSizes = [];
+    const mainCatalog419 = (typeof allProducts419 !== 'undefined' && Array.isArray(allProducts419)) ? allProducts419 : (window.allProducts419 || []);
+    const mainCatalogGen = (typeof allProducts !== 'undefined' && Array.isArray(allProducts)) ? allProducts : (window.allProducts || []);
+    const fullProd = mainCatalog419.find(p => String(p.id || p.id_articulo || p.id_playera).toUpperCase() === String(itemData.id || itemData.id_playera).toUpperCase())
+        || mainCatalogGen.find(p => String(p.id || p.id_articulo || p.id_playera).toUpperCase() === String(itemData.id || itemData.id_playera).toUpperCase())
+        || itemData;
+
+    if (fullProd && Array.isArray(fullProd.tallas) && fullProd.tallas.length > 0) {
+        availableSizes = fullProd.tallas.map(t => {
+            const szStr = String(t.talla || t.variante || 'M').toUpperCase();
+            return {
+                talla: szStr,
+                stock: t.stock !== undefined ? Number(t.stock) : (t.inventario !== undefined ? Number(t.inventario) : 999),
+                id_inventario: t.id_inventario || `${fullProd.id || fullProd.id_playera || 'PLAY'}-${szStr}`
+            };
+        });
+    } else {
+        const defaultGender = itemData.genero || 'Hombre';
+        const stdSizes = typeof getTallasForGender === 'function' ? getTallasForGender(defaultGender) : ['S', 'M', 'L', 'XL', '2XL'];
+        availableSizes = stdSizes.map(sz => ({
+            talla: sz,
+            stock: 999,
+            id_inventario: `${itemData.id || itemData.id_playera || 'PLAY'}-${sz}`
+        }));
+    }
+
+    currentStickerAvailableSizes = availableSizes;
+
+    // REGLA: Todas las piezas inician strictly en 0 al ingresar
+    stickerBatchCounts = {};
+    availableSizes.forEach(sObj => {
+        stickerBatchCounts[sObj.talla] = 0;
+    });
+
+    const priceToggleRow = document.getElementById('sticker-price-toggle-row');
+    if (priceToggleRow) {
+        if (currentStickerIsGeneralCatalog) {
+            priceToggleRow.classList.add('hidden');
+        } else {
+            priceToggleRow.classList.remove('hidden');
+        }
+    }
+
+    const showPriceCheck = document.getElementById('sticker-show-price-check');
+    if (showPriceCheck) showPriceCheck.checked = false;
+
+    renderStickerSizesBatchUI(availableSizes);
+    window.updateStickerPreviewFromUI();
+
+    modal.classList.remove('hidden');
+};
+
+function filterStickerProductSearch(query) {
+    const searchResults = document.getElementById('sticker-product-search-results');
+    if (!searchResults) return;
+
+    const q = query ? query.trim() : '';
+    if (!q) {
+        searchResults.innerHTML = '';
+        searchResults.classList.add('hidden');
+        return;
+    }
+
+    const catalog419 = (typeof allProducts419 !== 'undefined' && Array.isArray(allProducts419)) ? allProducts419 : (window.allProducts419 || []);
+    const catalogGen = (typeof allProducts !== 'undefined' && Array.isArray(allProducts)) ? allProducts : (window.allProducts || []);
+
+    const combinedMap = new Map();
+    [...catalog419, ...catalogGen].forEach(p => {
+        if (p && (p.id || p.id_playera) && !combinedMap.has(String(p.id || p.id_playera).toUpperCase())) {
+            combinedMap.set(String(p.id || p.id_playera).toUpperCase(), p);
+        }
+    });
+    const fullCatalog = Array.from(combinedMap.values());
+
+    const filtered = fullCatalog.filter(p => {
+        const targetStr = `${p.equipo || ''} ${p.nombre || ''} ${p.tipo || ''} ${p.version || ''} ${p.genero || ''} ${p.id || ''}`;
+        return matchText(targetStr, q);
+    }).slice(0, 8);
+
+    if (filtered.length === 0) {
+        searchResults.innerHTML = `<div class="p-3 text-xs text-gray-500 text-center italic">No se encontraron playeras en el inventario.</div>`;
+    } else {
+        searchResults.innerHTML = filtered.map(p => {
+            const rawImg = typeof getFirstImage === 'function' ? getFirstImage(p.foto || p.imagen) : (p.foto || p.imagen);
+            const imgUrl = typeof getOptimizedImageUrl === 'function' ? getOptimizedImageUrl(rawImg, 100) : (rawImg || 'https://via.placeholder.com/100');
+            const priceVal = Number(p.precio_menudeo || p.precio || p.precio_mayoreo || 550);
+            return `
+            <div onclick="window.selectStickerProductFromSearch('${p.id || p.id_playera}')" class="p-2.5 hover:bg-white/10 cursor-pointer transition-colors flex items-center justify-between gap-3 border-b border-white/5 last:border-none">
+                <div class="flex items-center gap-2.5">
+                    <img src="${imgUrl}" alt="${p.nombre || p.equipo}" class="w-9 h-11 object-cover rounded-lg border border-white/10 bg-dark-300 shrink-0">
+                    <div>
+                        <div class="text-xs font-bold text-white">${p.nombre || p.equipo}</div>
+                        <div class="text-[10px] text-gray-400 font-mono">ID: ${p.id || p.id_playera} | ${p.tipo || ''} ${p.genero || ''}</div>
+                    </div>
+                </div>
+                <span class="text-xs font-bold text-amber-400 font-mono">$${priceVal.toFixed(2)}</span>
+            </div>
+            `;
+        }).join('');
+    }
+    searchResults.classList.remove('hidden');
+}
+
+window.selectStickerProductFromSearch = function(idProd) {
+    const catalog419 = (typeof allProducts419 !== 'undefined' && Array.isArray(allProducts419)) ? allProducts419 : (window.allProducts419 || []);
+    const catalogGen = (typeof allProducts !== 'undefined' && Array.isArray(allProducts)) ? allProducts : (window.allProducts || []);
+    
+    const idTarget = String(idProd || '').trim().toUpperCase();
+    const target = catalog419.find(p => String(p.id || p.id_articulo || p.id_playera || '').trim().toUpperCase() === idTarget)
+        || catalogGen.find(p => String(p.id || p.id_articulo || p.id_playera || '').trim().toUpperCase() === idTarget);
+
+    if (target) {
+        openPrintStickerModal(target, currentStickerIsGeneralCatalog);
+    } else {
+        console.warn("No se encontró el producto con ID:", idProd);
+    }
+
+    const searchResults = document.getElementById('sticker-product-search-results');
+    if (searchResults) searchResults.classList.add('hidden');
+};
+
+function renderStickerSizesBatchUI(availableSizes) {
+    const container = document.getElementById('sticker-sizes-batch-container');
+    if (!container) return;
+
+    if (!availableSizes || availableSizes.length === 0) {
+        container.innerHTML = '';
+        return;
+    }
+
+    container.innerHTML = availableSizes.map(sObj => {
+        const sz = sObj.talla;
+        const stock = sObj.stock !== undefined ? Number(sObj.stock) : 0;
+        const qty = stickerBatchCounts[sz] !== undefined ? stickerBatchCounts[sz] : 0;
+        const hasStock = stock > 0;
+
+        return `
+            <div class="flex items-center justify-between p-2 bg-dark-200/50 rounded-xl border border-white/5 hover:border-amber-500/20 transition-all">
+                <div class="flex items-center gap-2">
+                    <span class="w-9 h-7 bg-black/60 border border-white/10 rounded-lg flex items-center justify-center font-bold text-amber-400 text-xs shadow-sm">
+                        ${sz}
+                    </span>
+                    <div class="text-[10px] text-gray-400">
+                        Stock: <span class="${hasStock ? 'text-emerald-400 font-bold' : 'text-red-400 font-bold'}">${stock} pcs</span>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-1.5">
+                    <button type="button" onclick="window.updateStickerSizeQty('${sz}', -1)" class="w-7 h-7 bg-white/5 hover:bg-white/10 text-gray-300 rounded-lg font-bold text-sm flex items-center justify-center border border-white/10">-</button>
+                    <input type="number" min="0" max="${stock}" value="${qty}" ${!hasStock ? 'disabled' : ''} onchange="window.updateStickerSizeQtyDirect('${sz}', this.value)" class="w-12 bg-dark-100 border border-white/10 rounded-lg py-1 text-center font-bold text-amber-300 text-xs focus:outline-none focus:border-amber-400 disabled:opacity-40">
+                    <button type="button" onclick="window.updateStickerSizeQty('${sz}', 1)" ${!hasStock ? 'disabled' : ''} class="w-7 h-7 bg-amber-500/20 hover:bg-amber-500 text-amber-300 hover:text-black rounded-lg font-bold text-sm flex items-center justify-center border border-amber-500/30 disabled:opacity-30 disabled:cursor-not-allowed">+</button>
+                    <button type="button" onclick="window.updateStickerSizeQty('${sz}', 5)" ${!hasStock ? 'disabled' : ''} class="px-2 h-7 bg-white/5 hover:bg-white/10 text-gray-300 rounded-lg font-bold text-[10px] flex items-center justify-center border border-white/10 disabled:opacity-30 disabled:cursor-not-allowed">+5</button>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    updateStickerTotalBatchCount();
+}
+
+window.updateStickerSizeQty = function(talla, delta) {
+    const current = stickerBatchCounts[talla] || 0;
+    const sObj = currentStickerAvailableSizes.find(x => x.talla === talla);
+    const maxStock = sObj ? Number(sObj.stock || 0) : 0;
+
+    if (delta > 0 && current + delta > maxStock) {
+        const toast = Swal.mixin({ toast: true, position: 'bottom-end', showConfirmButton: false, timer: 2000, background: '#151515', color: '#fff' });
+        toast.fire({ icon: 'warning', title: `Límite por stock alcanzado: Máximo ${maxStock} pegatinas (Stock disponible: ${maxStock})` });
+        stickerBatchCounts[talla] = maxStock;
+    } else {
+        stickerBatchCounts[talla] = Math.max(0, Math.min(maxStock, current + delta));
+    }
+    
+    const nextVal = stickerBatchCounts[talla];
+
+    // Actualizar input en UI
+    const container = document.getElementById('sticker-sizes-batch-container');
+    if (container) {
+        const rows = container.querySelectorAll('input');
+        rows.forEach(input => {
+            if (input.onchange && input.onchange.toString().includes(`'${talla}'`)) {
+                input.value = nextVal;
+            }
+        });
+    }
+
+    updateStickerTotalBatchCount();
+    window.updateStickerPreviewFromUI();
+};
+
+window.updateStickerSizeQtyDirect = function(talla, valStr) {
+    const num = Math.max(0, parseInt(valStr) || 0);
+    const sObj = currentStickerAvailableSizes.find(x => x.talla === talla);
+    const maxStock = sObj ? Number(sObj.stock || 0) : 0;
+
+    if (num > maxStock) {
+        const toast = Swal.mixin({ toast: true, position: 'bottom-end', showConfirmButton: false, timer: 2000, background: '#151515', color: '#fff' });
+        toast.fire({ icon: 'warning', title: `Máximo permitido por stock: ${maxStock}` });
+        stickerBatchCounts[talla] = maxStock;
+    } else {
+        stickerBatchCounts[talla] = num;
+    }
+
+    // Actualizar valor en el input
+    const container = document.getElementById('sticker-sizes-batch-container');
+    if (container) {
+        const rows = container.querySelectorAll('input');
+        rows.forEach(input => {
+            if (input.onchange && input.onchange.toString().includes(`'${talla}'`)) {
+                input.value = stickerBatchCounts[talla];
+            }
+        });
+    }
+
+    updateStickerTotalBatchCount();
+    window.updateStickerPreviewFromUI();
+};
+
+function updateStickerTotalBatchCount() {
+    let grandTotal = 0;
+    Object.keys(stickerBatchCounts).forEach(sz => {
+        grandTotal += (stickerBatchCounts[sz] || 0);
+    });
+
+    const badgeEl = document.getElementById('sticker-batch-total-count');
+    const btnTextEl = document.getElementById('btn-print-stickers-text');
+
+    if (badgeEl) {
+        badgeEl.textContent = `Total a Imprimir: ${grandTotal} ${grandTotal === 1 ? 'pegatina' : 'pegatinas'}`;
+    }
+    if (btnTextEl) {
+        btnTextEl.textContent = grandTotal > 0 ? `Imprimir ${grandTotal} Pegatinas` : `Imprimir Pegatinas`;
+    }
+}
+
+function formatStickerTalla(rawTalla) {
+    if (!rawTalla) return { display: 'M', fontSize: '14px' };
+    let clean = String(rawTalla).trim().toUpperCase();
+
+    // Formatear descripciones largas de niño como "16 (2 A 4 AÑOS)" -> "16 (2-4A)"
+    clean = clean.replace(/(\d+)\s*\(\s*(\d+)\s*A\s*(\d+)\s*AÑOS?\s*\)/gi, '$1 ($2-$3A)');
+    clean = clean.replace(/(\d+)\s*\(\s*(\d+)\s*-\s*(\d+)\s*AÑOS?\s*\)/gi, '$1 ($2-$3A)');
+
+    let fontSize = '14px';
+    if (clean.length > 9) {
+        fontSize = '8.5px';
+    } else if (clean.length > 5) {
+        fontSize = '10px';
+    } else if (clean.length > 3) {
+        fontSize = '11.5px';
+    }
+    return { display: clean, fontSize: fontSize };
+}
+
+window.updateStickerPreviewFromUI = function() {
+    const replicaContainer = document.getElementById('sticker-preview-card-replica');
+    if (!replicaContainer) return;
+
+    if (!currentStickerData) {
+        replicaContainer.innerHTML = `<div class="text-center text-xs text-gray-400 italic py-4">Selecciona o escanea una prenda para ver la vista previa.</div>`;
+        return;
+    }
+
+    const showPriceCheck = document.getElementById('sticker-show-price-check');
+    const showPrice = showPriceCheck ? showPriceCheck.checked : false;
+
+    const activeSize = Object.keys(stickerBatchCounts).find(sz => stickerBatchCounts[sz] > 0) || (currentStickerAvailableSizes[0] ? currentStickerAvailableSizes[0].talla : 'M');
+    const tFormatted = formatStickerTalla(activeSize);
+
+    const nombreStr = currentStickerData.nombre || currentStickerData.equipo || currentStickerData.id_playera || 'Playera Jerseys 419';
+    const tipoStr = currentStickerData.tipo || 'Regular';
+    const versionStr = currentStickerData.version || 'Aficionado';
+    const generoRaw = currentStickerData.genero || 'Hombre';
+    const generoStr = generoRaw.replace(/\(UNISEX\)/gi, '').trim();
+    const precioNum = Number(currentStickerData.precio_menudeo || currentStickerData.precio || 550);
+
+    const sObj = (currentStickerAvailableSizes || []).find(x => x.talla === activeSize);
+    const barcodeVal = (sObj && sObj.id_inventario && !String(sObj.id_inventario).startsWith('TEMP_'))
+        ? sObj.id_inventario
+        : `${currentStickerData.id || currentStickerData.id_playera || 'INV419'}-${activeSize}`;
+
+    if (currentStickerIsGeneralCatalog) {
+        replicaContainer.innerHTML = `
+            <div style="width: 100%; height: 100%; padding: 1mm 1.5mm; box-sizing: border-box; background: #ffffff; color: #000000; display: flex; flex-direction: column; justify-content: space-between; align-items: center; overflow: hidden; font-family: sans-serif;">
+                <div style="width: 100%; flex-shrink: 0; padding-bottom: 2px; border-bottom: 1px solid #000000; display: flex; justify-content: center; align-items: center; box-sizing: border-box; line-height: 1;">
+                    <span style="font-size: 9px; font-weight: 900; color: #000000 !important; white-space: nowrap; text-transform: uppercase; letter-spacing: 0.5px;">TALLA: <strong style="font-size: ${tFormatted.fontSize} !important; font-weight: 900 !important; color: #000000 !important;">${tFormatted.display}</strong></span>
+                </div>
+                <div style="font-size: 7.5px; font-weight: 800; text-align: center; color: #000000; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; margin-top: 3px; margin-bottom: 1px; letter-spacing: 0.2px;">
+                    ${generoStr} • ${versionStr} • ${tipoStr}
+                </div>
+                <svg id="sticker-preview-barcode-svg" style="width: 100%; max-height: 28px;"></svg>
+            </div>
+        `;
+    } else {
+        replicaContainer.innerHTML = `
+            <div style="width: 100%; height: 100%; padding: 1mm 1.5mm; box-sizing: border-box; background: #ffffff; color: #000000; display: flex; flex-direction: column; justify-content: space-between; align-items: center; overflow: hidden; font-family: sans-serif;">
+                <div style="width: 100%; flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #000000; padding-bottom: 1px; line-height: 1;">
+                    <span style="letter-spacing: 0.5px; font-size: 8.5px; font-weight: 900; color: #000000; white-space: nowrap; flex-shrink: 0;">JERSEYS 419</span>
+                    <div style="display: flex; align-items: center; gap: 2px; font-weight: 900; color: #000000; font-size: 8px; white-space: nowrap; flex-shrink: 0;">
+                        <span>TALLA:</span>
+                        <strong style="display: inline-block; background-color: #000000 !important; color: #ffffff !important; padding: 1px 5px !important; font-size: ${tFormatted.fontSize} !important; font-weight: 900 !important; border-radius: 3px !important; line-height: 1 !important; white-space: nowrap;">${tFormatted.display}</strong>
+                    </div>
+                </div>
+                <div style="font-size: 8.5px; font-weight: bold; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; margin-top: 1px;">
+                    ${nombreStr}
+                </div>
+                <div style="font-size: 7.5px; font-weight: bold; text-align: center; color: #222222; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; margin-top: -1px;">
+                    ${generoStr} • ${versionStr} • ${tipoStr}
+                </div>
+                ${showPrice ? `
+                <div style="font-size: 9px; font-weight: 900; text-align: center; margin-top: -1px;">
+                    $${precioNum.toFixed(2)}
+                </div>
+                ` : ''}
+                <svg id="sticker-preview-barcode-svg" style="width: 100%; max-height: 26px;"></svg>
+            </div>
+        `;
+    }
+
+    try {
+        if (typeof JsBarcode === 'function') {
+            JsBarcode("#sticker-preview-barcode-svg", barcodeVal, {
+                format: "CODE128",
+                width: 1.4,
+                height: currentStickerIsGeneralCatalog ? 23 : 22,
+                displayValue: true,
+                fontSize: 9,
+                margin: 0
+            });
+        }
+    } catch (eB) {
+        console.warn("JsBarcode preview update error:", eB);
+    }
+};
+
+window.closePrintStickerModal = function() {
+    const modal = document.getElementById('modal-print-barcode-labels');
+    if (modal) modal.classList.add('hidden');
+};
+
+window.confirmPrintStickers = function() {
+    if (!currentStickerData) return;
+
+    const showPriceCheck = document.getElementById('sticker-show-price-check');
+    const showPrice = showPriceCheck ? showPriceCheck.checked : true;
+
+    const printContainer = document.getElementById('sticker-barcode-print-area');
+    if (!printContainer) return;
+
+    const nombreStr = currentStickerData.nombre || currentStickerData.equipo || currentStickerData.id_playera || 'Playera Jerseys 419';
+    const tipoStr = currentStickerData.tipo || 'Regular';
+    const versionStr = currentStickerData.version || 'Aficionado';
+    const generoRaw = currentStickerData.genero || 'Hombre';
+    const generoStr = generoRaw.replace(/\(UNISEX\)/gi, '').trim();
+    const precioNum = Number(currentStickerData.precio_menudeo || currentStickerData.precio || 550);
+
+    let labelsToPrint = [];
+    Object.keys(stickerBatchCounts).forEach(sz => {
+        const count = stickerBatchCounts[sz] || 0;
+        const sObj = (currentStickerAvailableSizes || []).find(x => x.talla === sz);
+        const codeVal = (sObj && sObj.id_inventario && !String(sObj.id_inventario).startsWith('TEMP_'))
+            ? sObj.id_inventario
+            : `${currentStickerData.id || currentStickerData.id_playera || 'INV419'}-${sz}`;
+
+        for (let c = 0; c < count; c++) {
+            labelsToPrint.push({
+                talla: sz,
+                barcode: codeVal
+            });
+        }
+    });
+
+    if (labelsToPrint.length === 0) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Sin Pegatinas Seleccionadas',
+            text: 'Por favor asigna al menos 1 pegatina en alguna de las tallas para imprimir.',
+            background: '#151515', color: '#fff'
+        });
+        return;
+    }
+
+    let labelsHtml = '';
+    labelsToPrint.forEach((lbl, i) => {
+        const tFormatted = formatStickerTalla(lbl.talla);
+        if (currentStickerIsGeneralCatalog) {
+            labelsHtml += `
+                <div style="width: 51mm; height: 25mm; max-width: 51mm; max-height: 25mm; padding: 1.5mm 2mm; box-sizing: border-box; background: #ffffff; color: #000000; display: flex; flex-direction: column; justify-content: space-between; align-items: center; page-break-after: always; overflow: hidden; font-family: sans-serif;">
+                    <div style="width: 100%; flex-shrink: 0; padding-bottom: 2px; border-bottom: 1px solid #000000; display: flex; justify-content: center; align-items: center; box-sizing: border-box; line-height: 1;">
+                        <span style="font-size: 9px; font-weight: 900; color: #000000 !important; white-space: nowrap; text-transform: uppercase; letter-spacing: 0.5px;">TALLA: <strong style="font-size: ${tFormatted.fontSize} !important; font-weight: 900 !important; color: #000000 !important;">${tFormatted.display}</strong></span>
+                    </div>
+                    <div style="font-size: 7.5px; font-weight: 800; text-align: center; color: #000000; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; margin-top: 3px; margin-bottom: 1px; letter-spacing: 0.2px;">
+                        ${generoStr} • ${versionStr} • ${tipoStr}
+                    </div>
+                    <svg class="barcode-svg-instance-${i}" style="width: 100%; max-height: 12.5mm;"></svg>
+                </div>
+            `;
+        } else {
+            labelsHtml += `
+                <div style="width: 51mm; height: 25mm; max-width: 51mm; max-height: 25mm; padding: 1.5mm 2mm; box-sizing: border-box; background: #ffffff; color: #000000; display: flex; flex-direction: column; justify-content: space-between; align-items: center; page-break-after: always; overflow: hidden; font-family: sans-serif;">
+                    <div style="width: 100%; flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #000000; padding-bottom: 1px; line-height: 1;">
+                        <span style="letter-spacing: 0.5px; font-size: 8.5px; font-weight: 900; color: #000000; white-space: nowrap; flex-shrink: 0;">JERSEYS 419</span>
+                        <div style="display: flex; align-items: center; gap: 2px; font-weight: 900; color: #000000; font-size: 8px; white-space: nowrap; flex-shrink: 0;">
+                            <span>TALLA:</span>
+                            <strong style="display: inline-block; background-color: #000000 !important; color: #ffffff !important; padding: 1px 5px !important; font-size: ${tFormatted.fontSize} !important; font-weight: 900 !important; border-radius: 3px !important; line-height: 1 !important; white-space: nowrap; -webkit-print-color-adjust: exact; print-color-adjust: exact;">${tFormatted.display}</strong>
+                        </div>
+                    </div>
+                    <div style="font-size: 8.5px; font-weight: bold; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%;">
+                        ${nombreStr}
+                    </div>
+                    <div style="font-size: 7.5px; font-weight: bold; text-align: center; color: #222222; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; margin-top: -1px;">
+                        ${generoStr} • ${versionStr} • ${tipoStr}
+                    </div>
+                    ${showPrice ? `
+                    <div style="font-size: 9px; font-weight: 900; text-align: center; margin-top: -1px;">
+                        $${precioNum.toFixed(2)}
+                    </div>
+                    ` : ''}
+                    <svg class="barcode-svg-instance-${i}" style="width: 100%; max-height: 11mm;"></svg>
+                </div>
+            `;
+        }
+    });
+
+    printContainer.innerHTML = labelsHtml;
+
+    labelsToPrint.forEach((lbl, i) => {
+        try {
+            if (typeof JsBarcode === 'function') {
+                JsBarcode(`.barcode-svg-instance-${i}`, lbl.barcode, {
+                    format: "CODE128",
+                    width: 1.4,
+                    height: 28,
+                    displayValue: true,
+                    fontSize: 9,
+                    margin: 0
+                });
+            }
+        } catch (eSvg) {}
+    });
+
+    try {
+        let printFrame = document.getElementById('sticker-print-iframe');
+        if (printFrame) printFrame.remove();
+
+        printFrame = document.createElement('iframe');
+        printFrame.id = 'sticker-print-iframe';
+        printFrame.style.position = 'fixed';
+        printFrame.style.right = '0';
+        printFrame.style.bottom = '0';
+        printFrame.style.width = '0px';
+        printFrame.style.height = '0px';
+        printFrame.style.border = '0';
+        document.body.appendChild(printFrame);
+
+        const frameDoc = printFrame.contentWindow.document;
+        frameDoc.open();
+        frameDoc.write(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="utf-8">
+                <title>Etiquetas 51x25mm</title>
+                <style>
+                    @page { size: 51mm 25mm; margin: 0; }
+                    body { margin: 0; padding: 0; background: #ffffff; color: #000000; font-family: sans-serif; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+                    * { box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+                </style>
+            </head>
+            <body>
+                ${printContainer.innerHTML}
+            </body>
+            </html>
+        `);
+        frameDoc.close();
+
+        setTimeout(() => {
+            printFrame.contentWindow.focus();
+            printFrame.contentWindow.print();
+        }, 250);
+        return;
+    } catch (eErr) {
+        console.warn("Sticker iframe print error:", eErr);
+    }
+
+    document.body.classList.add('printing-barcode-stickers');
+    printContainer.classList.remove('hidden');
+    setTimeout(() => {
+        window.print();
+        setTimeout(() => {
+            document.body.classList.remove('printing-barcode-stickers');
+            printContainer.classList.add('hidden');
+        }, 500);
+    }, 200);
+};
+
+function playBarcodeBeepSound() {
+    try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.12);
+    } catch (eA) {}
+}
+
+window.handleScannedBarcode = function(scannedCode) {
+    if (!scannedCode) return;
+    const cleanCode = String(scannedCode).replace(/['’\`]/g, '-').trim().toUpperCase();
+    playBarcodeBeepSound();
+
+    let foundItem = null;
+
+    if (Array.isArray(local419ProductsList)) {
+        foundItem = local419ProductsList.find(p => 
+            (p.id_inventario && String(p.id_inventario).replace(/['’\`]/g, '-').toUpperCase() === cleanCode) ||
+            (p.id_playera && String(p.id_playera).replace(/['’\`]/g, '-').toUpperCase() === cleanCode) ||
+            (p.id_orden && String(p.id_orden).replace(/['’\`]/g, '-').toUpperCase() === cleanCode)
+        );
+    }
+
+    if (!foundItem && typeof initialProductsData !== 'undefined' && Array.isArray(initialProductsData)) {
+        foundItem = initialProductsData.find(p => 
+            (p.id_inventario && String(p.id_inventario).replace(/['’\`]/g, '-').toUpperCase() === cleanCode) ||
+            (p.id_playera && String(p.id_playera).replace(/['’\`]/g, '-').toUpperCase() === cleanCode) ||
+            (p.id_orden && String(p.id_orden).replace(/['’\`]/g, '-').toUpperCase() === cleanCode)
+        );
+    }
+
+    const stickerModal = document.getElementById('modal-print-barcode-labels');
+    const isStickerOpen = stickerModal && !stickerModal.classList.contains('hidden');
+
+    if (isStickerOpen) {
+        if (foundItem) {
+            window.openPrintStickerModal(foundItem);
+            const toast = Swal.mixin({ toast: true, position: 'bottom-end', showConfirmButton: false, timer: 1800, background: '#151515', color: '#fff' });
+            toast.fire({ icon: 'success', title: `✓ Prenda cargada para pegatinas: ${foundItem.nombre || foundItem.equipo}` });
+        } else {
+            const toast = Swal.mixin({ toast: true, position: 'bottom-end', showConfirmButton: false, timer: 2000, background: '#151515', color: '#fff' });
+            toast.fire({ icon: 'error', title: `Código no registrado: ${cleanCode}` });
+        }
+        return;
+    }
+
+    const posModal = document.getElementById('modal-pos-local419');
+    const isPosOpen = posModal && !posModal.classList.contains('hidden');
+
+    if (isPosOpen) {
+        if (foundItem) {
+            window.addPos419ItemToCart(foundItem.id_playera, foundItem.talla || 'M');
+            Swal.fire({
+                toast: true,
+                position: 'top-end',
+                icon: 'success',
+                title: `✓ Agregado: ${foundItem.nombre || foundItem.id_playera} (${foundItem.talla})`,
+                showConfirmButton: false,
+                timer: 1800,
+                background: '#151515', color: '#fff'
+            });
+        } else {
+            Swal.fire({
+                toast: true,
+                position: 'top-end',
+                icon: 'error',
+                title: `Código no encontrado: ${cleanCode}`,
+                showConfirmButton: false,
+                timer: 2000,
+                background: '#151515', color: '#fff'
+            });
+        }
+    } else {
+        if (foundItem) {
+            Swal.fire({
+                title: `Prenda Escaneada: ${foundItem.nombre || foundItem.id_playera}`,
+                html: `
+                    <div class="text-left space-y-2 text-xs py-2">
+                        <p class="text-gray-300">Talla: <strong class="text-amber-400 font-bold">${foundItem.talla || 'M'}</strong></p>
+                        <p class="text-gray-300">ID Inventario: <strong class="text-white font-mono">${foundItem.id_inventario || foundItem.id_playera}</strong></p>
+                        <p class="text-gray-300">Existencias Actuales: <strong class="text-emerald-400 font-bold">${foundItem.stock || 0} pcs</strong></p>
+                    </div>
+                `,
+                icon: 'info',
+                showCancelButton: true,
+                showDenyButton: true,
+                confirmButtonText: '🏷️ Imprimir Pegatinas',
+                denyButtonText: '➖ Restar -1 Stock',
+                cancelButtonText: 'Cerrar',
+                confirmButtonColor: '#f59e0b',
+                denyButtonColor: '#ef4444',
+                background: '#151515', color: '#fff'
+            }).then((res) => {
+                if (res.isConfirmed) {
+                    window.openPrintStickerModal(foundItem);
+                } else if (res.isDenied) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Stock Actualizado',
+                        text: `Se procesó la salida de 1 pieza de ${foundItem.nombre || foundItem.id_playera} (${foundItem.talla})`,
+                        background: '#151515', color: '#fff'
+                    });
+                }
+            });
+        } else {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Código No Encontrado',
+                text: `No se encontró ninguna prenda con el código: ${cleanCode}`,
+                background: '#151515', color: '#fff'
+            });
+        }
+    }
+};
+
+window.openCameraScannerModal = function(targetMode) {
+    const modal = document.getElementById('modal-camera-barcode-scanner');
+    if (!modal) return;
+    modal.classList.remove('hidden');
+
+    const statusEl = document.getElementById('camera-scanner-status');
+    if (statusEl) statusEl.textContent = 'Iniciando cámara de la tablet/dispositivo...';
+
+    setTimeout(() => {
+        try {
+            if (typeof Html5Qrcode === 'function') {
+                if (html5QrScannerInstance) {
+                    html5QrScannerInstance.stop().catch(() => {}).then(() => startScanner());
+                } else {
+                    startScanner();
+                }
+            } else {
+                if (statusEl) statusEl.textContent = 'Librería de cámara cargando... Intente de nuevo.';
+            }
+        } catch (eC) {
+            console.error("Camera scanner init error:", eC);
+        }
+    }, 300);
+
+    function startScanner() {
+        try {
+            html5QrScannerInstance = new Html5Qrcode("camera-reader-viewport");
+            html5QrScannerInstance.start(
+                { facingMode: "environment" },
+                { fps: 10, qrbox: { width: 220, height: 140 } },
+                (decodedText) => {
+                    window.closeCameraScannerModal();
+                    window.handleScannedBarcode(decodedText);
+                },
+                () => {}
+            ).catch(err => {
+                console.warn("Camera start warning:", err);
+                if (statusEl) statusEl.textContent = 'No se pudo acceder a la cámara. Verifique los permisos.';
+            });
+        } catch (eStart) {
+            console.error("Error starting camera:", eStart);
+        }
+    }
+};
+
+window.closeCameraScannerModal = function() {
+    const modal = document.getElementById('modal-camera-barcode-scanner');
+    if (modal) modal.classList.add('hidden');
+    if (html5QrScannerInstance) {
+        html5QrScannerInstance.stop().catch(() => {}).then(() => {
+            html5QrScannerInstance = null;
+        });
+    }
+};
+
+let barcodeBuffer = '';
+let barcodeLastKeyTime = 0;
+
+document.addEventListener('keydown', function(e) {
+    const target = e.target;
+    const isInput = (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
+    
+    const now = Date.now();
+    if (now - barcodeLastKeyTime > 120) {
+        barcodeBuffer = '';
+    }
+    barcodeLastKeyTime = now;
+
+    if (e.key === 'Enter') {
+        if (barcodeBuffer.length >= 3) {
+            const scannedCode = barcodeBuffer.replace(/['’\`]/g, '-').trim();
+            barcodeBuffer = '';
+            if (isInput && target.id && !target.id.includes('search')) {
+                return;
+            }
+            e.preventDefault();
+            window.handleScannedBarcode(scannedCode);
+        }
+    } else if (e.key && e.key.length === 1) {
+        // Auto-convertir apóstrofes (') que envían lectores de código en teclado español a guión (-)
+        const keyChar = (e.key === "'" || e.key === "’" || e.key === "`") ? "-" : e.key;
+        barcodeBuffer += keyChar;
+    }
+});
+
+// Listener global para auto-corregir comillas por guiones en cualquier input al escribir o escanear
+document.addEventListener('input', function(e) {
+    if (e.target && e.target.tagName === 'INPUT' && typeof e.target.value === 'string') {
+        if (/['’\`]/.test(e.target.value)) {
+            e.target.value = e.target.value.replace(/['’\`]/g, '-');
+        }
+    }
+}, true);
 
 
 
