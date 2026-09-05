@@ -1,5 +1,47 @@
 const API_URL = window.API_URL || "https://script.google.com/macros/s/AKfycbwQaUeO9EnLQCZe5B6juTmRYoGKm443dGYPbpHcbeFpKbvXNYm0akhYoSLc1AM_mVNZ-g/exec";
 
+// 🌟 YouTube Style Top Loading Bar Utility
+let topLoadingTimer = null;
+function startTopLoadingBar() {
+    let bar = document.getElementById('yt-top-loading-bar');
+    if (!bar) {
+        bar = document.createElement('div');
+        bar.id = 'yt-top-loading-bar';
+        bar.className = 'fixed top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-blue-600 via-blue-500 to-sky-400 shadow-[0_0_12px_rgba(59,130,246,0.9)] z-[99999] pointer-events-none transition-all duration-300 opacity-0 w-0';
+        document.body.appendChild(bar);
+    }
+    if (topLoadingTimer) clearInterval(topLoadingTimer);
+    
+    bar.style.transition = 'width 0.4s ease, opacity 0.2s ease';
+    bar.style.opacity = '1';
+    bar.style.width = '15%';
+    
+    let progress = 15;
+    topLoadingTimer = setInterval(() => {
+        if (progress < 85) {
+            progress += Math.floor(Math.random() * 8) + 2;
+            bar.style.width = progress + '%';
+        }
+    }, 250);
+}
+
+function finishTopLoadingBar() {
+    let bar = document.getElementById('yt-top-loading-bar');
+    if (!bar) return;
+    if (topLoadingTimer) clearInterval(topLoadingTimer);
+    
+    bar.style.width = '100%';
+    setTimeout(() => {
+        bar.style.opacity = '0';
+        setTimeout(() => {
+            bar.style.width = '0%';
+        }, 300);
+    }, 200);
+}
+
+window.startTopLoadingBar = startTopLoadingBar;
+window.finishTopLoadingBar = finishTopLoadingBar;
+
 // Elementos DOM
 const DOM = {
     grid: document.getElementById('products-grid'),
@@ -10,13 +52,17 @@ const DOM = {
         nombre: document.getElementById('filter-nombre'),
         tipo: document.getElementById('filter-tipo'),
         version: document.getElementById('filter-version'),
-        genero: document.getElementById('filter-genero')
+        genero: document.getElementById('filter-genero'),
+        orden: document.getElementById('filter-orden')
     },
     mobileFilters: {
         searchInput: document.getElementById('mobile-search-input'),
         tipo: document.getElementById('mobile-filter-tipo'),
         version: document.getElementById('mobile-filter-version'),
         genero: document.getElementById('mobile-filter-genero'),
+        orden: document.getElementById('mobile-filter-orden'),
+        precioMin: document.getElementById('mobile-filter-precio-min'),
+        precioMax: document.getElementById('mobile-filter-precio-max'),
         panel: document.getElementById('mobile-filters-panel'),
         btnToggle: document.getElementById('btn-toggle-filters'),
         iconToggle: document.getElementById('icon-toggle-filters')
@@ -55,6 +101,7 @@ function matchText(fullText, query) {
 
 // Utilidades API
 async function get_configs() {
+    if (window.startTopLoadingBar) startTopLoadingBar();
     try {
         const response = await fetch(API_URL, {
             method: 'POST',
@@ -66,6 +113,8 @@ async function get_configs() {
     } catch (error) {
         console.error("Error al obtener configuraciones:", error);
         return null;
+    } finally {
+        if (window.finishTopLoadingBar) finishTopLoadingBar();
     }
 }
 
@@ -82,7 +131,20 @@ async function initTienda() {
     
     // Listeners para auto-aplicar filtros (Desktop & Mobile real-time)
     if (DOM.filters.nombre) DOM.filters.nombre.addEventListener('input', handleFilterDesktop);
+    if (DOM.filters.tipo) DOM.filters.tipo.addEventListener('change', handleFilterDesktop);
+    if (DOM.filters.version) DOM.filters.version.addEventListener('change', handleFilterDesktop);
+    if (DOM.filters.genero) DOM.filters.genero.addEventListener('change', handleFilterDesktop);
+    if (DOM.filters.orden) DOM.filters.orden.addEventListener('change', handleFilterDesktop);
+
     if (DOM.mobileFilters.searchInput) DOM.mobileFilters.searchInput.addEventListener('input', handleFilterMobile);
+    if (DOM.mobileFilters.tipo) DOM.mobileFilters.tipo.addEventListener('change', handleFilterMobile);
+    if (DOM.mobileFilters.version) DOM.mobileFilters.version.addEventListener('change', handleFilterMobile);
+    if (DOM.mobileFilters.genero) DOM.mobileFilters.genero.addEventListener('change', handleFilterMobile);
+    if (DOM.mobileFilters.orden) DOM.mobileFilters.orden.addEventListener('change', handleFilterMobile);
+    if (DOM.mobileFilters.precioMin) DOM.mobileFilters.precioMin.addEventListener('input', handleFilterMobile);
+    if (DOM.mobileFilters.precioMax) DOM.mobileFilters.precioMax.addEventListener('input', handleFilterMobile);
+
+    if (DOM.btnAplicarMobile) DOM.btnAplicarMobile.addEventListener('click', handleFilterMobile);
     
     const pMinEl = document.getElementById('filter-precio-min');
     const pMaxEl = document.getElementById('filter-precio-max');
@@ -277,8 +339,32 @@ function populateSelects(selectEl, items) {
 }
 
 async function fetchInitialProducts419() {
-    renderSkeletons(8);
-    
+    const CACHE_KEY = 'tienda419_products_cache_v2';
+    let hasCache = false;
+
+    // 1. Carga instantánea (<15ms) desde caché local si existe
+    try {
+        const cachedStr = localStorage.getItem(CACHE_KEY);
+        if (cachedStr) {
+            const cachedData = JSON.parse(cachedStr);
+            if (Array.isArray(cachedData) && cachedData.length > 0) {
+                allProducts419 = cachedData;
+                renderLocalProducts(allProducts419);
+                hasCache = true;
+            }
+        }
+    } catch (e) {
+        console.warn("Error leyendo caché local de Tienda:", e);
+    }
+
+    // 2. Si no hay caché previa, mostrar esqueletos de carga
+    if (!hasCache) {
+        renderSkeletons(8);
+    }
+
+    // 3. Revalidación en segundo plano con indicador superior
+    if (window.startTopLoadingBar) startTopLoadingBar();
+
     try {
         const [jerseyRes, artRes] = await Promise.all([
             fetch(API_URL, {
@@ -331,13 +417,25 @@ async function fetchInitialProducts419() {
             }));
         }
 
-        allProducts419 = [...productsData, ...articulosData];
-        renderLocalProducts(allProducts419);
+        const freshProducts = [...productsData, ...articulosData];
+        if (freshProducts.length > 0) {
+            allProducts419 = freshProducts;
+            try {
+                localStorage.setItem(CACHE_KEY, JSON.stringify(freshProducts));
+            } catch (e) {
+                console.warn("Error guardando caché local de Tienda:", e);
+            }
+            renderLocalProducts(allProducts419);
+        }
     } catch (err) {
-        console.error("Error al cargar inventario:", err);
-        DOM.grid.innerHTML = '';
-        DOM.emptyState.classList.remove('hidden');
-        DOM.resultsCount.textContent = '0';
+        console.error("Error al revalidar inventario de tienda:", err);
+        if (!hasCache) {
+            DOM.grid.innerHTML = '';
+            DOM.emptyState.classList.remove('hidden');
+            DOM.resultsCount.textContent = '0';
+        }
+    } finally {
+        if (window.finishTopLoadingBar) finishTopLoadingBar();
     }
 }
 
@@ -346,8 +444,15 @@ function handleFilterDesktop() {
         nombre: DOM.filters.nombre ? DOM.filters.nombre.value : '',
         tipo: DOM.filters.tipo ? DOM.filters.tipo.value : '',
         version: DOM.filters.version ? DOM.filters.version.value : '',
-        genero: DOM.filters.genero ? DOM.filters.genero.value : ''
+        genero: DOM.filters.genero ? DOM.filters.genero.value : '',
+        orden: DOM.filters.orden ? DOM.filters.orden.value : ''
     };
+    if (DOM.mobileFilters.searchInput) DOM.mobileFilters.searchInput.value = filtros.nombre;
+    if (DOM.mobileFilters.tipo) DOM.mobileFilters.tipo.value = filtros.tipo;
+    if (DOM.mobileFilters.version) DOM.mobileFilters.version.value = filtros.version;
+    if (DOM.mobileFilters.genero) DOM.mobileFilters.genero.value = filtros.genero;
+    if (DOM.mobileFilters.orden) DOM.mobileFilters.orden.value = filtros.orden;
+
     applyFilters(filtros);
 }
 
@@ -356,21 +461,25 @@ function handleFilterMobile() {
         nombre: DOM.mobileFilters.searchInput ? DOM.mobileFilters.searchInput.value : '',
         tipo: DOM.mobileFilters.tipo ? DOM.mobileFilters.tipo.value : '',
         version: DOM.mobileFilters.version ? DOM.mobileFilters.version.value : '',
-        genero: DOM.mobileFilters.genero ? DOM.mobileFilters.genero.value : ''
+        genero: DOM.mobileFilters.genero ? DOM.mobileFilters.genero.value : '',
+        orden: DOM.mobileFilters.orden ? DOM.mobileFilters.orden.value : ''
     };
     if (DOM.filters.nombre) DOM.filters.nombre.value = filtros.nombre;
     if (DOM.filters.tipo) DOM.filters.tipo.value = filtros.tipo;
     if (DOM.filters.version) DOM.filters.version.value = filtros.version;
     if (DOM.filters.genero) DOM.filters.genero.value = filtros.genero;
+    if (DOM.filters.orden) DOM.filters.orden.value = filtros.orden;
+
+    const mobMin = document.getElementById('mobile-filter-precio-min');
+    const mobMax = document.getElementById('mobile-filter-precio-max');
+    if (mobMin && document.getElementById('filter-precio-min')) {
+        document.getElementById('filter-precio-min').value = mobMin.value;
+    }
+    if (mobMax && document.getElementById('filter-precio-max')) {
+        document.getElementById('filter-precio-max').value = mobMax.value;
+    }
     
     applyFilters(filtros);
-    
-    // Cerrar panel en móviles
-    if (DOM.mobileFilters.panel) DOM.mobileFilters.panel.classList.add('hidden');
-    if (DOM.mobileFilters.btnToggle) {
-        DOM.mobileFilters.iconToggle.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path>';
-        DOM.mobileFilters.btnToggle.classList.remove('bg-amber-500/20', 'text-amber-400', 'border-amber-500/40');
-    }
 }
 
 function computeSearchRelevanceScore(product, rawQuery) {
@@ -420,8 +529,16 @@ function computeSearchRelevanceScore(product, rawQuery) {
 window.setPriceChip = function(min, max) {
     const minInput = document.getElementById('filter-precio-min');
     const maxInput = document.getElementById('filter-precio-max');
-    if (minInput) minInput.value = min > 0 ? min : '';
-    if (maxInput) maxInput.value = max > 0 ? max : '';
+    const mobMinInput = document.getElementById('mobile-filter-precio-min');
+    const mobMaxInput = document.getElementById('mobile-filter-precio-max');
+
+    const minVal = min > 0 ? min : '';
+    const maxVal = max > 0 ? max : '';
+
+    if (minInput) minInput.value = minVal;
+    if (maxInput) maxInput.value = maxVal;
+    if (mobMinInput) mobMinInput.value = minVal;
+    if (mobMaxInput) mobMaxInput.value = maxVal;
 
     const chipBtns = document.querySelectorAll('.price-chip-btn');
     chipBtns.forEach(btn => {
@@ -531,7 +648,7 @@ function renderLocalProducts(products) {
     
     DOM.emptyState.classList.add('hidden');
     
-    products.forEach(p => {
+    products.forEach((p, cardIdx) => {
         const id = p.id || p.id_producto || p.id_articulo;
         const nombre = p.nombre || p.equipo || 'Sin nombre';
         
@@ -596,7 +713,7 @@ function renderLocalProducts(products) {
 
             <!-- Imagen del Producto con Carrusel -->
             <div class="product-image-container relative w-full aspect-square rounded-xl overflow-hidden mb-3 bg-[#09090b] border border-white/5 cursor-pointer">
-                <img src="${imgUrl}" alt="${nombre}" class="product-card-img w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-500">
+                <img src="${imgUrl}" alt="${nombre}" ${cardIdx < 6 ? 'loading="eager"' : 'loading="lazy" decoding="async"'} class="product-card-img w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-500">
                 <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-60 pointer-events-none"></div>
                 <div class="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center pointer-events-none">
                     <div class="bg-black/60 backdrop-blur-md rounded-full p-2.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg text-white">

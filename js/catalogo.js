@@ -32,8 +32,51 @@ const DOM = {
 
 let allProducts = [];
 
+// 🌟 YouTube Style Top Loading Bar Utility
+let topLoadingTimer = null;
+function startTopLoadingBar() {
+    let bar = document.getElementById('yt-top-loading-bar');
+    if (!bar) {
+        bar = document.createElement('div');
+        bar.id = 'yt-top-loading-bar';
+        bar.className = 'fixed top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-blue-600 via-blue-500 to-sky-400 shadow-[0_0_12px_rgba(59,130,246,0.9)] z-[99999] pointer-events-none transition-all duration-300 opacity-0 w-0';
+        document.body.appendChild(bar);
+    }
+    if (topLoadingTimer) clearInterval(topLoadingTimer);
+    
+    bar.style.transition = 'width 0.4s ease, opacity 0.2s ease';
+    bar.style.opacity = '1';
+    bar.style.width = '15%';
+    
+    let progress = 15;
+    topLoadingTimer = setInterval(() => {
+        if (progress < 85) {
+            progress += Math.floor(Math.random() * 8) + 2;
+            bar.style.width = progress + '%';
+        }
+    }, 250);
+}
+
+function finishTopLoadingBar() {
+    let bar = document.getElementById('yt-top-loading-bar');
+    if (!bar) return;
+    if (topLoadingTimer) clearInterval(topLoadingTimer);
+    
+    bar.style.width = '100%';
+    setTimeout(() => {
+        bar.style.opacity = '0';
+        setTimeout(() => {
+            bar.style.width = '0%';
+        }, 300);
+    }, 200);
+}
+
+window.startTopLoadingBar = startTopLoadingBar;
+window.finishTopLoadingBar = finishTopLoadingBar;
+
 // Utilidades API
 async function get_configs() {
+    if (window.startTopLoadingBar) startTopLoadingBar();
     try {
         const response = await fetch(API_URL, {
             method: 'POST',
@@ -45,10 +88,13 @@ async function get_configs() {
     } catch (error) {
         console.error("Error al obtener configuraciones:", error);
         return null;
+    } finally {
+        if (window.finishTopLoadingBar) finishTopLoadingBar();
     }
 }
 
 async function search(filtros = { nombre: "", tipo: "", version: "", genero: "" }) {
+    if (window.startTopLoadingBar) startTopLoadingBar();
     try {
         const response = await fetch(API_URL, {
             method: 'POST',
@@ -60,6 +106,8 @@ async function search(filtros = { nombre: "", tipo: "", version: "", genero: "" 
     } catch (error) {
         console.error("Error al buscar productos:", error);
         return [];
+    } finally {
+        if (window.finishTopLoadingBar) finishTopLoadingBar();
     }
 }
 
