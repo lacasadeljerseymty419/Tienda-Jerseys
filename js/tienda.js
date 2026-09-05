@@ -1,4 +1,4 @@
-const API_URL = window.API_URL || "https://script.google.com/macros/s/AKfycbw97tnD6AOYXNkttgCnQRtg2WpikVw_cXdIYnKdc3lFIdeQ8PrbL1RRGdqMM7KD82ucQg/exec";
+const API_URL = window.API_URL || "https://script.google.com/macros/s/AKfycbwQaUeO9EnLQCZe5B6juTmRYoGKm443dGYPbpHcbeFpKbvXNYm0akhYoSLc1AM_mVNZ-g/exec";
 
 // Elementos DOM
 const DOM = {
@@ -80,19 +80,14 @@ async function initTienda() {
     await loadCatalogs();
     await fetchInitialProducts419();
     
-    // Listeners para auto-aplicar filtros (Desktop)
-    if (DOM.btnAplicar) DOM.btnAplicar.addEventListener('click', handleFilterDesktop);
+    // Listeners para auto-aplicar filtros (Desktop & Mobile real-time)
     if (DOM.filters.nombre) DOM.filters.nombre.addEventListener('input', handleFilterDesktop);
-    if (DOM.filters.tipo) DOM.filters.tipo.addEventListener('change', handleFilterDesktop);
-    if (DOM.filters.version) DOM.filters.version.addEventListener('change', handleFilterDesktop);
-    if (DOM.filters.genero) DOM.filters.genero.addEventListener('change', handleFilterDesktop);
-    
-    // Listeners para auto-aplicar filtros (Mobile)
-    if (DOM.btnAplicarMobile) DOM.btnAplicarMobile.addEventListener('click', handleFilterMobile);
     if (DOM.mobileFilters.searchInput) DOM.mobileFilters.searchInput.addEventListener('input', handleFilterMobile);
-    if (DOM.mobileFilters.tipo) DOM.mobileFilters.tipo.addEventListener('change', handleFilterMobile);
-    if (DOM.mobileFilters.version) DOM.mobileFilters.version.addEventListener('change', handleFilterMobile);
-    if (DOM.mobileFilters.genero) DOM.mobileFilters.genero.addEventListener('change', handleFilterMobile);
+    
+    const pMinEl = document.getElementById('filter-precio-min');
+    const pMaxEl = document.getElementById('filter-precio-max');
+    if (pMinEl) pMinEl.addEventListener('input', handleFilterDesktop);
+    if (pMaxEl) pMaxEl.addEventListener('input', handleFilterDesktop);
 
     if (DOM.mobileFilters.btnToggle) {
         DOM.mobileFilters.btnToggle.addEventListener('click', () => {
@@ -378,8 +373,72 @@ function handleFilterMobile() {
     }
 }
 
+function computeSearchRelevanceScore(product, rawQuery) {
+    if (!rawQuery) return { score: 1, matchedCount: 0 };
+    const normQuery = normalizeText(rawQuery);
+    if (!normQuery) return { score: 1, matchedCount: 0 };
+
+    const queryTokens = normQuery.split(' ').filter(Boolean);
+    if (queryTokens.length === 0) return { score: 1, matchedCount: 0 };
+
+    const enrichedFields = [
+        product.nombre, product.equipo, product.tipo, product.version,
+        product.genero, product.jugador, product.temporada, product.categoria,
+        product.marca, product.tags, product.id, product.id_producto,
+        product.id_playera, product.id_articulo, product.id_inventario, product.comentarios
+    ].map(f => normalizeText(f)).join(' ');
+
+    const normNombre = normalizeText(product.nombre || product.equipo || '');
+
+    let score = 0;
+    let matchedCount = 0;
+
+    queryTokens.forEach(token => {
+        if (!token) return;
+        if (enrichedFields.includes(token)) {
+            matchedCount++;
+            score += 20;
+            if (normNombre.includes(token)) {
+                score += 15;
+            }
+        } else {
+            const tokenClean = token.replace(/[^a-z0-9]/g, '');
+            if (tokenClean && tokenClean.length >= 3 && enrichedFields.includes(tokenClean)) {
+                matchedCount++;
+                score += 10;
+            }
+        }
+    });
+
+    if (matchedCount === queryTokens.length) {
+        score += 50;
+    }
+
+    return { score, matchedCount };
+}
+
+window.setPriceChip = function(min, max) {
+    const minInput = document.getElementById('filter-precio-min');
+    const maxInput = document.getElementById('filter-precio-max');
+    if (minInput) minInput.value = min > 0 ? min : '';
+    if (maxInput) maxInput.value = max > 0 ? max : '';
+
+    const chipBtns = document.querySelectorAll('.price-chip-btn');
+    chipBtns.forEach(btn => {
+        const btnMin = Number(btn.getAttribute('data-min') || 0);
+        const btnMax = Number(btn.getAttribute('data-max') || 0);
+        if (btnMin === min && btnMax === max) {
+            btn.className = 'price-chip-btn px-2 py-1.5 rounded-lg text-[10px] font-bold border transition-all bg-blue-600 text-white border-blue-500 shadow-sm';
+        } else {
+            btn.className = 'price-chip-btn px-2 py-1.5 rounded-lg text-[10px] font-bold border transition-all bg-[#18181b] text-gray-300 border-white/10 hover:border-blue-500/40 hover:text-white';
+        }
+    });
+
+    handleFilterDesktop();
+};
+
 function applyFilters(filtros) {
-    let filtered = allProducts419;
+    let filtered = [...allProducts419];
     
     if (currentNavCategory === 'playeras') {
         filtered = filtered.filter(p => !p.es_articulo);
@@ -387,15 +446,65 @@ function applyFilters(filtros) {
         filtered = filtered.filter(p => p.es_articulo);
     }
     
-    if (filtros.nombre) {
-        filtered = filtered.filter(p => {
-            const targetText = `${p.nombre || ''} ${p.equipo || ''} ${p.tipo || ''} ${p.version || ''} ${p.genero || ''} ${p.id || p.id_producto || ''}`;
-            return matchText(targetText, filtros.nombre);
-        });
-    }
     if (filtros.tipo) filtered = filtered.filter(p => p.tipo === filtros.tipo);
     if (filtros.version) filtered = filtered.filter(p => p.version === filtros.version);
     if (filtros.genero) filtered = filtered.filter(p => p.genero === filtros.genero);
+
+    const minP = document.getElementById('filter-precio-min') && document.getElementById('filter-precio-min').value !== '' ? parseFloat(document.getElementById('filter-precio-min').value) : null;
+    const maxP = document.getElementById('filter-precio-max') && document.getElementById('filter-precio-max').value !== '' ? parseFloat(document.getElementById('filter-precio-max').value) : null;
+    const ordenVal = (document.getElementById('filter-orden') && document.getElementById('filter-orden').value) || (document.getElementById('mobile-filter-orden') && document.getElementById('mobile-filter-orden').value) || '';
+
+    if (minP !== null || maxP !== null) {
+        filtered = filtered.filter(p => {
+            const itemPrice = parseFloat(p.precio_menudeo || p.precio_Menudeo || p.precio || p.precio_mayoreo || 0);
+            if (minP !== null && !isNaN(minP) && itemPrice < minP) return false;
+            if (maxP !== null && !isNaN(maxP) && itemPrice > maxP) return false;
+            return true;
+        });
+    }
+    
+    const query = (filtros.nombre || '').trim();
+    if (query) {
+        const normQuery = normalizeText(query);
+        const queryTokens = normQuery.split(' ').filter(Boolean);
+        const totalTokens = queryTokens.length;
+
+        const scoredItems = [];
+        filtered.forEach(p => {
+            const { score, matchedCount } = computeSearchRelevanceScore(p, query);
+            if (matchedCount > 0) {
+                scoredItems.push({ product: p, score: score, matchedCount: matchedCount });
+            }
+        });
+
+        if (totalTokens >= 2) {
+            let exactMatches = scoredItems.filter(item => item.matchedCount >= totalTokens);
+            if (exactMatches.length === 0 && totalTokens > 2) {
+                exactMatches = scoredItems.filter(item => item.matchedCount >= totalTokens - 1);
+            }
+            if (!ordenVal) exactMatches.sort((a, b) => b.score - a.score);
+            filtered = exactMatches.map(item => item.product);
+        } else {
+            if (!ordenVal) scoredItems.sort((a, b) => b.score - a.score);
+            filtered = scoredItems.map(item => item.product);
+        }
+    }
+
+    if (ordenVal === 'precio-asc') {
+        filtered.sort((a, b) => {
+            const pA = parseFloat(a.precio_menudeo || a.precio_Menudeo || a.precio || a.precio_mayoreo || 0);
+            const pB = parseFloat(b.precio_menudeo || b.precio_Menudeo || b.precio || b.precio_mayoreo || 0);
+            return pA - pB;
+        });
+    } else if (ordenVal === 'precio-desc') {
+        filtered.sort((a, b) => {
+            const pA = parseFloat(a.precio_menudeo || a.precio_Menudeo || a.precio || a.precio_mayoreo || 0);
+            const pB = parseFloat(b.precio_menudeo || b.precio_Menudeo || b.precio || b.precio_mayoreo || 0);
+            return pB - pA;
+        });
+    } else if (ordenVal === 'nombre-asc') {
+        filtered.sort((a, b) => (a.nombre || a.equipo || '').localeCompare(b.nombre || b.equipo || ''));
+    }
     
     renderLocalProducts(filtered);
 }

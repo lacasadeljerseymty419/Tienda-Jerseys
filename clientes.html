@@ -278,6 +278,8 @@
     </style>
 </head>
 <body class="font-sans antialiased min-h-screen flex flex-col selection:bg-navy-400/30 selection:text-navy-400 overflow-x-hidden">
+    <!-- YouTube Style Top Blue Loading Bar -->
+    <div id="yt-top-loading-bar" class="fixed top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-blue-600 via-blue-500 to-sky-400 shadow-[0_0_12px_rgba(59,130,246,0.9)] z-[99999] pointer-events-none transition-all duration-300 opacity-0 w-0"></div>
     
     <!-- Fondo del Catálogo Principal (Post-Login) - Mesh Gradient Orgánico -->
     <div class="fixed inset-0 pointer-events-none z-[-1] overflow-hidden bg-[#0b0b0b]">
@@ -332,7 +334,7 @@
                 <div class="hidden sm:flex items-center gap-1 sm:gap-1.5 bg-dark-100/90 border border-white/10 p-1 sm:p-1.5 rounded-2xl shadow-xl backdrop-blur-md shrink-0">
                     <!-- Menú Local 419 (Solo Administración) -->
                     <div id="local419-menu-wrapper" class="relative group hidden">
-                        <button id="btn-local419-menu" class="text-xs font-bold text-amber-400 hover:text-amber-300 transition-all flex items-center gap-1.5 px-2 lg:px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/20 shadow-sm whitespace-nowrap" title="Local 419">
+                        <button id="btn-local419-menu" type="button" onclick="if(window.openInventario419View) window.openInventario419View();" class="text-xs font-bold text-amber-400 hover:text-amber-300 transition-all flex items-center gap-1.5 px-2 lg:px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/20 shadow-sm whitespace-nowrap cursor-pointer" title="Local 419">
                             <svg class="w-4 h-4 text-amber-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
                             <span class="hidden md:inline font-bold">Local 419</span>
                             <svg class="w-3.5 h-3.5 text-amber-400 opacity-70 group-hover:rotate-180 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
@@ -348,11 +350,15 @@
                                     <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path></svg>
                                     Ordenar
                                 </button>
+                                <button type="button" onclick="if(window.openPedidoMasivo419Modal) window.openPedidoMasivo419Modal();" class="w-full text-left px-3.5 py-2 text-xs font-semibold text-amber-300 hover:text-white hover:bg-amber-500/20 rounded-lg transition-colors flex items-center gap-2 cursor-pointer">
+                                    <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                                    Pedido Masivo (Surtido 419)
+                                </button>
                                 <button class="action-local419-mis-pedidos w-full text-left px-3.5 py-2 text-xs font-medium text-gray-300 hover:text-white hover:bg-amber-500/20 rounded-lg transition-colors flex items-center gap-2">
                                     <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
                                     Mis Pedidos
                                 </button>
-                                <button class="action-local419-inventario w-full text-left px-3.5 py-2 text-xs font-semibold text-amber-400 hover:text-white hover:bg-amber-500/20 rounded-lg transition-colors flex items-center gap-2">
+                                <button type="button" onclick="if(window.openInventario419View) window.openInventario419View();" class="action-local419-inventario w-full text-left px-3.5 py-2 text-xs font-semibold text-amber-400 hover:text-white hover:bg-amber-500/20 rounded-lg transition-colors flex items-center gap-2 cursor-pointer">
                                     <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
                                     Inventario
                                 </button>
@@ -395,17 +401,29 @@
                                     <svg class="w-4 h-4 text-navy-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
                                     Órdenes/Pedidos
                                 </button>
-                                <button onclick="if(window.openAdminArticulosModal) window.openAdminArticulosModal();" class="w-full text-left px-3.5 py-2 text-xs font-semibold text-amber-300 hover:text-white hover:bg-amber-500/20 rounded-lg transition-colors flex items-center gap-2">
+                                <button type="button" onclick="if(document.activeElement) document.activeElement.blur(); if(window.openAdminArticulosModal) window.openAdminArticulosModal();" class="w-full text-left px-3.5 py-2 text-xs font-semibold text-amber-300 hover:text-white hover:bg-amber-500/20 rounded-lg transition-colors flex items-center gap-2 cursor-pointer">
                                     <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                                     Artículos Deportivos
                                 </button>
-                                <button onclick="if(window.openPrintStickerModal) window.openPrintStickerModal(null, true);" class="w-full text-left px-3.5 py-2 text-xs font-semibold text-amber-400 hover:text-white hover:bg-amber-500/20 rounded-lg transition-colors flex items-center gap-2">
+                                <button type="button" onclick="if(document.activeElement) document.activeElement.blur(); if(window.openPrintStickerModal) window.openPrintStickerModal(null, true);" class="w-full text-left px-3.5 py-2 text-xs font-semibold text-amber-400 hover:text-white hover:bg-amber-500/20 rounded-lg transition-colors flex items-center gap-2 cursor-pointer">
                                     <span class="text-xs">🏷️</span>
                                     Imprimir Pegatinas (General)
                                 </button>
-                                <button onclick="if(window.openTicketConfigModal) window.openTicketConfigModal();" class="w-full text-left px-3.5 py-2 text-xs font-semibold text-sky-400 hover:text-white hover:bg-sky-500/20 rounded-lg transition-colors flex items-center gap-2">
+                                <button type="button" onclick="if(document.activeElement) document.activeElement.blur(); if(window.openTraspaso419Modal) window.openTraspaso419Modal(); else if(window.openTraspasoModal) window.openTraspasoModal();" class="w-full text-left px-3.5 py-2 text-xs font-semibold text-blue-300 hover:text-white hover:bg-blue-500/20 rounded-lg transition-colors flex items-center gap-2 cursor-pointer">
+                                    <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
+                                    Traspaso a General
+                                </button>
+                                <button type="button" onclick="if(document.activeElement) document.activeElement.blur(); if(window.openAuditoriaModal) window.openAuditoriaModal('419');" class="w-full text-left px-3.5 py-2 text-xs font-semibold text-emerald-300 hover:text-white hover:bg-emerald-500/20 rounded-lg transition-colors flex items-center gap-2 cursor-pointer">
+                                    <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
+                                    Cuadre Inventario
+                                </button>
+                                <button type="button" onclick="if(document.activeElement) document.activeElement.blur(); if(window.openTicketConfigModal) window.openTicketConfigModal();" class="w-full text-left px-3.5 py-2 text-xs font-semibold text-sky-400 hover:text-white hover:bg-sky-500/20 rounded-lg transition-colors flex items-center gap-2 cursor-pointer">
                                     <svg class="w-4 h-4 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                                     Configuración Ticket
+                                </button>
+                                <button type="button" onclick="if(document.activeElement) document.activeElement.blur(); if(window.openEstadisticasModal) window.openEstadisticasModal();" class="w-full text-left px-3.5 py-2 text-xs font-semibold text-purple-400 hover:text-white hover:bg-purple-500/20 rounded-lg transition-colors flex items-center gap-2 cursor-pointer">
+                                    <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                                    Estadística
                                 </button>
 
                                 <!-- Submenú Proveedor -->
@@ -550,13 +568,29 @@
                         <svg class="w-5 h-5 text-navy-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
                         Órdenes/Pedidos
                     </button>
+                    <button onclick="if(window.openAdminArticulosModal) window.openAdminArticulosModal(); if(window.closemobileMenu) window.closemobileMenu();" class="w-full text-left px-4 py-3 text-sm font-semibold text-amber-300 hover:text-white hover:bg-amber-500/10 rounded-xl transition-colors flex items-center gap-3">
+                        <svg class="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        Artículos Deportivos
+                    </button>
                     <button onclick="if(window.openPrintStickerModal) window.openPrintStickerModal(null, true); if(window.closemobileMenu) window.closemobileMenu();" class="w-full text-left px-4 py-3 text-sm font-semibold text-amber-400 hover:text-white hover:bg-amber-500/10 rounded-xl transition-colors flex items-center gap-3">
                         <span class="text-base">🏷️</span>
                         Imprimir Pegatinas (General)
                     </button>
+                    <button onclick="if(window.openTraspaso419Modal) window.openTraspaso419Modal(); if(window.closemobileMenu) window.closemobileMenu();" class="w-full text-left px-4 py-3 text-sm font-semibold text-blue-300 hover:text-white hover:bg-blue-500/10 rounded-xl transition-colors flex items-center gap-3">
+                        <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
+                        Traspaso a General
+                    </button>
+                    <button onclick="if(window.openAuditoriaModal) window.openAuditoriaModal('419'); if(window.closemobileMenu) window.closemobileMenu();" class="w-full text-left px-4 py-3 text-sm font-semibold text-emerald-300 hover:text-white hover:bg-emerald-500/10 rounded-xl transition-colors flex items-center gap-3">
+                        <svg class="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
+                        Cuadre Inventario
+                    </button>
                     <button onclick="if(window.openTicketConfigModal) window.openTicketConfigModal(); if(window.closemobileMenu) window.closemobileMenu();" class="w-full text-left px-4 py-3 text-sm font-semibold text-sky-400 hover:text-white hover:bg-sky-500/10 rounded-xl transition-colors flex items-center gap-3">
                         <svg class="w-5 h-5 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                         Configuración Ticket
+                    </button>
+                    <button onclick="if(window.openEstadisticasModal) window.openEstadisticasModal(); if(window.closemobileMenu) window.closemobileMenu();" class="w-full text-left px-4 py-3 text-sm font-semibold text-purple-400 hover:text-white hover:bg-purple-500/10 rounded-xl transition-colors flex items-center gap-3">
+                        <svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                        Estadística
                     </button>
 
                     <!-- Submenú Proveedor Móvil -->
@@ -645,7 +679,18 @@
                 
                 <!-- Panel Desplegable de Filtros Específicos (Horizontal Compacto en Móvil) -->
                 <div id="container-filtros" class="hidden mt-3 lg:mt-6 pt-3 lg:pt-0 border-t border-white/5 lg:border-none">
-                    <div class="grid grid-cols-3 lg:grid-cols-1 gap-2 sm:gap-3 lg:gap-4">
+                    <div class="grid grid-cols-2 lg:grid-cols-1 gap-2 sm:gap-3 lg:gap-4">
+                        <div>
+                            <label for="filter-orden" class="block text-[9px] sm:text-xs font-bold text-gray-400 mb-1 uppercase tracking-wider truncate">Ordenar por</label>
+                            <select id="filter-orden" class="w-full bg-dark-200/60 border border-white/10 rounded-lg lg:rounded-xl px-2 py-1.5 lg:px-3 lg:py-2.5 text-[11px] sm:text-xs lg:text-sm focus:outline-none focus:border-navy-400 transition-all appearance-none cursor-pointer text-white truncate">
+                                <option value="">Defecto / Relevancia</option>
+                                <option value="precio-asc">Precio: Menor a Mayor ⬆️</option>
+                                <option value="precio-desc">Precio: Mayor a Menor ⬇️</option>
+                                <option value="nombre-asc">Nombre: A - Z 🔤</option>
+                                <option value="nombre-desc">Nombre: Z - A 🔤</option>
+                            </select>
+                        </div>
+
                         <div>
                             <label for="filter-version" class="block text-[9px] sm:text-xs font-bold text-gray-400 mb-1 uppercase tracking-wider truncate">Versión</label>
                             <select id="filter-version" class="w-full bg-dark-200/60 border border-white/10 rounded-lg lg:rounded-xl px-2 py-1.5 lg:px-3 lg:py-2.5 text-[11px] sm:text-xs lg:text-sm focus:outline-none focus:border-navy-400 transition-all appearance-none cursor-pointer text-white truncate">
@@ -668,7 +713,31 @@
                         </div>
                     </div>
 
-                    <div class="mt-3 lg:mt-6 hidden lg:block">
+                    <!-- Sección de Rango de Precios -->
+                    <div class="mt-3 lg:mt-4 pt-3 border-t border-white/5">
+                        <label class="block text-[9px] sm:text-xs font-bold text-gray-400 mb-1.5 uppercase tracking-wider truncate">Filtro de Precio ($)</label>
+                        <!-- Botones Rápidos Preset -->
+                        <div class="grid grid-cols-4 gap-1 mb-2" id="price-presets-container">
+                            <button type="button" data-min="" data-max="" class="price-preset-btn active bg-navy-500/40 text-navy-300 border border-navy-400/50 text-[9px] sm:text-xs font-bold py-1 px-1 rounded-md transition-all truncate text-center">Todos</button>
+                            <button type="button" data-min="" data-max="350" class="price-preset-btn bg-dark-200/60 text-gray-400 border border-white/10 hover:text-white text-[9px] sm:text-xs font-semibold py-1 px-1 rounded-md transition-all truncate text-center">-$350</button>
+                            <button type="button" data-min="350" data-max="450" class="price-preset-btn bg-dark-200/60 text-gray-400 border border-white/10 hover:text-white text-[9px] sm:text-xs font-semibold py-1 px-1 rounded-md transition-all truncate text-center">$350-450</button>
+                            <button type="button" data-min="450" data-max="" class="price-preset-btn bg-dark-200/60 text-gray-400 border border-white/10 hover:text-white text-[9px] sm:text-xs font-semibold py-1 px-1 rounded-md transition-all truncate text-center">+$450</button>
+                        </div>
+                        <!-- Entradas Min y Max -->
+                        <div class="flex items-center gap-1.5">
+                            <div class="relative flex-1">
+                                <span class="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500 text-[10px] sm:text-xs font-bold">$</span>
+                                <input type="number" id="filter-precio-min" placeholder="Mín" class="w-full bg-dark-200/60 border border-white/10 rounded-lg pl-4 pr-1 py-1 text-[11px] sm:text-xs focus:outline-none focus:border-navy-400 text-white placeholder-gray-500">
+                            </div>
+                            <span class="text-gray-500 text-xs font-bold">-</span>
+                            <div class="relative flex-1">
+                                <span class="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500 text-[10px] sm:text-xs font-bold">$</span>
+                                <input type="number" id="filter-precio-max" placeholder="Máx" class="w-full bg-dark-200/60 border border-white/10 rounded-lg pl-4 pr-1 py-1 text-[11px] sm:text-xs focus:outline-none focus:border-navy-400 text-white placeholder-gray-500">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-3 lg:mt-5 hidden lg:block">
                         <button id="btn-aplicar" class="w-full bg-navy-500 hover:bg-navy-400 text-white font-bold py-2.5 lg:py-3.5 text-xs lg:text-sm rounded-xl transition-all duration-300 shadow-[0_0_20px_rgba(59,130,246,0.3)] hover:shadow-[0_0_30px_rgba(59,130,246,0.5)] active:scale-[0.98]">
                             Aplicar Filtros
                         </button>
@@ -680,7 +749,7 @@
         <!-- Contenedor Principal (Grid) -->
         <div class="flex-grow">
             <!-- Grid de Productos -->
-            <div id="products-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
+            <div id="products-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-5 lg:gap-6">
                 <!-- Skeletons se inyectan dinámicamente -->
             </div>
             
@@ -726,7 +795,7 @@
         </div>
     </template>
     
-    <div id="image-modal" class="fixed inset-0 z-[60] flex items-center justify-center hidden bg-dark/95 backdrop-blur-md transition-opacity duration-300 opacity-0 select-none">
+    <div id="image-modal" class="fixed inset-0 z-[99999] flex items-center justify-center hidden bg-dark/95 backdrop-blur-md transition-opacity duration-300 opacity-0 select-none">
         <button id="close-modal" class="absolute top-4 right-4 sm:top-6 sm:right-6 text-white/50 hover:text-white transition-colors p-2 bg-white/5 rounded-full hover:bg-white/10 z-50">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
         </button>
@@ -1144,7 +1213,14 @@
 
                 <!-- Formulario para Nueva Talla -->
                 <div class="pt-6 border-t border-white/5">
-                    <h3 class="text-sm font-semibold text-gray-300 mb-3 uppercase tracking-wider">Añadir Nueva Talla</h3>
+                    <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                        <h3 class="text-xs sm:text-sm font-semibold text-gray-300 uppercase tracking-wider">Añadir Nueva Talla</h3>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <button type="button" onclick="if(window.addAllStandardTallas) window.addAllStandardTallas();" class="px-3 py-1.5 rounded-xl bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 font-bold text-xs border border-blue-500/40 transition-all flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95" title="Añadir todas las tallas estándar para este género con 1 solo clic">
+                                <span>⚡ Añadir TODAS las Tallas</span>
+                            </button>
+                        </div>
+                    </div>
                     <form id="form-add-talla" class="flex gap-3 items-end bg-dark-200/30 p-4 rounded-xl border border-white/5">
                         <div class="flex-1">
                             <label class="block text-[10px] font-semibold text-gray-400 mb-1 uppercase tracking-wider">Talla</label>
@@ -1186,7 +1262,7 @@
     </div>
 
     <!-- Modal de Gestión de Inventario Local 419 (Mismo estilo que Inventario General) -->
-    <div id="local419-inventory-manage-modal" class="fixed inset-0 z-[100] flex items-center justify-center hidden bg-dark/90 backdrop-blur-sm transition-opacity duration-300 opacity-0 overflow-y-auto py-6 sm:py-10">
+    <div id="local419-inventory-manage-modal" class="fixed inset-0 z-[300] flex items-center justify-center hidden bg-dark/90 backdrop-blur-sm transition-opacity duration-300 opacity-0 overflow-y-auto py-6 sm:py-10">
         <div class="bg-dark-100 border border-amber-500/30 rounded-2xl w-full max-w-2xl mx-4 shadow-2xl shadow-amber-500/10 transform scale-95 transition-transform duration-300 flex flex-col my-auto relative max-h-[85vh]">
             <!-- Header -->
             <div class="p-4 sm:p-6 border-b border-white/5 flex justify-between items-center bg-dark-100/90 backdrop-blur-md rounded-t-2xl z-10 flex-shrink-0">
@@ -1206,7 +1282,14 @@
             <div class="p-4 sm:p-6 space-y-6 overflow-y-auto flex-grow custom-scrollbar">
                 <!-- Formulario para Añadir Talla a Local 419 -->
                 <div>
-                    <h3 class="text-xs sm:text-sm font-semibold text-amber-400 uppercase tracking-wider mb-3">Añadir Nueva Talla a Local 419</h3>
+                    <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                        <h3 class="text-xs sm:text-sm font-semibold text-amber-400 uppercase tracking-wider">Añadir Nueva Talla a Local 419</h3>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <button type="button" onclick="if(window.addAllStandardTallas419) window.addAllStandardTallas419();" class="px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-bold text-xs border border-amber-500/40 transition-all flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95" title="Añadir todas las tallas estándar para este género con 1 solo clic">
+                                <span>⚡ Añadir TODAS las Tallas</span>
+                            </button>
+                        </div>
+                    </div>
                     <form id="form-add-talla-419" class="flex gap-2 sm:gap-3 items-end bg-dark-200/40 p-3.5 sm:p-4 rounded-xl border border-amber-500/20">
                         <div class="flex-1 min-w-0">
                             <label class="block text-[10px] font-semibold text-gray-400 mb-1 uppercase tracking-wider">Talla</label>
@@ -1247,6 +1330,139 @@
         </div>
     </div>
 
+    <!-- Modal: Pedido Masivo de Reabastecimiento Local 419 vs Inventario General -->
+    <div id="modal-pedido-masivo-419" class="fixed inset-0 z-[310] flex items-center justify-center hidden bg-dark/95 backdrop-blur-md transition-opacity duration-300 opacity-0 overflow-y-auto py-4 sm:py-8 p-2 sm:p-4">
+        <div class="bg-dark-100 border border-amber-500/40 rounded-2xl w-full max-w-5xl mx-auto shadow-2xl shadow-amber-500/20 transform scale-95 transition-transform duration-300 flex flex-col my-auto relative max-h-[92vh] sm:max-h-[88vh] overflow-hidden">
+            
+            <!-- Header -->
+            <div class="p-4 sm:p-5 border-b border-white/10 flex justify-between items-center bg-dark-100/90 backdrop-blur-md rounded-t-2xl z-10 flex-shrink-0">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-xl flex items-center justify-center text-xl font-bold shadow-sm">
+                        📦
+                    </div>
+                    <div>
+                        <h2 class="text-base sm:text-xl font-black text-white leading-tight flex items-center gap-2">
+                            <span>Pedido Masivo Surtido 419</span>
+                            <span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40">Bodega ➔ Local 419</span>
+                        </h2>
+                        <p class="text-xs text-gray-400 mt-0.5">Prendas sin stock en Local 419 (Stock = 0) con existencias disponibles en Bodega General</p>
+                    </div>
+                </div>
+                <button type="button" onclick="if(window.closePedidoMasivo419Modal) window.closePedidoMasivo419Modal();" class="text-gray-400 hover:text-white transition-colors p-2 bg-white/5 rounded-full hover:bg-white/10 flex-shrink-0">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+
+            <!-- Body Area -->
+            <div class="p-4 sm:p-6 space-y-4 overflow-y-auto flex-grow custom-scrollbar">
+                
+                <!-- Barra KPI de Métricas Resumen -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                    <div class="bg-dark-200/70 border border-white/10 p-3 rounded-xl shadow-sm">
+                        <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Modelos Faltantes</span>
+                        <div id="masivo-kpi-modelos" class="text-lg sm:text-xl font-black text-white font-mono mt-0.5">0</div>
+                    </div>
+                    <div class="bg-dark-200/70 border border-red-500/30 p-3 rounded-xl shadow-sm">
+                        <span class="text-[10px] font-bold text-red-400 uppercase tracking-wider block">Tallas Faltantes (419=0)</span>
+                        <div id="masivo-kpi-tallas" class="text-lg sm:text-xl font-black text-red-300 font-mono mt-0.5">0</div>
+                    </div>
+                    <div class="bg-dark-200/70 border border-emerald-500/30 p-3 rounded-xl shadow-sm">
+                        <span class="text-[10px] font-bold text-emerald-400 uppercase tracking-wider block">Disponibles Bodega</span>
+                        <div id="masivo-kpi-disponibles" class="text-lg sm:text-xl font-black text-emerald-300 font-mono mt-0.5">0 pzs</div>
+                    </div>
+                    <div class="bg-amber-500/10 border border-amber-500/40 p-3 rounded-xl shadow-sm">
+                        <span class="text-[10px] font-bold text-amber-400 uppercase tracking-wider block">Piezas Seleccionadas</span>
+                        <div id="masivo-kpi-seleccionadas" class="text-lg sm:text-xl font-black text-amber-300 font-mono mt-0.5">0 pzs</div>
+                    </div>
+                </div>
+
+                <!-- Botones de Acción Rápida (Presets) y Filtros -->
+                <div class="bg-dark-200/40 p-3 rounded-xl border border-white/5 space-y-3">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span class="text-xs font-bold text-gray-300 uppercase tracking-wider mr-1">Selección Rápida:</span>
+                            <button type="button" onclick="if(window.setAllMasivoQty) window.setAllMasivoQty(1);" class="px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-bold text-xs border border-amber-500/40 transition-all flex items-center gap-1 cursor-pointer shadow-sm active:scale-95">
+                                <span>⚡ Surtir 1 pza por Talla</span>
+                            </button>
+                            <button type="button" onclick="if(window.setAllMasivoQty) window.setAllMasivoQty('max');" class="px-3 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 font-bold text-xs border border-emerald-500/40 transition-all flex items-center gap-1 cursor-pointer shadow-sm active:scale-95">
+                                <span>📦 Surtir Todo de Bodega</span>
+                            </button>
+                            <button type="button" onclick="if(window.setAllMasivoQty) window.setAllMasivoQty(0);" class="px-2.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white font-semibold text-xs border border-white/10 transition-all cursor-pointer">
+                                <span>🧹 Limpiar</span>
+                            </button>
+                        </div>
+
+                        <div class="text-xs font-mono text-amber-400 font-bold" id="masivo-selected-count-badge">
+                            0 prendas en lote
+                        </div>
+                    </div>
+
+                    <!-- Buscador y Filtros Secundarios -->
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 border-t border-white/5">
+                        <div class="relative">
+                            <input type="text" id="masivo-filter-search" oninput="if(window.renderPedidoMasivoGrid) window.renderPedidoMasivoGrid();" placeholder="Buscar por equipo, ID o jersey..." class="w-full bg-dark-100 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400 pl-8">
+                            <svg class="w-4 h-4 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                        </div>
+                        <div>
+                            <select id="masivo-filter-version" onchange="if(window.renderPedidoMasivoGrid) window.renderPedidoMasivoGrid();" class="w-full bg-dark-100 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400 cursor-pointer">
+                                <option value="">Versión (Todas)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <select id="masivo-filter-genero" onchange="if(window.renderPedidoMasivoGrid) window.renderPedidoMasivoGrid();" class="w-full bg-dark-100 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400 cursor-pointer">
+                                <option value="">Género (Todos)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tabla / Grid de Productos Faltantes -->
+                <div class="bg-dark-200/30 rounded-xl border border-white/5 overflow-hidden">
+                    <div class="overflow-x-auto custom-scrollbar max-h-[50vh]">
+                        <table class="w-full text-left text-xs text-gray-300 table-auto">
+                            <thead class="bg-dark-200 text-gray-400 uppercase text-[10px] font-bold sticky top-0 z-10 border-b border-white/10 shadow-md">
+                                <tr>
+                                    <th class="px-3 py-2.5 w-10 text-center">
+                                        <input type="checkbox" id="masivo-check-all" onchange="if(window.toggleAllMasivoCheck) window.toggleAllMasivoCheck(this.checked);" class="w-4 h-4 text-amber-500 rounded border-white/20 bg-dark-100 focus:ring-amber-500" checked>
+                                    </th>
+                                    <th class="px-3 py-2.5">Producto</th>
+                                    <th class="px-3 py-2.5">Etiquetas</th>
+                                    <th class="px-3 py-2.5 text-center">Talla</th>
+                                    <th class="px-3 py-2.5 text-center">Stock 419</th>
+                                    <th class="px-3 py-2.5 text-center">Stock Bodega</th>
+                                    <th class="px-3 py-2.5 text-center w-40">Cantidad a Surtir</th>
+                                </tr>
+                            </thead>
+                            <tbody id="masivo-table-body" class="divide-y divide-white/5">
+                                <!-- Filas dinámicas se inyectan aquí -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <div id="masivo-table-empty" class="hidden text-center py-12 text-gray-500 italic text-xs">
+                        🎉 ¡No hay prendas faltantes! Todas las prendas con stock en Bodega General ya están surtidas en Local 419.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer con Acciones -->
+            <div class="p-4 sm:p-5 border-t border-white/10 bg-dark-100/90 backdrop-blur-md rounded-b-2xl flex flex-wrap items-center justify-between gap-3 shrink-0">
+                <div class="flex items-center gap-2">
+                    <span class="text-xs text-gray-400">Total a traspasar a Local 419:</span>
+                    <span id="masivo-footer-total-pieces" class="text-base font-black text-amber-400 font-mono">0 PZS</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button type="button" onclick="if(window.closePedidoMasivo419Modal) window.closePedidoMasivo419Modal();" class="px-4 py-2 rounded-xl border border-white/10 text-gray-300 hover:text-white hover:bg-white/5 text-xs font-semibold transition-colors">
+                        Cancelar
+                    </button>
+                    <button type="button" onclick="if(window.submitPedidoMasivo419) window.submitPedidoMasivo419();" id="btn-submit-pedido-masivo" class="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-extrabold text-xs uppercase tracking-wider transition-all shadow-lg shadow-amber-500/20 flex items-center gap-2 cursor-pointer active:scale-95">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                        <span>Confirmar y Surtir Pedido Masivo</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal de Administración: Órdenes/Pedidos -->
     <div id="admin-ordenes-modal" class="fixed inset-0 z-[60] flex items-center justify-center hidden bg-dark/90 backdrop-blur-sm transition-opacity duration-300 opacity-0 overflow-y-auto py-6 sm:py-10">
         <div class="bg-dark-100 border border-white/10 rounded-2xl w-full max-w-4xl mx-4 shadow-2xl shadow-navy-500/10 transform scale-95 transition-transform duration-300 flex flex-col my-auto relative max-h-none sm:max-h-[85vh]">
@@ -1266,67 +1482,142 @@
             </div>
             
             <div class="p-4 sm:p-6 flex-grow overflow-y-auto flex flex-col">
-                <!-- Filtros -->
-                <div class="mb-4 bg-dark-200/50 p-4 rounded-xl border border-white/5 flex flex-wrap gap-3 items-end">
-                    <div class="flex-grow min-w-[150px]">
-                        <label class="block text-[10px] text-gray-400 mb-1 uppercase tracking-wider">Nombre Cliente</label>
-                        <input type="text" id="admin-ordenes-filtro-nombre" placeholder="Ej. Carlos" class="w-full bg-dark-100 border border-white/10 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-navy-400 text-white placeholder-gray-500 transition-colors">
+                <!-- Resumen de Métricas KPI por Estatus (Semana Lunes a Domingo) -->
+                <div id="admin-ordenes-kpi-bar" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-2.5 mb-4 shrink-0">
+                    <!-- Card 1: Pendiente -->
+                    <div id="kpi-card-pendiente" onclick="if(window.filterOrdersByKpi) window.filterOrdersByKpi('pendiente')" class="bg-dark-200/60 border border-amber-500/30 hover:border-amber-400 p-2.5 rounded-xl cursor-pointer transition-all hover:bg-dark-200/90 group shadow-sm flex flex-col justify-between" title="Clic para filtrar órdenes Pendientes esta semana (Lun-Dom)">
+                        <div class="flex items-center justify-between text-[10px] sm:text-[11px] text-amber-400 font-semibold uppercase tracking-wider">
+                            <span class="truncate">🟡 Pendiente</span>
+                            <span class="text-[9px] bg-amber-500/20 text-amber-300 px-1 py-0.5 rounded font-mono shrink-0">Lun-Dom</span>
+                        </div>
+                        <div class="mt-1 flex items-baseline justify-between">
+                            <div id="kpi-status-pendiente" class="text-base sm:text-xl font-black text-white font-mono">0</div>
+                            <span id="kpi-status-pendiente-pzs" class="text-[10px] text-gray-400 font-mono">0 pzs</span>
+                        </div>
                     </div>
-                    <div class="flex-grow min-w-[150px]">
-                        <label class="block text-[10px] text-gray-400 mb-1 uppercase tracking-wider">ID Orden</label>
-                        <input type="text" id="admin-ordenes-filtro-id" placeholder="Ej. ORD-..." class="w-full bg-dark-100 border border-white/10 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-navy-400 text-white placeholder-gray-500 transition-colors">
+
+                    <!-- Card 2: Revisando -->
+                    <div id="kpi-card-revisando" onclick="if(window.filterOrdersByKpi) window.filterOrdersByKpi('revisando')" class="bg-dark-200/60 border border-purple-500/30 hover:border-purple-400 p-2.5 rounded-xl cursor-pointer transition-all hover:bg-dark-200/90 group shadow-sm flex flex-col justify-between" title="Clic para filtrar órdenes Revisando esta semana (Lun-Dom)">
+                        <div class="flex items-center justify-between text-[10px] sm:text-[11px] text-purple-400 font-semibold uppercase tracking-wider">
+                            <span class="truncate">🟣 Revisando</span>
+                            <span class="text-[9px] bg-purple-500/20 text-purple-300 px-1 py-0.5 rounded font-mono shrink-0">Lun-Dom</span>
+                        </div>
+                        <div class="mt-1 flex items-baseline justify-between">
+                            <div id="kpi-status-revisando" class="text-base sm:text-xl font-black text-white font-mono">0</div>
+                            <span id="kpi-status-revisando-pzs" class="text-[10px] text-gray-400 font-mono">0 pzs</span>
+                        </div>
                     </div>
-                    <div class="relative w-full sm:w-[220px]">
-                        <label class="block text-[10px] text-gray-400 mb-1 uppercase tracking-wider">Estatus</label>
-                        <button type="button" id="btn-admin-ordenes-estatus-toggle" onclick="toggleEstatusMultiselectDropdown()" class="w-full bg-dark-100 border border-white/10 rounded-lg px-3 py-2 text-xs font-medium focus:outline-none focus:border-navy-400 text-white flex items-center justify-between gap-2 cursor-pointer h-[38px]">
-                            <span id="admin-ordenes-estatus-label" class="truncate text-gray-200 font-semibold">Todos los Estatus</span>
-                            <svg class="w-3.5 h-3.5 text-gray-400 shrink-0 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+
+                    <!-- Card 3: Disponible - Para recoger -->
+                    <div id="kpi-card-recoger" onclick="if(window.filterOrdersByKpi) window.filterOrdersByKpi('recoger')" class="bg-dark-200/60 border border-teal-500/30 hover:border-teal-400 p-2.5 rounded-xl cursor-pointer transition-all hover:bg-dark-200/90 group shadow-sm flex flex-col justify-between" title="Clic para filtrar órdenes Para Recoger esta semana (Lun-Dom)">
+                        <div class="flex items-center justify-between text-[10px] sm:text-[11px] text-teal-400 font-semibold uppercase tracking-wider">
+                            <span class="truncate">🏪 Para Recoger</span>
+                            <span class="text-[9px] bg-teal-500/20 text-teal-300 px-1 py-0.5 rounded font-mono shrink-0">Lun-Dom</span>
+                        </div>
+                        <div class="mt-1 flex items-baseline justify-between">
+                            <div id="kpi-status-recoger" class="text-base sm:text-xl font-black text-white font-mono">0</div>
+                            <span id="kpi-status-recoger-pzs" class="text-[10px] text-gray-400 font-mono">0 pzs</span>
+                        </div>
+                    </div>
+
+                    <!-- Card 4: Disponible - Para enviar -->
+                    <div id="kpi-card-enviar" onclick="if(window.filterOrdersByKpi) window.filterOrdersByKpi('enviar')" class="bg-dark-200/60 border border-blue-500/30 hover:border-blue-400 p-2.5 rounded-xl cursor-pointer transition-all hover:bg-dark-200/90 group shadow-sm flex flex-col justify-between" title="Clic para filtrar órdenes Para Enviar esta semana (Lun-Dom)">
+                        <div class="flex items-center justify-between text-[10px] sm:text-[11px] text-blue-400 font-semibold uppercase tracking-wider">
+                            <span class="truncate">🚚 Para Enviar</span>
+                            <span class="text-[9px] bg-blue-500/20 text-blue-300 px-1 py-0.5 rounded font-mono shrink-0">Lun-Dom</span>
+                        </div>
+                        <div class="mt-1 flex items-baseline justify-between">
+                            <div id="kpi-status-enviar" class="text-base sm:text-xl font-black text-white font-mono">0</div>
+                            <span id="kpi-status-enviar-pzs" class="text-[10px] text-gray-400 font-mono">0 pzs</span>
+                        </div>
+                    </div>
+
+                    <!-- Card 5: Enviado - Paqueteria -->
+                    <div id="kpi-card-enviado" onclick="if(window.filterOrdersByKpi) window.filterOrdersByKpi('enviado')" class="bg-dark-200/60 border border-sky-500/30 hover:border-sky-400 p-2.5 rounded-xl cursor-pointer transition-all hover:bg-dark-200/90 group shadow-sm flex flex-col justify-between" title="Clic para filtrar órdenes Enviadas esta semana (Lun-Dom)">
+                        <div class="flex items-center justify-between text-[10px] sm:text-[11px] text-sky-400 font-semibold uppercase tracking-wider">
+                            <span class="truncate">📦 Enviado</span>
+                            <span class="text-[9px] bg-sky-500/20 text-sky-300 px-1 py-0.5 rounded font-mono shrink-0">Lun-Dom</span>
+                        </div>
+                        <div class="mt-1 flex items-baseline justify-between">
+                            <div id="kpi-status-enviado" class="text-base sm:text-xl font-black text-white font-mono">0</div>
+                            <span id="kpi-status-enviado-pzs" class="text-[10px] text-gray-400 font-mono">0 pzs</span>
+                        </div>
+                    </div>
+
+                    <!-- Card 6: Finalizada -->
+                    <div id="kpi-card-finalizada" onclick="if(window.filterOrdersByKpi) window.filterOrdersByKpi('finalizada')" class="bg-dark-200/60 border border-emerald-500/30 hover:border-emerald-400 p-2.5 rounded-xl cursor-pointer transition-all hover:bg-dark-200/90 group shadow-sm flex flex-col justify-between" title="Clic para filtrar órdenes Finalizadas esta semana (Lun-Dom)">
+                        <div class="flex items-center justify-between text-[10px] sm:text-[11px] text-emerald-400 font-semibold uppercase tracking-wider">
+                            <span class="truncate">✅ Finalizada</span>
+                            <span class="text-[9px] bg-emerald-500/20 text-emerald-300 px-1 py-0.5 rounded font-mono shrink-0">Lun-Dom</span>
+                        </div>
+                        <div class="mt-1 flex items-baseline justify-between">
+                            <div id="kpi-status-finalizada" class="text-base sm:text-xl font-black text-white font-mono">0</div>
+                            <span id="kpi-status-finalizada-pzs" class="text-[10px] text-gray-400 font-mono">0 pzs</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Filtros Compactos -->
+                <div class="mb-3 bg-dark-200/50 p-2.5 sm:p-3 rounded-xl border border-white/5 flex flex-col sm:flex-row items-stretch sm:items-end gap-2">
+                    <div class="flex-grow min-w-[110px]">
+                        <label class="block text-[9px] font-bold text-gray-400 mb-0.5 uppercase tracking-wider">Nombre Cliente</label>
+                        <input type="text" id="admin-ordenes-filtro-nombre" placeholder="Ej. Carlos" class="w-full bg-dark-100 border border-white/10 rounded-lg px-2.5 py-1 text-xs focus:outline-none focus:border-navy-400 text-white placeholder-gray-500 transition-colors h-[32px]">
+                    </div>
+                    <div class="w-full sm:w-[130px] shrink-0">
+                        <label class="block text-[9px] font-bold text-gray-400 mb-0.5 uppercase tracking-wider">ID Orden</label>
+                        <input type="text" id="admin-ordenes-filtro-id" placeholder="Ej. ORD-..." class="w-full bg-dark-100 border border-white/10 rounded-lg px-2.5 py-1 text-xs focus:outline-none focus:border-navy-400 text-white placeholder-gray-500 transition-colors h-[32px]">
+                    </div>
+                    <div class="relative w-full sm:w-[170px] shrink-0">
+                        <label class="block text-[9px] font-bold text-gray-400 mb-0.5 uppercase tracking-wider">Estatus</label>
+                        <button type="button" id="btn-admin-ordenes-estatus-toggle" onclick="toggleEstatusMultiselectDropdown()" class="w-full bg-dark-100 border border-white/10 rounded-lg px-2.5 py-1 text-xs font-medium focus:outline-none focus:border-navy-400 text-white flex items-center justify-between gap-1.5 cursor-pointer h-[32px]">
+                            <span id="admin-ordenes-estatus-label" class="truncate text-gray-200 font-semibold text-[11px]">Todos los Estatus</span>
+                            <svg class="w-3 h-3 text-gray-400 shrink-0 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                         </button>
                         
                         <!-- Dropdown Menu con Checkboxes -->
                         <div id="admin-ordenes-estatus-dropdown" class="absolute left-0 right-0 mt-1 bg-dark-100 border border-white/10 rounded-xl shadow-2xl z-50 p-2 space-y-1 hidden max-h-64 overflow-y-auto custom-scrollbar">
-                            <label class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-white/5 cursor-pointer text-xs font-bold text-navy-400 border-b border-white/10 pb-2 mb-1">
+                            <label class="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-white/5 cursor-pointer text-xs font-bold text-navy-400 border-b border-white/10 pb-1.5 mb-1">
                                 <input type="checkbox" id="estatus-chk-todos" checked onchange="toggleAllEstatusCheckboxes(this.checked)" class="rounded border-white/20 bg-dark-200 text-navy-500 focus:ring-0 w-3.5 h-3.5">
                                 <span>Todos los Estatus</span>
                             </label>
-                            <label class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-white/5 cursor-pointer text-xs text-gray-200 font-medium">
+                            <label class="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-white/5 cursor-pointer text-xs text-gray-200 font-medium">
                                 <input type="checkbox" value="Pendiente" class="estatus-option-chk rounded border-white/20 bg-dark-200 text-navy-500 focus:ring-0 w-3.5 h-3.5" checked onchange="updateEstatusMultiselectLabel()">
                                 <span>Pendiente</span>
                             </label>
-                            <label class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-white/5 cursor-pointer text-xs text-gray-200 font-medium">
+                            <label class="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-white/5 cursor-pointer text-xs text-gray-200 font-medium">
                                 <input type="checkbox" value="Revisando" class="estatus-option-chk rounded border-white/20 bg-dark-200 text-navy-500 focus:ring-0 w-3.5 h-3.5" checked onchange="updateEstatusMultiselectLabel()">
                                 <span>Revisando</span>
                             </label>
-                            <label class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-white/5 cursor-pointer text-xs text-gray-200 font-medium">
+                            <label class="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-white/5 cursor-pointer text-xs text-gray-200 font-medium">
                                 <input type="checkbox" value="Disponible - Para recoger" class="estatus-option-chk rounded border-white/20 bg-dark-200 text-navy-500 focus:ring-0 w-3.5 h-3.5" checked onchange="updateEstatusMultiselectLabel()">
                                 <span>Disponible - Para recoger</span>
                             </label>
-                            <label class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-white/5 cursor-pointer text-xs text-gray-200 font-medium">
+                            <label class="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-white/5 cursor-pointer text-xs text-gray-200 font-medium">
                                 <input type="checkbox" value="Disponible - Para enviar" class="estatus-option-chk rounded border-white/20 bg-dark-200 text-navy-500 focus:ring-0 w-3.5 h-3.5" checked onchange="updateEstatusMultiselectLabel()">
                                 <span>Disponible - Para enviar</span>
                             </label>
-                            <label class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-white/5 cursor-pointer text-xs text-gray-200 font-medium">
+                            <label class="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-white/5 cursor-pointer text-xs text-gray-200 font-medium">
                                 <input type="checkbox" value="Enviado - Paqueteria" class="estatus-option-chk rounded border-white/20 bg-dark-200 text-navy-500 focus:ring-0 w-3.5 h-3.5" checked onchange="updateEstatusMultiselectLabel()">
                                 <span>Enviado - Paqueteria</span>
                             </label>
-                            <label class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-white/5 cursor-pointer text-xs text-gray-200 font-medium">
+                            <label class="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-white/5 cursor-pointer text-xs text-gray-200 font-medium">
                                 <input type="checkbox" value="Finalizada" class="estatus-option-chk rounded border-white/20 bg-dark-200 text-navy-500 focus:ring-0 w-3.5 h-3.5" checked onchange="updateEstatusMultiselectLabel()">
                                 <span>Finalizada</span>
                             </label>
-                            <label class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-white/5 cursor-pointer text-xs text-gray-200 font-medium">
+                            <label class="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-white/5 cursor-pointer text-xs text-gray-200 font-medium">
                                 <input type="checkbox" value="Cancelada" class="estatus-option-chk rounded border-white/20 bg-dark-200 text-navy-500 focus:ring-0 w-3.5 h-3.5" checked onchange="updateEstatusMultiselectLabel()">
                                 <span>Cancelada</span>
                             </label>
                         </div>
                     </div>
-                    <button id="btn-admin-ordenes-buscar" class="px-5 py-2 rounded-lg bg-navy-500 hover:bg-navy-400 text-white font-bold transition-all shadow hover:shadow-navy-500/30 text-sm flex items-center gap-2 h-[38px]">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                        Buscar
+                    <button id="btn-admin-ordenes-buscar" class="px-3.5 py-1 rounded-lg bg-navy-500 hover:bg-navy-400 text-white font-bold transition-all shadow hover:shadow-navy-500/30 text-xs flex items-center justify-center gap-1.5 h-[32px] shrink-0 cursor-pointer">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                        <span>Buscar</span>
                     </button>
                 </div>
                 
                 <div class="flex-grow min-h-[300px] flex flex-col">
-                    <div id="admin-ordenes-list" class="space-y-4">
+                    <div id="admin-ordenes-list" class="space-y-2">
                         <!-- Orders will be rendered here -->
                     </div>
                     <div id="admin-ordenes-empty" class="hidden m-auto text-center p-8 bg-dark-200/30 rounded-2xl border border-white/5 w-full">
@@ -1991,9 +2282,40 @@
 
                 <!-- Totales -->
                 <div id="cart-totals-container" class="bg-dark-200/30 p-4 rounded-xl border border-white/5 space-y-2 text-sm text-gray-400">
-                    <div class="flex items-center justify-end gap-2 mb-3 pb-3 border-b border-white/5">
-                        <input type="checkbox" id="cart-envio-domicilio" onchange="renderCartItems()" class="w-4 h-4 rounded border-white/10 bg-dark-200 text-navy-500 focus:ring-navy-500 cursor-pointer">
-                        <label for="cart-envio-domicilio" class="text-sm text-gray-300 font-semibold cursor-pointer select-none">Envío a domicilio</label>
+                    <!-- Selección Tipo de Entrega -->
+                    <div class="mb-3 space-y-2 pb-3 border-b border-white/10">
+                        <label class="block text-xs font-bold text-gray-300 uppercase tracking-wider">Tipo de Entrega del Pedido:</label>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2" id="cart-tipo-entrega-group">
+                            <label id="lbl-tipo-domicilio" class="tipo-entrega-card relative flex items-center gap-2 p-2.5 rounded-xl border border-white/10 bg-dark-200/50 text-gray-300 hover:text-white cursor-pointer transition-all">
+                                <input type="radio" name="cart-tipo-entrega" value="domicilio" onchange="renderCartItems()" class="w-4 h-4 text-navy-500 bg-dark-200 border-white/20 focus:ring-navy-500 cursor-pointer">
+                                <div class="min-w-0">
+                                    <div class="text-xs font-bold flex items-center gap-1">
+                                        <span>🏠 Domicilio</span>
+                                    </div>
+                                    <div class="text-[10px] text-gray-400">Paquetería</div>
+                                </div>
+                            </label>
+
+                            <label id="lbl-tipo-recoleccion" class="tipo-entrega-card relative flex items-center gap-2 p-2.5 rounded-xl border border-amber-500/50 bg-amber-500/10 text-amber-300 cursor-pointer transition-all shadow-sm">
+                                <input type="radio" name="cart-tipo-entrega" value="recoleccion" onchange="renderCartItems()" checked class="w-4 h-4 text-amber-500 bg-dark-200 border-white/20 focus:ring-amber-500 cursor-pointer">
+                                <div class="min-w-0">
+                                    <div class="text-xs font-bold flex items-center gap-1">
+                                        <span>🏪 Recolección</span>
+                                    </div>
+                                    <div class="text-[10px] text-gray-400">En Tienda / Local</div>
+                                </div>
+                            </label>
+
+                            <label id="lbl-tipo-app" class="tipo-entrega-card relative flex items-center gap-2 p-2.5 rounded-xl border border-white/10 bg-dark-200/50 text-gray-300 hover:text-white cursor-pointer transition-all">
+                                <input type="radio" name="cart-tipo-entrega" value="app" onchange="renderCartItems()" class="w-4 h-4 text-emerald-500 bg-dark-200 border-white/20 focus:ring-emerald-500 cursor-pointer">
+                                <div class="min-w-0">
+                                    <div class="text-xs font-bold flex items-center gap-1">
+                                        <span>🚗 App Express</span>
+                                    </div>
+                                    <div class="text-[10px] text-gray-400">DiDi / Uber</div>
+                                </div>
+                            </label>
+                        </div>
                     </div>
 
                     <!-- Banner Estimado de Recojo en Tienda (Solo si NO es Envío) -->
@@ -2317,7 +2639,7 @@
     </div>
 
     <!-- Vista Pantalla Completa: Inventario Local 419 -->
-    <div id="local419-inventario-modal" class="fixed inset-0 z-[70] flex flex-col hidden bg-[#0c0c0e] text-white w-screen h-screen overflow-hidden transition-all duration-300 opacity-0">
+    <div id="local419-inventario-modal" class="fixed inset-0 z-[200] flex flex-col hidden bg-[#0c0c0e] text-white w-screen h-screen overflow-hidden transition-all duration-300 opacity-0">
         <!-- Header de Pantalla Completa con Menú Integrado para Local 419 -->
         <header class="bg-[#141417] border-b border-amber-500/20 px-4 sm:px-8 py-3 flex flex-wrap items-center justify-between gap-4 flex-shrink-0 shadow-lg z-20">
             <div class="flex items-center gap-4 flex-wrap">
@@ -2344,9 +2666,6 @@
                     <button type="button" class="action-local419-pos px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 bg-white/5 text-gray-300 hover:text-white hover:bg-amber-500/20 border border-white/10">
                         <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
                         <span>Punto Venta</span>
-                    </button>
-                    <button type="button" onclick="window.openPrintStickerModal()" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 bg-amber-500/20 text-amber-300 hover:text-white hover:bg-amber-500/30 border border-amber-500/30 cursor-pointer">
-                        <span>🏷️ Imprimir Pegatinas</span>
                     </button>
                     <button type="button" class="action-local419-ordenar px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 bg-white/5 text-gray-300 hover:text-white hover:bg-amber-500/20 border border-white/10">
                         <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path></svg>
@@ -2384,24 +2703,257 @@
         </main>
     </div>
 
+    <!-- Modal: Auditoría y Cuadre de Inventario (Local 419 & Inventario General) -->
+    <div id="modal-auditoria-inventario" class="fixed inset-0 z-[250] flex items-center justify-center hidden bg-dark/95 backdrop-blur-md transition-opacity duration-300 opacity-0 p-2 sm:p-4 overflow-y-auto">
+        <div class="bg-dark-100 border border-emerald-500/30 rounded-2xl w-full max-w-5xl shadow-2xl shadow-emerald-500/10 flex flex-col relative max-h-[94vh] overflow-hidden">
+            
+            <!-- Header -->
+            <div class="p-4 sm:p-5 border-b border-white/10 bg-black/40 flex justify-between items-center flex-shrink-0">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-emerald-500/20 text-emerald-400 rounded-xl flex items-center justify-center border border-emerald-500/30 font-bold">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
+                    </div>
+                    <div>
+                        <h2 class="text-base sm:text-xl font-black text-white flex items-center gap-2 tracking-tight">
+                            Auditoría y Cuadre de Inventario
+                        </h2>
+                        <p class="text-xs text-gray-400">Conteo físico rápido por código de barras y ajuste automático de existencias</p>
+                    </div>
+                </div>
+                <button type="button" onclick="window.closeAuditoriaModal()" class="text-white/50 hover:text-white transition-colors p-2 bg-white/5 rounded-full hover:bg-white/10 cursor-pointer" title="Cerrar modal">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+
+            <!-- Selector de Origen & Controles Top -->
+            <div class="p-3 sm:p-4 bg-dark-200/80 border-b border-white/5 flex flex-wrap items-center justify-between gap-3 flex-shrink-0">
+                <div class="flex items-center gap-2">
+                    <span class="text-xs text-gray-400 font-semibold">Ubicación a auditar:</span>
+                    <button type="button" id="btn-audit-target-419" onclick="window.switchAuditoriaTarget('419')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all border bg-amber-500 text-black border-amber-400 shadow-md">
+                        🏢 Local 419
+                    </button>
+                    <button type="button" id="btn-audit-target-gen" onclick="window.switchAuditoriaTarget('general')" class="px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all border bg-white/5 text-gray-300 hover:text-white border-white/10">
+                        📦 Inventario General
+                    </button>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <button type="button" onclick="window.saveAuditoriaDraft()" class="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white font-semibold text-xs border border-white/10 transition-all flex items-center gap-1.5">
+                        💾 Guardar Borrador
+                    </button>
+                    <button type="button" onclick="window.resetAuditoriaCount()" class="px-3 py-1.5 rounded-xl bg-red-500/20 hover:bg-red-500/30 text-red-300 font-semibold text-xs border border-red-500/30 transition-all">
+                        🔄 Reiniciar Conteo
+                    </button>
+                </div>
+            </div>
+
+            <!-- Contenido Principal: Buscador Escáner + Tabla de Conteo -->
+            <div class="p-4 sm:p-5 space-y-4 overflow-y-auto custom-scrollbar flex-grow">
+                
+                <!-- Escáner / Buscador enfocado -->
+                <div class="bg-dark-200/60 p-3 sm:p-4 rounded-xl border border-white/10 flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+                    <div class="relative flex-grow">
+                        <input type="text" id="audit-barcode-input" placeholder="⚡ Pistolea el código de barras o busca por nombre/equipo/talla..." class="w-full bg-black/50 border border-emerald-500/40 rounded-xl pl-9 pr-3 py-2.5 text-xs sm:text-sm focus:outline-none focus:border-emerald-400 text-white placeholder-gray-400 shadow-inner">
+                        <svg class="w-4 h-4 text-emerald-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                        </svg>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <select id="audit-filter-status" onchange="window.renderAuditoriaTable()" class="bg-black/40 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-400 cursor-pointer">
+                            <option value="todos">Todos los productos</option>
+                            <option value="diferencias">Solo Diferencias (Faltantes/Sobrantes)</option>
+                            <option value="faltantes">Solo Faltantes (🔴)</option>
+                            <option value="sobrantes">Solo Sobrantes (🟡)</option>
+                            <option value="cuadrados">Solo Cuadrados (🟢)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Resumen de Auditoría Flotante -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+                    <div class="bg-dark-200/80 border border-white/10 rounded-xl p-2.5 text-center">
+                        <span class="block text-[10px] text-gray-400 uppercase font-bold">Total Sistema</span>
+                        <span id="audit-stat-sistema" class="text-sm sm:text-base font-black text-white">0 pzs</span>
+                    </div>
+                    <div class="bg-dark-200/80 border border-emerald-500/30 rounded-xl p-2.5 text-center">
+                        <span class="block text-[10px] text-emerald-400 uppercase font-bold">Total Contado</span>
+                        <span id="audit-stat-contado" class="text-sm sm:text-base font-black text-emerald-400">0 pzs</span>
+                    </div>
+                    <div class="bg-dark-200/80 border border-red-500/30 rounded-xl p-2.5 text-center">
+                        <span class="block text-[10px] text-red-400 uppercase font-bold">Piezas Faltantes</span>
+                        <span id="audit-stat-faltantes" class="text-sm sm:text-base font-black text-red-400">0 pzs</span>
+                    </div>
+                    <div class="bg-dark-200/80 border border-amber-500/30 rounded-xl p-2.5 text-center">
+                        <span class="block text-[10px] text-amber-400 uppercase font-bold">Piezas Sobrantes</span>
+                        <span id="audit-stat-sobrantes" class="text-sm sm:text-base font-black text-amber-400">0 pzs</span>
+                    </div>
+                </div>
+
+                <!-- Tabla de Conteo Físico -->
+                <div class="border border-white/10 rounded-xl overflow-hidden bg-dark-200/40">
+                    <div class="p-3 bg-black/40 border-b border-white/10 flex justify-between items-center">
+                        <h3 class="text-xs font-bold text-gray-300 uppercase tracking-wider flex items-center gap-2">
+                            <span>📦 Detalle de Conteo Físico vs Sistema</span>
+                        </h3>
+                        <span id="audit-diferencia-monetaria" class="text-xs font-bold text-gray-400">Ajuste monetario: $0.00</span>
+                    </div>
+
+                    <div id="audit-items-container" class="divide-y divide-white/5 max-h-[340px] overflow-y-auto custom-scrollbar p-2">
+                        <div class="text-center py-10 text-gray-500 text-xs italic">
+                            Selecciona una ubicación e inicia el pistoleo o busca prendas para auditar.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Campo de Observaciones -->
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Notas u Observaciones de Auditoría</label>
+                    <input type="text" id="audit-notas-input" placeholder="Ej. Auditoría mensual de inventario Local 419 realizada por Juan..." class="w-full bg-dark-200/60 border border-white/10 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-emerald-400 text-white placeholder-gray-600">
+                </div>
+            </div>
+
+            <!-- Footer con Botón de Cuadre -->
+            <div class="p-4 sm:p-5 border-t border-white/10 bg-black/40 flex flex-col sm:flex-row justify-between items-center gap-3 flex-shrink-0">
+                <div class="text-xs text-gray-400">
+                    <span class="font-bold text-white">Importante:</span> Al presionar aplicar cuadre, el stock del sistema se sobrescribirá con el valor contado físicamente.
+                </div>
+                <div class="flex items-center gap-2 w-full sm:w-auto">
+                    <button type="button" onclick="window.closeAuditoriaModal()" class="flex-1 sm:flex-none px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 font-bold text-xs transition-all">
+                        Cancelar
+                    </button>
+                    <button type="button" id="btn-submit-auditoria" onclick="window.submitAuditoriaCuadre()" class="flex-1 sm:flex-none px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-all shadow-lg shadow-emerald-500/20 active:scale-95 flex items-center justify-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                        <span>⚡ Aplicar Cuadre de Inventario</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Traspaso de Inventario (Local 419 -> Inventario General) -->
+    <div id="modal-traspaso-419-general" class="fixed inset-0 z-[250] flex items-center justify-center hidden bg-dark/95 backdrop-blur-md transition-opacity duration-300 opacity-0 p-2 sm:p-4 overflow-y-auto">
+        <div class="bg-dark-100 border border-blue-500/30 rounded-2xl w-full max-w-4xl shadow-2xl shadow-blue-500/10 flex flex-col relative max-h-[92vh] overflow-hidden">
+            <!-- Header -->
+            <div class="p-4 sm:p-5 border-b border-white/10 bg-black/40 flex justify-between items-center flex-shrink-0">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-blue-500/20 text-blue-400 rounded-xl flex items-center justify-center border border-blue-500/30 font-bold">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
+                    </div>
+                    <div>
+                        <h2 class="text-base sm:text-xl font-black text-white flex items-center gap-2 tracking-tight">
+                            Traspaso a Inventario General
+                        </h2>
+                        <p class="text-xs text-gray-400">Reubicar existencias desde Local 419 hacia el Almacén General</p>
+                    </div>
+                </div>
+                <button type="button" onclick="window.closeTraspaso419Modal()" class="text-white/50 hover:text-white transition-colors p-2 bg-white/5 rounded-full hover:bg-white/10 cursor-pointer" title="Cerrar modal">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+
+            <!-- Contenido Principal: Buscador + Lista de Artículos -->
+            <div class="p-4 sm:p-6 space-y-4 overflow-y-auto custom-scrollbar flex-grow">
+                <!-- Buscador de prendas del Local 419 -->
+                <div class="bg-dark-200/60 p-3 sm:p-4 rounded-xl border border-white/10 flex flex-col relative">
+                    <div class="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+                        <div class="relative flex-grow">
+                            <input type="text" id="traspaso-search-input" placeholder="Buscar por nombre, equipo, talla o escanea código de barras..." class="w-full bg-black/40 border border-white/10 rounded-xl pl-9 pr-3 py-2.5 text-xs sm:text-sm focus:outline-none focus:border-blue-400 text-white placeholder-gray-500">
+                            <svg class="w-4 h-4 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                            </svg>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <select id="traspaso-filter-tipo" class="bg-black/40 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-blue-400 cursor-pointer">
+                                <option value="todos">Todos los productos (419)</option>
+                                <option value="jerseys">Jerseys / Playeras</option>
+                                <option value="articulos">Artículos Deportivos</option>
+                            </select>
+                        </div>
+                    </div>
+                    <!-- Result Dropdown -->
+                    <div id="traspaso-search-results" class="hidden mt-2 bg-dark-100 border border-navy-500/40 rounded-xl overflow-hidden shadow-2xl max-h-64 overflow-y-auto custom-scrollbar z-30"></div>
+                </div>
+
+                <!-- Lista / Tabla de prendas seleccionadas para traspaso -->
+                <div class="border border-white/10 rounded-xl overflow-hidden bg-dark-200/40">
+                    <div class="p-3 bg-black/40 border-b border-white/10 flex justify-between items-center">
+                        <h3 class="text-xs font-bold text-gray-300 uppercase tracking-wider flex items-center gap-2">
+                            <span>📦 Artículos Seleccionados para Traspasar</span>
+                            <span id="traspaso-items-badge" class="bg-blue-500/20 text-blue-300 text-[10px] px-2 py-0.5 rounded-full font-bold border border-blue-500/30">0 piezas</span>
+                        </h3>
+                        <button type="button" onclick="window.clearTraspasoList()" class="text-xs text-red-400 hover:text-red-300 font-semibold transition-colors">
+                            Vaciar Lista
+                        </button>
+                    </div>
+
+                    <div id="traspaso-items-container" class="divide-y divide-white/5 max-h-[320px] overflow-y-auto custom-scrollbar p-2">
+                        <div class="text-center py-8 text-gray-500 text-xs italic">
+                            Usa el buscador arriba o escanea prendas del Local 419 para agregarlas al lote de traspaso.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Campo para Notas / Motivo -->
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Notas / Motivo del Traspaso (Opcional)</label>
+                    <input type="text" id="traspaso-notas-input" placeholder="Ej. Reubicación a almacén principal por sobrestock..." class="w-full bg-dark-200/60 border border-white/10 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-400 text-white placeholder-gray-600">
+                </div>
+            </div>
+
+            <!-- Footer con totales y confirmación -->
+            <div class="p-4 sm:p-5 border-t border-white/10 bg-black/40 flex flex-col sm:flex-row justify-between items-center gap-3 flex-shrink-0">
+                <div class="flex items-center gap-4 text-xs">
+                    <div>
+                        <span class="text-gray-400">Total Modelos:</span>
+                        <span id="traspaso-total-modelos" class="font-bold text-white ml-1">0</span>
+                    </div>
+                    <div>
+                        <span class="text-gray-400">Total Piezas:</span>
+                        <span id="traspaso-total-piezas" class="font-bold text-blue-400 text-sm ml-1">0 PZS</span>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2 w-full sm:w-auto">
+                    <button type="button" onclick="window.closeTraspaso419Modal()" class="flex-1 sm:flex-none px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 font-bold text-xs transition-all">
+                        Cancelar
+                    </button>
+                    <button type="button" id="btn-submit-traspaso-419" onclick="window.submitTraspaso419AGeneral()" class="flex-1 sm:flex-none px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs transition-all shadow-lg shadow-blue-500/20 active:scale-95 flex items-center justify-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
+                        <span>🚀 Confirmar Traspaso a General</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal: Punto de Venta / Venta Exprés Local 419 -->
-    <div id="modal-pos-local419" class="fixed inset-0 z-[80] flex items-center justify-center hidden bg-dark/95 backdrop-blur-md transition-opacity duration-300 opacity-0 p-1.5 sm:p-4 overflow-y-auto">
+    <div id="modal-pos-local419" class="fixed inset-0 z-[230] flex items-center justify-center hidden bg-dark/95 backdrop-blur-md transition-opacity duration-300 opacity-0 p-1.5 sm:p-4 overflow-y-auto">
         <div class="bg-dark-100 border border-amber-500/30 rounded-2xl w-full max-w-[98vw] xl:max-w-[1680px] h-[96vh] max-h-[96vh] flex flex-col shadow-2xl shadow-amber-500/10 overflow-hidden relative">
             
             <!-- Encabezado del Modal -->
             <div class="p-3.5 sm:p-5 border-b border-white/10 bg-black/40 flex justify-between items-center flex-shrink-0">
-                <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 bg-amber-500/20 text-amber-400 rounded-xl flex items-center justify-center border border-amber-500/30 font-bold">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2z"></path></svg>
-                    </div>
-                    <div>
-                        <h2 class="text-base sm:text-xl font-black text-white flex items-center gap-2 tracking-tight">
-                            Punto Venta Exprés Local 419
-                        </h2>
-                        <p class="text-xs text-gray-400">Captura rápida presencial con existencias del Local 419</p>
+                <div class="flex items-center gap-2.5 sm:gap-4">
+                    <button type="button" onclick="window.closePos419Modal()" class="px-3 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 hover:text-amber-200 font-bold text-xs sm:text-sm border border-amber-500/40 transition-all flex items-center gap-1.5 shadow-md active:scale-95 cursor-pointer" title="Regresar a la vista principal de Local 419">
+                        <svg class="w-4 h-4 sm:w-5 sm:h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                        <span>Regresar a Local 419</span>
+                    </button>
+                    <div class="h-8 w-px bg-white/10 hidden sm:block"></div>
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-9 h-9 sm:w-10 sm:h-10 bg-amber-500/20 text-amber-400 rounded-xl flex items-center justify-center border border-amber-500/30 font-bold flex-shrink-0">
+                            <svg class="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2z"></path></svg>
+                        </div>
+                        <div class="min-w-0">
+                            <h2 class="text-sm sm:text-lg lg:text-xl font-black text-white flex items-center gap-2 tracking-tight truncate">
+                                Punto Venta Exprés Local 419
+                                <div id="pos419-sync-status-badge" class="px-2.5 py-1 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-extrabold flex items-center gap-1.5 shadow-sm" title="Estatus de conexión y sincronización en segundo plano">
+                                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                                    <span>🟢 Sincronizado</span>
+                                </div>
+                            </h2>
+                            <p class="text-[10px] sm:text-xs text-gray-400 truncate">Captura rápida presencial con existencias del Local 419</p>
+                        </div>
                     </div>
                 </div>
-                <button type="button" id="close-pos-local419-modal" class="text-white/50 hover:text-white transition-colors p-2 bg-white/5 rounded-full hover:bg-white/10">
+                <button type="button" id="close-pos-local419-modal" onclick="window.closePos419Modal()" class="text-white/50 hover:text-white transition-colors p-2 bg-white/5 rounded-full hover:bg-white/10 cursor-pointer" title="Cerrar y volver a Local 419">
                     <svg class="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                 </button>
             </div>
@@ -2459,10 +3011,15 @@
                 
                 <!-- Columna Izquierda: Catálogo de Tallas de Local 419 -->
                 <div id="pos419-col-catalog" class="w-full flex-grow flex flex-col overflow-hidden min-h-0 p-3 sm:p-5 border-b md:border-b-0 md:border-r border-white/5">
-                    <!-- Buscador de Jerseys en POS -->
-                    <div class="mb-3 relative flex-shrink-0">
-                        <svg class="w-4 h-4 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                        <input type="text" id="pos419-catalog-search-input" placeholder="🔍 Buscar por equipo, versión o género en Local 419..." class="w-full bg-dark-200 border border-white/10 rounded-xl pl-9 pr-4 py-2 text-xs focus:outline-none focus:border-amber-400 text-white placeholder-gray-500 transition-colors">
+                    <!-- Buscador de Jerseys en POS & Botón Venta Rápida -->
+                    <div class="mb-3 flex flex-col sm:flex-row gap-2 flex-shrink-0">
+                        <div class="relative flex-grow">
+                            <svg class="w-4 h-4 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                            <input type="text" id="pos419-catalog-search-input" placeholder="🔍 Buscar por equipo, versión o género en Local 419..." class="w-full bg-dark-200 border border-white/10 rounded-xl pl-9 pr-4 py-2 text-xs focus:outline-none focus:border-amber-400 text-white placeholder-gray-500 transition-colors">
+                        </div>
+                        <button type="button" onclick="if(window.openPos419UnidentifiedItemModal) window.openPos419UnidentifiedItemModal();" class="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-extrabold text-xs shadow-md transition-all flex items-center justify-center gap-1.5 shrink-0 cursor-pointer" title="Vender artículo sin dar de alta en el sistema">
+                            <span>⚡ + Producto Sin Identificar</span>
+                        </button>
                     </div>
 
                     <!-- Grid de Selección Rápida por Talla -->
@@ -2568,8 +3125,86 @@
         </div>
     </div>
 
+    <!-- Modal: Venta Rápida de Producto Sin Identificar / Varios en POS 419 -->
+    <div id="modal-pos419-unidentified-item" class="fixed inset-0 z-[320] flex items-center justify-center hidden bg-black/80 backdrop-blur-sm transition-opacity duration-300 opacity-0 p-3 sm:p-4 overflow-y-auto">
+        <div class="bg-dark-100 border border-amber-500/40 rounded-2xl w-full max-w-md shadow-2xl shadow-amber-500/10 overflow-hidden relative transform scale-95 transition-transform duration-300">
+            <!-- Header -->
+            <div class="p-4 border-b border-white/10 bg-black/40 flex justify-between items-center">
+                <div class="flex items-center gap-3">
+                    <div class="p-2 bg-amber-500/20 text-amber-400 rounded-xl text-lg font-bold">📦</div>
+                    <div>
+                        <h3 class="text-sm font-extrabold text-white">Venta de Producto Sin Identificar</h3>
+                        <p class="text-[10px] text-gray-400">Captura un artículo genérico o no catalogado en Local 419</p>
+                    </div>
+                </div>
+                <button type="button" onclick="if(window.closePos419UnidentifiedItemModal) window.closePos419UnidentifiedItemModal();" class="text-white/50 hover:text-white transition-colors p-1.5 bg-white/5 rounded-full hover:bg-white/10 cursor-pointer">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+
+            <!-- Form Body -->
+            <form id="form-pos419-unidentified-item" onsubmit="if(window.submitPos419UnidentifiedItem) window.submitPos419UnidentifiedItem(event);" class="p-4 space-y-4 text-xs">
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Nombre / Concepto del Producto:</label>
+                    <input type="text" id="pos419-unidentified-nombre" required value="Producto Sin Identificar" placeholder="Ej. Producto Sin Identificar, Gorra, Estampado..." class="w-full bg-dark-200 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-amber-400 font-semibold">
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[10px] font-bold text-amber-400 uppercase tracking-wider mb-1">Precio Unitario ($):</label>
+                        <input type="number" step="0.01" min="1" id="pos419-unidentified-precio" required placeholder="0.00" class="w-full bg-dark-200 border border-amber-500/40 rounded-xl px-3.5 py-2.5 text-sm font-black text-amber-300 font-mono focus:outline-none focus:border-amber-400">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Talla / Medida:</label>
+                        <select id="pos419-unidentified-talla" class="w-full bg-dark-200 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-amber-400 cursor-pointer">
+                            <option value="Única" selected>Única / N/A</option>
+                            <option value="S">S</option>
+                            <option value="M">M</option>
+                            <option value="L">L</option>
+                            <option value="XL">XL</option>
+                            <option value="2XL">2XL</option>
+                            <option value="3XL">3XL</option>
+                            <option value="Niño">Niño</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Cantidad (Piezas):</label>
+                        <div class="flex items-center bg-black/60 border border-white/10 rounded-xl overflow-hidden h-[38px]">
+                            <button type="button" onclick="const input = document.getElementById('pos419-unidentified-qty'); if(input) input.value = Math.max(1, (parseInt(input.value)||1)-1);" class="w-9 h-full flex items-center justify-center text-gray-300 hover:text-white hover:bg-white/10 font-black cursor-pointer text-sm">-</button>
+                            <input type="number" id="pos419-unidentified-qty" value="1" min="1" class="w-full text-center font-extrabold text-xs text-white bg-transparent focus:outline-none">
+                            <button type="button" onclick="const input = document.getElementById('pos419-unidentified-qty'); if(input) input.value = (parseInt(input.value)||1)+1;" class="w-9 h-full flex items-center justify-center text-gray-300 hover:text-white hover:bg-white/10 font-black cursor-pointer text-sm">+</button>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Género / Categoría:</label>
+                        <select id="pos419-unidentified-genero" class="w-full bg-dark-200 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-amber-400 cursor-pointer">
+                            <option value="Unisex" selected>Unisex / General</option>
+                            <option value="Hombre">Hombre</option>
+                            <option value="Dama">Dama</option>
+                            <option value="Niño">Niño</option>
+                            <option value="Accesorio">Accesorio</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="pt-3 border-t border-white/10 flex gap-2">
+                    <button type="button" onclick="if(window.closePos419UnidentifiedItemModal) window.closePos419UnidentifiedItemModal();" class="w-1/3 py-2.5 bg-white/5 hover:bg-white/10 text-gray-300 font-bold rounded-xl transition-all">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="w-2/3 py-2.5 bg-amber-500 hover:bg-amber-400 text-black font-extrabold rounded-xl transition-all shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 cursor-pointer">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                        <span>Agregar al Carrito</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- MODAL DE ADMINISTRACIÓN DE ARTÍCULOS DEPORTIVOS GENERALES -->
-    <div id="modal-admin-articulos" class="fixed inset-0 z-[85] flex items-center justify-center hidden bg-dark/95 backdrop-blur-md transition-opacity duration-300 opacity-0 p-3 sm:p-6 overflow-hidden">
+    <div id="modal-admin-articulos" class="fixed inset-0 z-[250] flex items-center justify-center hidden bg-dark/95 backdrop-blur-md transition-opacity duration-300 opacity-0 p-3 sm:p-6 overflow-hidden">
         <div class="bg-dark-100 border border-amber-500/30 rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden relative">
             <div class="p-4 sm:p-5 border-b border-white/10 bg-black/40 flex justify-between items-center flex-shrink-0">
                 <div class="flex items-center gap-3">
@@ -2767,7 +3402,7 @@
     </div>
 
     <!-- MODAL: Configuración del Ticket de Venta (80mm) con Vista Previa en Vivo -->
-    <div id="admin-ticket-config-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm hidden">
+    <div id="admin-ticket-config-modal" class="fixed inset-0 z-[250] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm transition-opacity duration-300 opacity-0 hidden">
         <div class="bg-dark-100 border border-white/10 rounded-2xl max-w-4xl w-full max-h-[92vh] overflow-hidden shadow-2xl flex flex-col">
             <!-- Header -->
             <div class="flex items-center justify-between p-4 sm:p-5 border-b border-white/10 bg-dark-200/50 shrink-0 backdrop-blur-md">
@@ -2865,7 +3500,7 @@
     </button>
 
     <!-- Modal Impresión de Pegatinas/Etiquetas (51x25mm / Xprinter 365B) -->
-    <div id="modal-print-barcode-labels" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] hidden flex items-center justify-center p-3 sm:p-4">
+    <div id="modal-print-barcode-labels" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-[250] hidden flex items-center justify-center p-3 sm:p-4 opacity-0 transition-opacity duration-300">
         <div class="bg-dark-100 border border-white/10 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl animate-fade-in max-h-[92vh] flex flex-col">
             <div class="p-3.5 sm:p-4 border-b border-white/10 flex items-center justify-between bg-dark-200 shrink-0">
                 <div id="sticker-item-info" class="flex-grow min-w-0 pr-2">
@@ -2883,6 +3518,21 @@
             </div>
             
             <div class="p-4 overflow-y-auto custom-scrollbar space-y-4 text-xs flex-grow">
+                <!-- Selector de Origen de Inventario (General vs Local 419) -->
+                <div class="space-y-1">
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider">Seleccionar Origen del Inventario:</label>
+                    <div class="bg-black/50 p-1.5 rounded-xl border border-white/10 flex items-center gap-1.5">
+                        <button type="button" id="btn-sticker-mode-gen" onclick="window.switchStickerInventoryMode('general')" class="flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 bg-amber-500 text-black shadow-md cursor-pointer">
+                            <span>📦</span>
+                            <span>Inventario General</span>
+                        </button>
+                        <button type="button" id="btn-sticker-mode-419" onclick="window.switchStickerInventoryMode('419')" class="flex-1 py-2 px-3 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 bg-white/5 text-gray-300 hover:text-white hover:bg-white/10 border border-white/10 cursor-pointer">
+                            <span>🏪</span>
+                            <span>Inventario Local 419</span>
+                        </button>
+                    </div>
+                </div>
+
                 <!-- Buscador de Producto / Escáner -->
                 <div class="relative space-y-1">
                     <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider">Buscar Otra Playera o Escanear Código:</label>
@@ -2897,14 +3547,6 @@
                     <div id="sticker-product-search-results" class="absolute left-0 right-0 top-full mt-1 bg-dark-100 border border-white/10 rounded-xl shadow-2xl z-50 max-h-48 overflow-y-auto hidden"></div>
                 </div>
 
-                <!-- Opciones de Formato (Precio) -->
-                <div id="sticker-price-toggle-row" class="hidden bg-dark-200/50 p-3 rounded-xl border border-white/5 flex items-center justify-between">
-                    <label for="sticker-show-price-check" class="flex items-center gap-2 cursor-pointer select-none">
-                        <input type="checkbox" id="sticker-show-price-check" onchange="window.updateStickerPreviewFromUI()" class="w-4 h-4 rounded bg-dark-200 border-white/20 text-amber-500 focus:ring-amber-400">
-                        <span class="text-xs font-bold text-white">Mostrar Precio ($) en la pegatina</span>
-                    </label>
-                    <span id="sticker-price-badge-val" class="text-xs font-mono font-bold text-amber-400">$550.00</span>
-                </div>
 
                 <!-- Configuración de Tallas y Cantidades (Lote Multi-Talla) -->
                 <div class="space-y-2">
@@ -2971,15 +3613,389 @@
         </div>
     </div>
 
+    <!-- MODAL ESTADÍSTICAS E INDICADORES DE VENTAS -->
+    <div id="admin-estadisticas-modal" class="fixed inset-0 bg-black/80 backdrop-blur-md hidden items-center justify-center z-50 p-2 sm:p-4 overflow-y-auto">
+        <div class="bg-dark-100 border border-white/10 rounded-2xl w-full max-w-5xl overflow-hidden shadow-2xl my-auto flex flex-col max-h-[92vh]">
+            <!-- Encabezado Modal -->
+            <div class="px-5 py-4 border-b border-white/10 bg-dark-200 flex items-center justify-between shrink-0">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-purple-400">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                    </div>
+                    <div>
+                        <h3 class="text-base font-bold text-white flex items-center gap-2">
+                            Estadísticas & Indicadores de Ventas
+                        </h3>
+                        <p class="text-xs text-gray-400">Control de Metas Semanales (Lun-Dom), Mensuales y Ritmo de Venta</p>
+                    </div>
+                </div>
+                <button type="button" onclick="window.closeEstadisticasModal()" class="text-gray-400 hover:text-white p-2 rounded-lg hover:bg-white/5 transition-colors">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+
+            <!-- Cuerpo Modal -->
+            <div class="p-4 sm:p-6 overflow-y-auto space-y-6 flex-1 text-xs">
+                
+                <!-- Barra de Filtro & Configuración de Metas -->
+                <div class="bg-dark-200 border border-white/10 rounded-xl p-4 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+                    <div class="flex items-center gap-3">
+                        <label class="text-gray-300 font-semibold flex items-center gap-1.5 whitespace-nowrap">
+                            <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path></svg>
+                            Sucursal / Origen:
+                        </label>
+                        <select id="stat-origen-filter" class="bg-dark-300 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-purple-500">
+                            <option value="all">Todas las Ventas</option>
+                            <option value="general">Tienda Principal / General</option>
+                            <option value="419">Local 419</option>
+                        </select>
+                    </div>
+
+                    <div id="stat-meta-inputs-container" class="flex items-center gap-3 flex-wrap">
+                        <div class="flex items-center gap-2">
+                            <span class="text-gray-400">Meta Semanal:</span>
+                            <input type="number" id="stat-input-meta-semana" value="100" min="1" class="w-16 bg-dark-300 border border-white/10 rounded-lg px-2 py-1 text-center font-bold text-purple-300 focus:outline-none focus:border-purple-500" />
+                            <span class="text-gray-500">pzs</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-gray-400">Meta Mensual:</span>
+                            <input type="number" id="stat-input-meta-mes" value="400" min="1" class="w-16 bg-dark-300 border border-white/10 rounded-lg px-2 py-1 text-center font-bold text-purple-300 focus:outline-none focus:border-purple-500" />
+                            <span class="text-gray-500">pzs</span>
+                        </div>
+                        <button type="button" id="btn-save-stat-targets" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white font-semibold rounded-lg transition-colors shadow-lg shadow-purple-600/20">
+                            Guardar Metas
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Grilla de Tarjetas KPI -->
+                <div id="stat-general-kpi-grid" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    
+                    <!-- KPI 1: Ventas Semanales (Piezas) -->
+                    <div id="stat-card-semana-piezas" class="bg-dark-200 border border-white/10 rounded-xl p-4 flex flex-col justify-between transition-all">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-gray-400 font-semibold flex items-center gap-1.5">
+                                📅 Ventas Semana (Pzs)
+                            </span>
+                            <span id="stat-badge-semana-range" class="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-gray-300 font-mono">
+                                Lunes - Domingo
+                            </span>
+                        </div>
+                        <div class="flex items-baseline justify-between mt-2">
+                            <div>
+                                <span id="stat-val-semana-piezas" class="text-3xl font-black text-white">0</span>
+                                <span class="text-gray-400 text-xs ml-1">/ <span id="stat-val-semana-meta-target">100</span> pzs</span>
+                            </div>
+                            <div class="text-right">
+                                <div id="stat-val-semana-esperado" class="text-xs font-semibold text-gray-400">Meta hoy: 0 pzs</div>
+                                <div id="stat-val-semana-dia-nombre" class="text-[10px] text-gray-500">Día 1 de 7</div>
+                            </div>
+                        </div>
+                        <div class="w-full bg-dark-300 h-2 rounded-full mt-3 overflow-hidden">
+                            <div id="stat-bar-semana-progress" class="h-full bg-purple-500 transition-all duration-500" style="width: 0%"></div>
+                        </div>
+                    </div>
+
+                    <!-- KPI 2: Total Vendido en Dinero (Semana) -->
+                    <div id="stat-card-semana-dinero" class="bg-dark-200 border border-white/10 rounded-xl p-4 flex flex-col justify-between transition-all">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-gray-400 font-semibold flex items-center gap-1.5">
+                                💵 Venta Dinero (Semana)
+                            </span>
+                            <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold">
+                                MXN
+                            </span>
+                        </div>
+                        <div class="mt-2">
+                            <div id="stat-val-semana-dinero" class="text-3xl font-black text-emerald-400">$0.00</div>
+                            <p class="text-[10px] text-gray-400 mt-1">Total vendido acumulado esta semana</p>
+                        </div>
+                        <div class="mt-3 text-[11px] text-gray-400 border-t border-white/5 pt-2 flex justify-between">
+                            <span>Promedio/Día:</span>
+                            <span id="stat-val-semana-dinero-prom" class="font-bold text-gray-200">$0.00</span>
+                        </div>
+                    </div>
+
+                    <!-- KPI 3: Ritmo Semanal (%) -->
+                    <div id="stat-card-semana-ritmo" class="bg-dark-200 border border-white/10 rounded-xl p-4 flex flex-col justify-between transition-all">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-gray-400 font-semibold flex items-center gap-1.5">
+                                🎯 Efectividad Semanal
+                            </span>
+                            <span id="stat-badge-semana-ritmo" class="text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider bg-gray-500/20 text-gray-300">
+                                Calculando...
+                            </span>
+                        </div>
+                        <div class="mt-2 flex items-baseline gap-2">
+                            <span id="stat-val-semana-ritmo-pct" class="text-3xl font-black text-white">0%</span>
+                            <span class="text-gray-400 text-xs">del ritmo al día de hoy</span>
+                        </div>
+                        <p id="stat-desc-semana-ritmo" class="text-[11px] text-gray-400 mt-3 border-t border-white/5 pt-2">
+                            Evaluando ritmo diario...
+                        </p>
+                    </div>
+
+                    <!-- KPI 4: Ventas Mensuales (Piezas) -->
+                    <div id="stat-card-mes-piezas" class="bg-dark-200 border border-white/10 rounded-xl p-4 flex flex-col justify-between transition-all">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-gray-400 font-semibold flex items-center gap-1.5">
+                                📆 Ventas Mes (Pzs)
+                            </span>
+                            <span id="stat-badge-mes-range" class="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-gray-300 font-mono">
+                                Mes Actual
+                            </span>
+                        </div>
+                        <div class="flex items-baseline justify-between mt-2">
+                            <div>
+                                <span id="stat-val-mes-piezas" class="text-3xl font-black text-white">0</span>
+                                <span class="text-gray-400 text-xs ml-1">/ <span id="stat-val-mes-meta-target">400</span> pzs</span>
+                            </div>
+                            <div class="text-right">
+                                <div id="stat-val-mes-esperado" class="text-xs font-semibold text-gray-400">Meta hoy: 0 pzs</div>
+                                <div id="stat-val-mes-dia-nombre" class="text-[10px] text-gray-500">Día 1 de 30</div>
+                            </div>
+                        </div>
+                        <div class="w-full bg-dark-300 h-2 rounded-full mt-3 overflow-hidden">
+                            <div id="stat-bar-mes-progress" class="h-full bg-blue-500 transition-all duration-500" style="width: 0%"></div>
+                        </div>
+                    </div>
+
+                    <!-- KPI 5: Total Vendido en Dinero (Mes) -->
+                    <div id="stat-card-mes-dinero" class="bg-dark-200 border border-white/10 rounded-xl p-4 flex flex-col justify-between transition-all">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-gray-400 font-semibold flex items-center gap-1.5">
+                                💰 Venta Dinero (Mes)
+                            </span>
+                            <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold">
+                                MXN
+                            </span>
+                        </div>
+                        <div class="mt-2">
+                            <div id="stat-val-mes-dinero" class="text-3xl font-black text-emerald-400">$0.00</div>
+                            <p class="text-[10px] text-gray-400 mt-1">Total vendido acumulado en el mes</p>
+                        </div>
+                        <div class="mt-3 text-[11px] text-gray-400 border-t border-white/5 pt-2 flex justify-between">
+                            <span>Promedio/Día:</span>
+                            <span id="stat-val-mes-dinero-prom" class="font-bold text-gray-200">$0.00</span>
+                        </div>
+                    </div>
+
+                    <!-- KPI 6: Ritmo Mensual (%) -->
+                    <div id="stat-card-mes-ritmo" class="bg-dark-200 border border-white/10 rounded-xl p-4 flex flex-col justify-between transition-all">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-gray-400 font-semibold flex items-center gap-1.5">
+                                📈 Efectividad Mensual
+                            </span>
+                            <span id="stat-badge-mes-ritmo" class="text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider bg-gray-500/20 text-gray-300">
+                                Calculando...
+                            </span>
+                        </div>
+                        <div class="mt-2 flex items-baseline gap-2">
+                            <span id="stat-val-mes-ritmo-pct" class="text-3xl font-black text-white">0%</span>
+                            <span class="text-gray-400 text-xs">del ritmo al día de hoy</span>
+                        </div>
+                        <p id="stat-desc-mes-ritmo" class="text-[11px] text-gray-400 mt-3 border-t border-white/5 pt-2">
+                            Evaluando ritmo diario...
+                        </p>
+                    </div>
+
+                </div>
+
+                <!-- MÓDULO ANÁLISIS DE RENTABILIDAD & PUNTO DE EQUILIBRIO (LOCAL 419) -->
+                <div id="stat-419-rentabilidad-container" class="bg-dark-200 border border-emerald-500/30 rounded-xl p-4 sm:p-5 space-y-4">
+                    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-white/10 pb-3">
+                        <div class="flex items-center gap-2.5">
+                            <div class="w-8 h-8 rounded-lg bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 font-bold">
+                                🏪
+                            </div>
+                            <div>
+                                <h4 class="text-sm font-bold text-white flex items-center gap-2">
+                                    Rentabilidad & Punto de Equilibrio (Local 419)
+                                </h4>
+                                <p class="text-[11px] text-gray-400">Cálculo de Viabilidad Financiera (Ganancia Súper Mayoreo vs Menudeo vs Gastos Fijos)</p>
+                            </div>
+                        </div>
+                        <span id="stat-419-badge-rentabilidad" class="px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                            Calculando Rentabilidad...
+                        </span>
+                    </div>
+
+                    <!-- Panel de Entrada de Gastos Fijos (Valores Editables) -->
+                    <div class="bg-dark-300/60 border border-white/5 rounded-xl p-3.5 space-y-3">
+                        <div class="flex items-center justify-between flex-wrap gap-2">
+                            <span class="text-xs font-bold text-gray-200 flex items-center gap-1.5">
+                                ⚙️ Gastos Fijos Mensuales (Editables)
+                            </span>
+                            <span class="text-[11px] text-emerald-400 font-semibold">
+                                Total Gastos Fijos: <strong id="stat-419-val-gastos-total" class="text-base text-emerald-300 font-black ml-1">$13,350.00</strong>/mes
+                            </span>
+                        </div>
+
+                        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2.5">
+                            <div>
+                                <label class="text-[10px] text-gray-400 font-medium block mb-1">🏠 Renta Local ($)</label>
+                                <input type="number" id="stat-419-input-renta" value="5000" min="0" class="w-full bg-dark-200 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white font-bold focus:border-emerald-500 focus:outline-none" />
+                            </div>
+                            <div>
+                                <label class="text-[10px] text-gray-400 font-medium block mb-1">💡 Luz ($)</label>
+                                <input type="number" id="stat-419-input-luz" value="1500" min="0" class="w-full bg-dark-200 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white font-bold focus:border-emerald-500 focus:outline-none" />
+                            </div>
+                            <div>
+                                <label class="text-[10px] text-gray-400 font-medium block mb-1">🧑‍💼 Pago Ayudante ($)</label>
+                                <input type="number" id="stat-419-input-ayudante" value="6000" min="0" class="w-full bg-dark-200 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white font-bold focus:border-emerald-500 focus:outline-none" />
+                            </div>
+                            <div>
+                                <label class="text-[10px] text-gray-400 font-medium block mb-1">💧 Agua ($)</label>
+                                <input type="number" id="stat-419-input-agua" value="150" min="0" class="w-full bg-dark-200 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white font-bold focus:border-emerald-500 focus:outline-none" />
+                            </div>
+                            <div>
+                                <label class="text-[10px] text-gray-400 font-medium block mb-1">🌐 Internet ($)</label>
+                                <input type="number" id="stat-419-input-internet" value="700" min="0" class="w-full bg-dark-200 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white font-bold focus:border-emerald-500 focus:outline-none" />
+                            </div>
+                            <div>
+                                <label class="text-[10px] text-gray-400 font-medium block mb-1">➕ Otros Gastos ($)</label>
+                                <input type="number" id="stat-419-input-otros" value="0" min="0" class="w-full bg-dark-200 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white font-bold focus:border-emerald-500 focus:outline-none" />
+                            </div>
+                        </div>
+
+                        <div class="flex items-center justify-between text-[11px] text-gray-400 border-t border-white/5 pt-2 flex-wrap gap-2">
+                            <span>💡 <em>Ganancia por playera = Precio Menudeo - Precio Súper Mayoreo (registrado en cada prenda vendida).</em></span>
+                            <button type="button" id="btn-save-gastos-419" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-lg transition-colors text-xs shadow-md">
+                                Guardar Gastos
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Cuadrícula de Indicadores de Rentabilidad del Local 419 -->
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+                        
+                        <!-- Tarjeta 1: Punto de Equilibrio Mensual -->
+                        <div class="bg-dark-300/80 border border-white/10 rounded-xl p-3.5 flex flex-col justify-between">
+                            <span class="text-gray-400 font-semibold text-[11px]">🎯 Punto Equilibrio (Mes)</span>
+                            <div class="mt-2">
+                                <div class="text-2xl font-black text-amber-300" id="stat-419-val-pzs-mes-target">54 pzs</div>
+                                <div class="text-[10px] text-gray-400 mt-0.5" id="stat-419-val-monto-mes-target">Venta meta: $29,700.00/mes</div>
+                            </div>
+                            <div class="mt-2 text-[10px] text-amber-400/80 border-t border-white/5 pt-1.5">
+                                Playeras necesarias al mes para pagar gastos fijos
+                            </div>
+                        </div>
+
+                        <!-- Tarjeta 2: Punto de Equilibrio Semanal & Diario -->
+                        <div class="bg-dark-300/80 border border-white/10 rounded-xl p-3.5 flex flex-col justify-between">
+                            <span class="text-gray-400 font-semibold text-[11px]">📅 Meta Semanal & Diaria</span>
+                            <div class="mt-2 flex justify-between items-baseline">
+                                <div>
+                                    <span class="text-2xl font-black text-white" id="stat-419-val-pzs-semana-target">13 pzs</span>
+                                    <span class="text-[10px] text-gray-400 block">/semana</span>
+                                </div>
+                                <div class="text-right">
+                                    <span class="text-lg font-bold text-emerald-400" id="stat-419-val-pzs-dia-target">1.8 pzs</span>
+                                    <span class="text-[10px] text-gray-400 block">/día</span>
+                                </div>
+                            </div>
+                            <div class="mt-2 text-[10px] text-gray-400 border-t border-white/5 pt-1.5">
+                                Ritmo necesario para estar en punto de equilibrio
+                            </div>
+                        </div>
+
+                        <!-- Tarjeta 3: Ganancia Bruta Real del Mes -->
+                        <div class="bg-dark-300/80 border border-white/10 rounded-xl p-3.5 flex flex-col justify-between">
+                            <span class="text-gray-400 font-semibold text-[11px]">💰 Ganancia Bruta Real (419)</span>
+                            <div class="mt-2">
+                                <div class="text-2xl font-black text-emerald-400" id="stat-419-val-ganancia-bruta">$0.00</div>
+                                <div class="text-[10px] text-gray-400 mt-0.5">
+                                    <span id="stat-419-val-pzs-vendidas">0</span> pzs vendidas este mes
+                                </div>
+                            </div>
+                            <div class="mt-2 text-[10px] text-gray-400 border-t border-white/5 pt-1.5 flex justify-between">
+                                <span>Margen prom/pz:</span>
+                                <strong id="stat-419-val-margen-prom" class="text-emerald-300 font-bold">$250.00</strong>
+                            </div>
+                        </div>
+
+                        <!-- Tarjeta 4: Utilidad Neta Real (Local 419) -->
+                        <div id="stat-419-card-utilidad-neta" class="bg-dark-300/80 border border-white/10 rounded-xl p-3.5 flex flex-col justify-between transition-all">
+                            <span class="text-gray-400 font-semibold text-[11px]">📈 Utilidad Neta Real (Mes)</span>
+                            <div class="mt-2">
+                                <div class="text-2xl font-black text-white" id="stat-419-val-utilidad-neta">-$13,350.00</div>
+                                <div class="text-[10px] text-gray-400 mt-0.5" id="stat-419-val-utilidad-desc">Ganancia limpia tras pagar gastos fijos</div>
+                            </div>
+                            <div class="mt-2 text-[10px] font-semibold border-t border-white/5 pt-1.5" id="stat-419-val-utilidad-status">
+                                Faltan 54 pzs para cubrir gastos fijos
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <!-- Barra Gráfica de Progreso de Rentabilidad 419 -->
+                    <div class="bg-dark-300/50 border border-white/5 rounded-xl p-3 space-y-2">
+                        <div class="flex items-center justify-between text-xs">
+                            <span class="text-gray-300 font-semibold">Comparativa Ganancia Real vs Gastos Fijos:</span>
+                            <span id="stat-419-val-pct-cobertura" class="font-bold text-amber-400">0% de gastos cubiertos</span>
+                        </div>
+                        <div class="w-full bg-dark-200 h-3 rounded-full overflow-hidden flex relative">
+                            <div id="stat-419-bar-rentabilidad" class="h-full bg-amber-500 transition-all duration-500" style="width: 0%"></div>
+                        </div>
+                        <div class="flex justify-between text-[10px] text-gray-500">
+                            <span>$0 (Inicio de Mes)</span>
+                            <span class="font-bold text-amber-300">Punto de Equilibrio: <span id="stat-419-val-meta-bar">$13,350.00</span></span>
+                            <span class="text-emerald-400 font-bold">Zona de Ganancia Neta 🚀</span>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Tabla Desglose Diario de la Semana Actual -->
+                <div class="bg-dark-200 border border-white/10 rounded-xl p-4 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <h4 class="text-sm font-bold text-white flex items-center gap-2">
+                            <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2h2a2 2 0 002-2z"></path></svg>
+                            Desglose Diario (Semana Actual: Lunes a Domingo)
+                        </h4>
+                        <span class="text-[11px] text-gray-400">Meta Diaria Promedio: <strong id="stat-val-promedio-diario-target" class="text-purple-300">14.3 pzs/día</strong></span>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs border-collapse">
+                            <thead>
+                                <tr class="border-b border-white/10 text-gray-400 bg-dark-300/50">
+                                    <th class="py-2.5 px-3 font-semibold">Día</th>
+                                    <th class="py-2.5 px-3 font-semibold">Fecha</th>
+                                    <th class="py-2.5 px-3 font-semibold text-center">Piezas Vendidas</th>
+                                    <th class="py-2.5 px-3 font-semibold text-right">Monto ($ MXN)</th>
+                                    <th class="py-2.5 px-3 font-semibold text-center">Estado del Día</th>
+                                </tr>
+                            </thead>
+                            <tbody id="stat-table-weekly-breakdown" class="divide-y divide-white/5 text-gray-200">
+                                <tr>
+                                    <td colspan="5" class="py-6 text-center text-gray-500">Cargando desglose diario...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Pie Modal -->
+            <div class="px-5 py-3 border-t border-white/10 bg-dark-200 flex justify-end shrink-0">
+                <button type="button" onclick="window.closeEstadisticasModal()" class="px-5 py-2 bg-dark-300 hover:bg-white/10 text-gray-300 font-bold text-xs rounded-xl transition-colors">
+                    Cerrar
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Área de Impresión Térmica 80mm (Xprinter XP-N160I-BT / Local 419) -->
     <div id="ticket-419-print-area" class="hidden"></div>
     <!-- Área de Impresión Térmica de Etiquetas 51x25mm (Xprinter 365B) -->
     <div id="sticker-barcode-print-area" class="hidden"></div>
 
     <!-- Configuración Global API -->
-    <script src="./js/config.js?v=9.3.0"></script>
+    <script src="./js/config.js?v=10.6.0"></script>
     <!-- Módulo Principal JS -->
-    <script src="./js/app2.js?v=18.83.0"></script>
+    <script src="./js/app2.js?v=26.18.0"></script>
 </body>
 </html>
 

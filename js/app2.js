@@ -1,4 +1,4 @@
-const API_URL = window.API_URL || "https://script.google.com/macros/s/AKfycbw97tnD6AOYXNkttgCnQRtg2WpikVw_cXdIYnKdc3lFIdeQ8PrbL1RRGdqMM7KD82ucQg/exec";
+const API_URL = window.API_URL || "https://script.google.com/macros/s/AKfycbwQaUeO9EnLQCZe5B6juTmRYoGKm443dGYPbpHcbeFpKbvXNYm0akhYoSLc1AM_mVNZ-g/exec";
 
 // --- MONKEY PATCH FETCH PARA INYECCIÓN Y VALIDACIÓN DE TOKENS ---
 let isSessionExpiring = false;
@@ -119,12 +119,13 @@ function getOptimizedImageUrl(rawUrl, customWidth = null) {
         url = url.split(',')[0].trim();
     }
 
-    // Extraer ID de archivo de Google Drive / Google UserContent
+    // Extraer ID de archivo de Google Drive / Google UserContent / Google Drive links
     let driveId = '';
-    const matchId = url.match(/id=([a-zA-Z0-9_-]+)/) || url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+    const matchId = url.match(/id=([a-zA-Z0-9_-]+)/) || url.match(/\/d\/([a-zA-Z0-9_-]+)/) || url.match(/file\/d\/([a-zA-Z0-9_-]+)/);
     if (matchId && matchId[1]) {
         driveId = matchId[1];
-        return `https://drive.google.com/thumbnail?id=${driveId}&sz=w${width}`;
+        // Usar CDN oficial directa de Google Drive para máxima compatibilidad sin bloqueo CORS/referer
+        return `https://lh3.googleusercontent.com/d/${driveId}=w${width}`;
     }
 
     // Transformación para Google UserContent (lh3.googleusercontent.com)
@@ -145,6 +146,7 @@ function getOptimizedImageUrl(rawUrl, customWidth = null) {
 }
 
 async function get_configs() {
+    if (window.startTopLoadingBar) startTopLoadingBar();
     try {
         const response = await fetch(API_URL, {
             method: 'POST',
@@ -157,10 +159,13 @@ async function get_configs() {
     } catch (error) {
         console.error("Error al obtener configuraciones:", error);
         return null;
+    } finally {
+        if (window.finishTopLoadingBar) finishTopLoadingBar();
     }
 }
 
 async function get_personalizations() {
+    if (window.startTopLoadingBar) startTopLoadingBar();
     try {
         const response = await fetch(API_URL, {
             method: 'POST',
@@ -173,10 +178,13 @@ async function get_personalizations() {
     } catch (error) {
         console.error("Error al obtener personalizaciones:", error);
         return null;
+    } finally {
+        if (window.finishTopLoadingBar) finishTopLoadingBar();
     }
 }
 
 async function search(filtros = { nombre: "", tipo: "", version: "", genero: "" }) {
+    if (window.startTopLoadingBar) startTopLoadingBar();
     try {
         const response = await fetch(API_URL, {
             method: 'POST',
@@ -189,6 +197,8 @@ async function search(filtros = { nombre: "", tipo: "", version: "", genero: "" 
     } catch (error) {
         console.error("Error al buscar productos:", error);
         return [];
+    } finally {
+        if (window.finishTopLoadingBar) finishTopLoadingBar();
     }
 }
 
@@ -217,6 +227,7 @@ async function login_client(usuario, password) {
     }
 }
 async function uploadImageToDrive(base64Data, fileName) {
+    if (window.startTopLoadingBar) startTopLoadingBar();
     try {
         const response = await fetch(API_URL, {
             method: 'POST',
@@ -228,6 +239,8 @@ async function uploadImageToDrive(base64Data, fileName) {
     } catch (error) {
         console.error("Error al subir imagen a Drive:", error);
         return { status: "error", message: "Error al conectar para subir imagen." };
+    } finally {
+        if (window.finishTopLoadingBar) finishTopLoadingBar();
     }
 }
 
@@ -363,7 +376,10 @@ const DOM = {
         nombre: document.getElementById('filter-nombre'),
         genero: document.getElementById('filter-genero'),
         version: document.getElementById('filter-version'),
-        tipo: document.getElementById('filter-tipo')
+        tipo: document.getElementById('filter-tipo'),
+        orden: document.getElementById('filter-orden'),
+        precioMin: document.getElementById('filter-precio-min'),
+        precioMax: document.getElementById('filter-precio-max')
     },
     btnAplicar: document.getElementById('btn-aplicar'),
     filtrosContainer: document.getElementById('container-filtros'),
@@ -564,14 +580,13 @@ const defaultPersonalizaciones = [
 ];
 let currentJerseyForPedido = null; // Jersey activo para configurar en el modal
 
-
 function getGenderColorClass(genero) {
-    const gen = (genero || '').toLowerCase();
-    if (gen.includes('hombre')) {
+    const gen = String(genero || '').toLowerCase();
+    if (gen.includes('hombre') || gen.includes('caballero') || gen === 'h') {
         return 'bg-blue-500/10 text-blue-400 border-blue-500/20';
-    } else if (gen.includes('niño') || gen.includes('unisex')) {
+    } else if (gen.includes('niño') || gen.includes('nino') || gen.includes('niña') || gen.includes('nina') || gen.includes('infantil') || gen.includes('kid') || gen.includes('unisex')) {
         return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
-    } else if (gen.includes('mujer') || gen.includes('dama')) {
+    } else if (gen.includes('mujer') || gen.includes('dama') || gen === 'm' || gen === 'd') {
         return 'bg-purple-500/10 text-purple-400 border-purple-500/20';
     }
     return 'bg-white/5 text-gray-400 border-white/10';
@@ -948,7 +963,21 @@ async function initApp() {
         }).catch(err => console.warn("Error al refrescar perfil en segundo plano:", err));
     }
 
-    renderSkeletons(6);
+    // Cargar caché local al instante (<1ms) para renderizado inmediato
+    try {
+        const cachedStr = localStorage.getItem('jerseys_products_cache_v5');
+        if (cachedStr) {
+            const cachedObj = JSON.parse(cachedStr);
+            if (cachedObj && Array.isArray(cachedObj.data) && cachedObj.data.length > 0) {
+                allProducts = cachedObj.data;
+                renderProductsWithFilters();
+            }
+        }
+    } catch(e) {}
+
+    if (!allProducts || allProducts.length === 0) {
+        renderSkeletons(6);
+    }
     
     // Cargar catálogos y catálogo de productos en paralelo (concurrencia)
     await Promise.all([
@@ -978,8 +1007,10 @@ async function initApp() {
     }
     if (DOM.local419 && DOM.local419.actionsOrdenar) {
         DOM.local419.actionsOrdenar.forEach(btn => btn.addEventListener('click', () => {
-            if (typeof openPos419Modal === 'function') openPos419Modal();
-            closemobileMenu();
+            if (typeof closeInventario419View === 'function') closeInventario419View();
+            if (typeof closePos419Modal === 'function') closePos419Modal();
+            if (typeof switchView === 'function') switchView('jerseys-pedido');
+            if (typeof closemobileMenu === 'function') closemobileMenu();
         }));
     }
     if (DOM.local419 && DOM.local419.actionsMisPedidos) {
@@ -1116,10 +1147,34 @@ async function initApp() {
         DOM.btnToggleFiltros.addEventListener('click', toggleFiltros);
     }
 
-    // Búsqueda automática al ¿¿Cambiar cualquier select
-    DOM.filters.version.addEventListener('change', handleLocalSearch);
-    DOM.filters.tipo.addEventListener('change', handleLocalSearch);
-    DOM.filters.genero.addEventListener('change', handleLocalSearch);
+    // Búsqueda automática al cambiar cualquier select o input de precio
+    if (DOM.filters.version) DOM.filters.version.addEventListener('change', handleLocalSearch);
+    if (DOM.filters.tipo) DOM.filters.tipo.addEventListener('change', handleLocalSearch);
+    if (DOM.filters.genero) DOM.filters.genero.addEventListener('change', handleLocalSearch);
+    if (DOM.filters.orden) DOM.filters.orden.addEventListener('change', handleLocalSearch);
+    if (DOM.filters.precioMin) DOM.filters.precioMin.addEventListener('input', handleLocalSearch);
+    if (DOM.filters.precioMax) DOM.filters.precioMax.addEventListener('input', handleLocalSearch);
+
+    // Event listeners para botones rápidos de rango de precio
+    const pricePresetBtns = document.querySelectorAll('.price-preset-btn');
+    pricePresetBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            pricePresetBtns.forEach(b => {
+                b.classList.remove('active', 'bg-navy-500/40', 'text-navy-300', 'border-navy-400/50', 'font-bold');
+                b.classList.add('bg-dark-200/60', 'text-gray-400', 'border-white/10', 'font-semibold');
+            });
+            btn.classList.add('active', 'bg-navy-500/40', 'text-navy-300', 'border-navy-400/50', 'font-bold');
+            btn.classList.remove('bg-dark-200/60', 'text-gray-400', 'border-white/10', 'font-semibold');
+
+            const minVal = btn.getAttribute('data-min') || '';
+            const maxVal = btn.getAttribute('data-max') || '';
+
+            if (DOM.filters.precioMin) DOM.filters.precioMin.value = minVal;
+            if (DOM.filters.precioMax) DOM.filters.precioMax.value = maxVal;
+
+            handleLocalSearch();
+        });
+    });
     
     if (DOM.modal.closeBtn) DOM.modal.closeBtn.addEventListener('click', closeModal);
     if (DOM.modal.overlay) {
@@ -1448,6 +1503,7 @@ let modalCurrentIndex = 0;
 
 function openModal(imgUrl, imagesArray = [], currentIndex = 0) {
     if (!DOM.modal.overlay) return;
+    DOM.modal.overlay.style.zIndex = '99999';
     DOM.modal.img.src = imgUrl;
     DOM.modal.overlay.classList.remove('hidden');
     requestAnimationFrame(() => {
@@ -1472,6 +1528,7 @@ function openModal(imgUrl, imagesArray = [], currentIndex = 0) {
         }
     }
 }
+window.openModal = openModal;
 
 function closeModal() {
     if (!DOM.modal.overlay) return;
@@ -1488,6 +1545,7 @@ function closeModal() {
         modalCurrentIndex = 0;
     }, 300);
 }
+window.closeModal = closeModal;
 
 async function loadCatalogs() {
     let configs = null;
@@ -2339,11 +2397,43 @@ function getTallasForGender(genero) {
 }
 window.getTallasForGender = getTallasForGender;
 
+function extractBaseSizeToken(raw) {
+    if (!raw) return '';
+    let s = String(raw).trim().toUpperCase();
+    if (s.includes('(')) {
+        s = s.split('(')[0].trim();
+    }
+    s = s.split(/\s+/)[0].trim();
+    return s;
+}
+window.extractBaseSizeToken = extractBaseSizeToken;
+
+function isSameTalla(tallaA, tallaB) {
+    if (!tallaA || !tallaB) return false;
+    const strA = String(tallaA).trim().toUpperCase();
+    const strB = String(tallaB).trim().toUpperCase();
+    if (strA === strB) return true;
+    
+    const cleanA = strA.replace(/[\s\-_()]/g, '');
+    const cleanB = strB.replace(/[\s\-_()]/g, '');
+    if (cleanA && cleanB && cleanA === cleanB) return true;
+
+    const tokenA = extractBaseSizeToken(strA);
+    const tokenB = extractBaseSizeToken(strB);
+    if (tokenA && tokenB && tokenA === tokenB) return true;
+
+    return false;
+}
+window.isSameTalla = isSameTalla;
+
 function updateNewTallaSelect(producto) {
     if (DOM.admin && DOM.admin.newTallaVal && producto) {
         const tallas = getTallasForGender(producto.genero);
-        const existentes = (producto.tallas || []).map(t => String(t.talla || '').trim().toUpperCase());
-        const disponibles = tallas.filter(t => !existentes.includes(String(t || '').trim().toUpperCase()));
+        const existentes = producto.tallas || [];
+        const disponibles = tallas.filter(t => {
+            const yaExiste = existentes.some(ex => isSameTalla(ex.talla, t));
+            return !yaExiste;
+        });
         
         if (disponibles.length === 0) {
             DOM.admin.newTallaVal.innerHTML = '<option value="" disabled selected>Todas las tallas agregadas</option>';
@@ -2495,6 +2585,14 @@ function closeInventoryModal() {
     }, 300);
 }
 
+function removeInventorySizeFromMemory(idx) {
+    if (!currentJerseyToManage || !currentJerseyToManage.tallas) return;
+    currentJerseyToManage.tallas.splice(idx, 1);
+    renderInventorySizes(currentJerseyToManage);
+    updateNewTallaSelect(currentJerseyToManage);
+}
+window.removeInventorySizeFromMemory = removeInventorySizeFromMemory;
+
 function renderInventorySizes(producto) {
     DOM.admin.invTallasList.innerHTML = '';
     
@@ -2524,11 +2622,16 @@ function renderInventorySizes(producto) {
                     </div>
                 </div>
             </div>
-            <div class="flex items-center gap-1.5">
-                <label class="text-[11px] text-gray-400 font-medium uppercase tracking-wider mr-1">Stock:</label>
-                <button type="button" class="btn-stock-minus-gen w-7 h-7 bg-red-500/20 hover:bg-red-500 text-red-400 hover:text-white rounded-lg border border-red-500/30 flex items-center justify-center font-bold text-sm transition-all" data-idx="${idx}" title="Restar 1 pieza">-</button>
-                <input type="number" min="0" value="${stockActual}" class="w-16 bg-dark-200/80 border border-white/10 rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:border-navy-400 focus:ring-1 focus:ring-navy-400 text-white font-semibold input-stock-local-val" data-idx="${idx}">
-                <button type="button" class="btn-stock-plus-gen w-7 h-7 bg-emerald-500/20 hover:bg-emerald-500 text-emerald-400 hover:text-white rounded-lg border border-emerald-500/30 flex items-center justify-center font-bold text-sm transition-all" data-idx="${idx}" title="Sumar 1 pieza">+</button>
+            <div class="flex items-center gap-3">
+                <div class="flex items-center gap-1.5">
+                    <label class="text-[11px] text-gray-400 font-medium uppercase tracking-wider mr-1">Stock:</label>
+                    <button type="button" class="btn-stock-minus-gen w-7 h-7 bg-red-500/20 hover:bg-red-500 text-red-400 hover:text-white rounded-lg border border-red-500/30 flex items-center justify-center font-bold text-sm transition-all" data-idx="${idx}" title="Restar 1 pieza">-</button>
+                    <input type="number" min="0" value="${stockActual}" class="w-16 bg-dark-200/80 border border-white/10 rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:border-navy-400 focus:ring-1 focus:ring-navy-400 text-white font-semibold input-stock-local-val" data-idx="${idx}">
+                    <button type="button" class="btn-stock-plus-gen w-7 h-7 bg-emerald-500/20 hover:bg-emerald-500 text-emerald-400 hover:text-white rounded-lg border border-emerald-500/30 flex items-center justify-center font-bold text-sm transition-all" data-idx="${idx}" title="Sumar 1 pieza">+</button>
+                </div>
+                <button type="button" onclick="window.removeInventorySizeFromMemory(${idx})" class="p-1.5 text-gray-500 hover:text-red-400 hover:bg-white/5 rounded-lg transition-colors" title="Eliminar talla">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                </button>
             </div>
         `;
         DOM.admin.invTallasList.appendChild(div);
@@ -2641,6 +2744,63 @@ function handleAddNewTalla(e) {
         title: `Talla ${tallaVal} agregada. Presiona "Actualizar Datos" para guardar.`
     });
 }
+
+function addAllStandardTallas() {
+    if (!currentJerseyToManage) return;
+
+    const genero = currentJerseyToManage.genero || 'Hombre';
+    const tallasGenericas = getTallasForGender(genero);
+    const inputStockEl = DOM.admin.newStockVal;
+    const stockVal = parseInt(inputStockEl ? inputStockEl.value : 0);
+    const finalStock = isNaN(stockVal) || stockVal < 0 ? 0 : stockVal;
+
+    if (!currentJerseyToManage.tallas) currentJerseyToManage.tallas = [];
+
+    let addedCount = 0;
+    tallasGenericas.forEach(sz => {
+        const existing = currentJerseyToManage.tallas.find(t => isSameTalla(t.talla, sz));
+        if (!existing) {
+            currentJerseyToManage.tallas.push({
+                id_inventario: 'TEMP_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+                id_producto: currentJerseyToManage.id,
+                talla: sz,
+                categoria: currentJerseyToManage.genero || 'Adultos',
+                stock: finalStock,
+                isNew: true
+            });
+            addedCount++;
+        }
+    });
+
+    renderInventorySizes(currentJerseyToManage);
+    updateNewTallaSelect(currentJerseyToManage);
+
+    const Toast = Swal.mixin({
+        toast: true,
+        position: 'bottom-end',
+        showConfirmButton: false,
+        timer: 2500,
+        background: '#141416',
+        color: '#fff',
+        heightAuto: false,
+        customClass: {
+            container: 'swal2-toast-no-lock'
+        }
+    });
+
+    if (addedCount > 0) {
+        Toast.fire({
+            icon: 'success',
+            title: `Se añadieron ${addedCount} tallas (${genero}). Presiona "Actualizar Datos" para guardar.`
+        });
+    } else {
+        Toast.fire({
+            icon: 'info',
+            title: `Todas las tallas para ${genero} ya fueron añadidas.`
+        });
+    }
+}
+window.addAllStandardTallas = addAllStandardTallas;
 
 async function handleSaveBatchTallas() {
     if (!currentJerseyToManage) return;
@@ -3571,44 +3731,114 @@ async function revalidateProductsBackground(cacheKey) {
     }
 }
 
+function getFilteredAndSortedProducts() {
+    const activeProductsOnly = (allProducts || []).filter(p => p.activo === undefined || p.activo === null || p.activo === "" || Number(p.activo) === 1);
+
+    const nombreQ = DOM.filters.nombre ? DOM.filters.nombre.value.trim() : "";
+    const tipoQ = DOM.filters.tipo ? DOM.filters.tipo.value : "";
+    const versionQ = DOM.filters.version ? DOM.filters.version.value : "";
+    const generoQ = DOM.filters.genero ? DOM.filters.genero.value : "";
+    const ordenQ = DOM.filters.orden ? DOM.filters.orden.value : "";
+    const minP = (DOM.filters.precioMin && DOM.filters.precioMin.value !== "") ? parseFloat(DOM.filters.precioMin.value) : null;
+    const maxP = (DOM.filters.precioMax && DOM.filters.precioMax.value !== "") ? parseFloat(DOM.filters.precioMax.value) : null;
+
+    const activeProfile = localStorage.getItem('current_perfil') || 'Menudeo';
+    let profileToUse = activeProfile;
+    if (activeProfile === "Administrador") {
+        profileToUse = localStorage.getItem('current_subperfil') || 'Mayoreo';
+    }
+
+    let filtrados = activeProductsOnly.filter(p => {
+        let match = true;
+        if (tipoQ && p.tipo !== tipoQ) match = false;
+        if (versionQ && p.version !== versionQ) match = false;
+        if (generoQ && p.genero !== generoQ) match = false;
+
+        if (minP !== null || maxP !== null) {
+            const itemPrice = getBasePriceForProfile(p, profileToUse);
+            if (minP !== null && !isNaN(minP) && itemPrice < minP) match = false;
+            if (maxP !== null && !isNaN(maxP) && itemPrice > maxP) match = false;
+        }
+        return match;
+    });
+
+    if (nombreQ) {
+        const scoredItems = [];
+        filtrados.forEach(p => {
+            const enrichedFields = [
+                p.nombre, p.equipo, p.tipo, p.version,
+                p.genero, p.jugador, p.temporada, p.categoria,
+                p.marca, p.tags, p.id, p.id_producto,
+                p.id_playera, p.id_articulo, p.id_inventario, p.comentarios
+            ].map(f => (typeof normalizeText === 'function' ? normalizeText(f) : String(f || '').toLowerCase())).join(' ');
+
+            const normQuery = typeof normalizeText === 'function' ? normalizeText(nombreQ) : nombreQ.toLowerCase();
+            const queryTokens = normQuery.split(' ').filter(Boolean);
+            const normNombre = typeof normalizeText === 'function' ? normalizeText(p.nombre || p.equipo || '') : String(p.nombre || p.equipo || '').toLowerCase();
+
+            let score = 0;
+            let matchedCount = 0;
+
+            queryTokens.forEach(token => {
+                if (!token) return;
+                if (enrichedFields.includes(token)) {
+                    matchedCount++;
+                    score += 20;
+                    if (normNombre.includes(token)) score += 15;
+                } else {
+                    const tokenClean = token.replace(/[^a-z0-9]/g, '');
+                    if (tokenClean && tokenClean.length >= 3 && enrichedFields.includes(tokenClean)) {
+                        matchedCount++;
+                        score += 10;
+                    }
+                }
+            });
+
+            if (matchedCount === queryTokens.length) score += 50;
+
+            if (matchedCount > 0) {
+                scoredItems.push({ product: p, score: score, matchedCount: matchedCount });
+            }
+        });
+
+        const normQuery = typeof normalizeText === 'function' ? normalizeText(nombreQ) : nombreQ.toLowerCase();
+        const totalTokens = normQuery.split(' ').filter(Boolean).length;
+
+        if (totalTokens >= 2) {
+            let exactMatches = scoredItems.filter(item => item.matchedCount >= totalTokens);
+            if (exactMatches.length === 0 && totalTokens > 2) {
+                exactMatches = scoredItems.filter(item => item.matchedCount >= totalTokens - 1);
+            }
+            if (!ordenQ) exactMatches.sort((a, b) => b.score - a.score);
+            filtrados = exactMatches.map(item => item.product);
+        } else {
+            if (!ordenQ) scoredItems.sort((a, b) => b.score - a.score);
+            filtrados = scoredItems.map(item => item.product);
+        }
+    }
+
+    if (ordenQ === "precio-asc") {
+        filtrados.sort((a, b) => getBasePriceForProfile(a, profileToUse) - getBasePriceForProfile(b, profileToUse));
+    } else if (ordenQ === "precio-desc") {
+        filtrados.sort((a, b) => getBasePriceForProfile(b, profileToUse) - getBasePriceForProfile(a, profileToUse));
+    } else if (ordenQ === "nombre-asc") {
+        filtrados.sort((a, b) => (a.nombre || a.equipo || '').localeCompare(b.nombre || b.equipo || ''));
+    } else if (ordenQ === "nombre-desc") {
+        filtrados.sort((a, b) => (b.nombre || b.equipo || '').localeCompare(a.nombre || a.equipo || ''));
+    }
+
+    return filtrados;
+}
+
 function renderProductsWithFilters() {
     if (!allProducts || allProducts.length === 0) {
         renderSkeletons(6);
         return;
     }
 
-    // Filtrar únicamente los productos activos (Activo = 1 o vacío) para la vista pública de catálogo
-    const activeProductsOnly = (allProducts || []).filter(p => p.activo === undefined || p.activo === null || p.activo === "" || Number(p.activo) === 1);
+    const filtrados = getFilteredAndSortedProducts();
+    renderLocalProducts(filtrados);
 
-    // Aplicar filtros locales de búsqueda si existen
-    const hasActiveFilters = (DOM.filters.nombre && DOM.filters.nombre.value.trim() !== "") ||
-                             (DOM.filters.tipo && DOM.filters.tipo.value !== "") ||
-                             (DOM.filters.version && DOM.filters.version.value !== "") ||
-                             (DOM.filters.genero && DOM.filters.genero.value !== "");
-                             
-    if (hasActiveFilters) {
-        const nombreQ = DOM.filters.nombre ? DOM.filters.nombre.value : "";
-        const tipoQ = DOM.filters.tipo ? DOM.filters.tipo.value : "";
-        const versionQ = DOM.filters.version ? DOM.filters.version.value : "";
-        const generoQ = DOM.filters.genero ? DOM.filters.genero.value : "";
-        
-        const filtrados = activeProductsOnly.filter(p => {
-            let match = true;
-            if (nombreQ) {
-                const targetText = `${p.nombre || ''} ${p.equipo || ''} ${p.tipo || ''} ${p.version || ''} ${p.genero || ''} ${p.id || ''}`;
-                if (!matchText(targetText, nombreQ)) match = false;
-            }
-            if (tipoQ && p.tipo !== tipoQ) match = false;
-            if (versionQ && p.version !== versionQ) match = false;
-            if (generoQ && p.genero !== generoQ) match = false;
-            return match;
-        });
-        renderLocalProducts(filtrados);
-    } else {
-        renderLocalProducts(activeProductsOnly);
-    }
-    
-    // Si el modal de administración de lista está abierto, actualizar sus filtros e interfaz conservando la página
     if (DOM.admin.listModal && !DOM.admin.listModal.classList.contains('hidden')) {
         applyAdminFilters(true);
     }
@@ -3619,28 +3849,10 @@ let searchDebounceTimer = null;
 function handleLocalSearch() {
     if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
     
-    // Búsqueda instantánea suave (50ms) sin reseteo de esqueletos ni retrasos artificiales
     searchDebounceTimer = setTimeout(() => {
-        const activeProductsOnly = (allProducts || []).filter(p => p.activo === undefined || p.activo === null || p.activo === "" || Number(p.activo) === 1);
-        const nombreQ = DOM.filters.nombre ? DOM.filters.nombre.value : "";
-        const tipoQ = DOM.filters.tipo ? DOM.filters.tipo.value : "";
-        const versionQ = DOM.filters.version ? DOM.filters.version.value : "";
-        const generoQ = DOM.filters.genero ? DOM.filters.genero.value : "";
-        
-        const filtrados = activeProductsOnly.filter(p => {
-            let match = true;
-            if (nombreQ) {
-                const targetText = `${p.nombre || ''} ${p.equipo || ''} ${p.tipo || ''} ${p.version || ''} ${p.genero || ''} ${p.id || ''}`;
-                if (!matchText(targetText, nombreQ)) match = false;
-            }
-            if (tipoQ && p.tipo !== tipoQ) match = false;
-            if (versionQ && p.version !== versionQ) match = false;
-            if (generoQ && p.genero !== generoQ) match = false;
-            return match;
-        });
-        
+        const filtrados = getFilteredAndSortedProducts();
         renderLocalProducts(filtrados);
-    }, 50);
+    }, 40);
 }
 
 let currentRenderToken = 0;
@@ -3686,9 +3898,26 @@ function renderLocalProducts(productos) {
     renderNextChunk();
 }
 
+function formatShortTallaLabel(rawTalla) {
+    if (!rawTalla) return 'M';
+    let str = String(rawTalla).trim();
+    if (str.includes('(')) {
+        const parts = str.split('(');
+        const numPart = parts[0].trim();
+        const detailPart = parts[1].replace(')', '').trim();
+        const ageMatch = detailPart.match(/(\d+)\s*(?:a|-)\s*(\d+)/i);
+        if (ageMatch && numPart) {
+            return `${numPart} (${ageMatch[1]}-${ageMatch[2]}A)`;
+        }
+        const cleanDetail = detailPart.replace(/años|año|anios|anio/gi, 'A').trim();
+        return `${numPart} (${cleanDetail})`;
+    }
+    return str;
+}
+
 function createProductCard(producto, cardIndex = 0) {
     const article = document.createElement('article');
-    article.className = 'group bg-dark-100 rounded-xl sm:rounded-2xl p-2 sm:p-4 border border-white/5 hover:border-navy-400/40 transition-all duration-300 flex flex-col h-full hover:shadow-[0_0_30px_rgba(59,130,246,0.08)] relative overflow-hidden';
+    article.className = 'group bg-dark-100 rounded-xl sm:rounded-2xl p-3 sm:p-4 border border-white/5 hover:border-navy-400/40 transition-all duration-300 flex flex-col h-full hover:shadow-[0_0_30px_rgba(59,130,246,0.08)] relative overflow-hidden';
     
     const images = (producto.foto || producto.imagen || '').split(',').map(u => u.trim()).filter(Boolean);
     let currentImgIdx = 0;
@@ -3715,27 +3944,35 @@ function createProductCard(producto, cardIndex = 0) {
     const hasSizes = Array.isArray(producto.tallas) && producto.tallas.length > 0;
 
     const isAdmin = (localStorage.getItem('current_perfil') === "Administrador" && currentView === "mis-jerseys");
+    const isNinoProd = String(producto.genero || '').toLowerCase().includes('niño') || String(producto.genero || '').toLowerCase().includes('nino');
 
     if (hasSizes) {
-        tallasHtml = '<div class="flex flex-wrap gap-1 sm:gap-2 mt-2 pt-2 z-10 relative">';
+        const sizeSectionHeader = isNinoProd
+            ? `<div class="text-[10px] text-emerald-400 font-bold uppercase tracking-wider mb-1.5 flex items-center gap-1"><span>👶 Tallas de Niño:</span></div>`
+            : `<div class="text-[10px] text-gray-400 font-semibold uppercase tracking-wider mb-1.5">Tallas Disponibles:</div>`;
+
+        tallasHtml = `<div class="mt-2.5 pt-2 border-t border-white/5 z-10 relative">${sizeSectionHeader}<div class="flex flex-wrap gap-1.5 sm:gap-2">`;
+        
         producto.tallas.forEach(t => {
-            const stockVal = t.stock !== undefined ? t.stock : t.inventario;
-            if (stockVal > 0) totalStock += stockVal;
-            const hasStock = stockVal > 0;
-            const btnClass = hasStock 
-                ? 'bg-dark-200 text-gray-200 border-white/10 hover:border-navy-400 hover:text-navy-400 hover:bg-dark-100 cursor-pointer shadow-sm' 
-                : 'bg-dark/50 text-gray-600 border-white/5 line-through opacity-40 cursor-not-allowed';
+            const stockVal = Number(t.stock !== undefined ? t.stock : (t.inventario || 0)) || 0;
+            if (stockVal <= 0) return; // 🚫 Ocultar completamente tallas sin existencias (stock <= 0)
+
+            totalStock += stockVal;
+            const displayTalla = String(t.talla || '');
+            const isKidsSize = isNinoProd || displayTalla.includes('(') || /^\d{2}/.test(displayTalla.trim());
             
+            const btnClass = isKidsSize
+                ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30 hover:border-emerald-400 hover:text-white hover:bg-emerald-500/20 cursor-pointer shadow-sm'
+                : 'bg-dark-200 text-gray-200 border-white/10 hover:border-navy-400 hover:text-navy-400 hover:bg-dark-100 cursor-pointer shadow-sm';
+
             const adminStockHtml = isAdmin ? `<span class="absolute -top-2 -right-2 bg-navy-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full shadow-lg border border-dark z-20">${stockVal}</span>` : '';
 
-            const displayTalla = String(t.talla || '');
-            const shortLabel = displayTalla.includes('(') ? (displayTalla.split('(')[0].trim() || displayTalla) : displayTalla;
-            const fullTitle = `${displayTalla} | ${hasStock ? `Stock: ${stockVal}` : 'Agotado'}`;
+            const shortLabel = formatShortTallaLabel(displayTalla);
+            const fullTitle = `${displayTalla} | Stock: ${stockVal}`;
             tallasHtml += `
                 <div class="relative">
-                    <button type="button" class="talla-btn min-w-[1.75rem] px-1.5 h-7 sm:min-w-[2.25rem] sm:px-2 sm:h-9 rounded-md sm:rounded-lg flex items-center justify-center text-[9px] sm:text-xs font-bold leading-none border transition-all duration-200 ${btnClass} whitespace-nowrap" 
-                            data-talla="${displayTalla}"
-                            ${!hasStock ? 'disabled' : ''} 
+                    <button type="button" class="talla-btn px-2 sm:px-2.5 h-7 sm:h-8.5 rounded-lg flex items-center justify-center text-[10px] sm:text-xs font-bold leading-none border transition-all duration-200 ${btnClass} whitespace-nowrap shadow-sm" 
+                            data-talla="${displayTalla}" 
                             title="${fullTitle}">
                         ${shortLabel}
                     </button>
@@ -3743,7 +3980,7 @@ function createProductCard(producto, cardIndex = 0) {
                 </div>
             `;
         });
-        tallasHtml += '</div>';
+        tallasHtml += '</div></div>';
     }
 
     const isProximamente = !hasSizes;
@@ -3829,6 +4066,40 @@ function createProductCard(producto, cardIndex = 0) {
         }
     }
 
+    // Insignia de Existencias del Local 419 (EXCLUSIVA PARA ADMINISTRADORES)
+    const loggedUserStr = localStorage.getItem('logged_user');
+    let loggedUserObj = null;
+    try { if (loggedUserStr) loggedUserObj = JSON.parse(loggedUserStr); } catch(e){}
+    const isUserAdminRole = activeProfile === 'Administrador' || (loggedUserObj && (
+        String(loggedUserObj.perfil || loggedUserObj.rol || '').toLowerCase() === 'administrador' ||
+        String(loggedUserObj.perfil || loggedUserObj.rol || '').toLowerCase() === 'admin' ||
+        loggedUserObj.is_admin === true
+    ));
+
+    let admin419BadgeHtml = '';
+    if (isUserAdminRole) {
+        const prodId = producto.id || producto.id_playera || producto.id_articulo;
+        const prod419 = (allProducts419 || []).find(p => String(p.id || p.id_playera || p.id_articulo).toUpperCase() === String(prodId).toUpperCase());
+
+        if (prod419 && Array.isArray(prod419.tallas) && prod419.tallas.length > 0) {
+            const avail419Tallas = prod419.tallas.filter(t => (t.stock !== undefined ? t.stock : t.inventario || 0) > 0);
+            const total419Stock = avail419Tallas.reduce((acc, t) => acc + (t.stock !== undefined ? t.stock : t.inventario || 0), 0);
+
+            if (total419Stock > 0) {
+                const tallas419Summary = avail419Tallas.map(t => {
+                    const stk = t.stock !== undefined ? t.stock : t.inventario || 0;
+                    return `${formatShortTallaLabel(t.talla)}:${stk}`;
+                }).join(' ');
+
+                admin419BadgeHtml = `
+                    <div class="mt-2 p-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-[10px] text-amber-300 font-bold flex items-center justify-between gap-1 z-20 relative shadow-sm">
+                        <span class="truncate" title="Existencias en Local 419: ${tallas419Summary}">🏪 Stock 419: <strong class="text-amber-400">${tallas419Summary}</strong></span>
+                    </div>
+                `;
+            }
+        }
+    }
+
     article.innerHTML = `
         <div class="product-image-container relative w-full aspect-[4/5] rounded-lg sm:rounded-xl overflow-hidden mb-2 sm:mb-4 bg-dark z-10 cursor-pointer">
             <img src="${imgUrl}" alt="${producto.nombre || 'Jersey'}" class="product-card-img w-full h-full object-cover object-center group-hover:scale-110 transition-transform duration-700 ease-out ${(isAgotado || isProximamente) ? 'grayscale opacity-60' : ''}" ${loadingAttr}>
@@ -3842,6 +4113,7 @@ function createProductCard(producto, cardIndex = 0) {
             </h3>
             ${tagsHtml}
             ${bottomSectionHtml}
+            ${admin419BadgeHtml}
         </div>
         
         <div class="absolute inset-0 bg-gradient-to-tr from-navy-400/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
@@ -3976,6 +4248,7 @@ function createProductCard(producto, cardIndex = 0) {
 
 async function fetchClients(keepPage = false) {
     renderClientSkeletons(clientsPerPage);
+    if (window.startTopLoadingBar) startTopLoadingBar();
     try {
         const response = await fetch(API_URL, {
             method: 'POST',
@@ -3993,6 +4266,8 @@ async function fetchClients(keepPage = false) {
     } catch (error) {
         console.error("Error al consultar clientes:", error);
         allClients = [];
+    } finally {
+        if (window.finishTopLoadingBar) finishTopLoadingBar();
     }
     applyClientFilters(keepPage);
 }
@@ -5285,11 +5560,41 @@ function renderCartItems() {
     let totalPieces = cart.reduce((sum, item) => sum + item.cantidad, 0);
     let shippingCost = 0;
     
+    const selectedDeliveryRadio = document.querySelector('input[name="cart-tipo-entrega"]:checked');
     const cartEnvioCheckbox = document.getElementById('cart-envio-domicilio');
+    const selectedDelivery = selectedDeliveryRadio ? selectedDeliveryRadio.value : (cartEnvioCheckbox && cartEnvioCheckbox.checked ? 'domicilio' : 'recoleccion');
+    
+    // Actualizar estilos dinámicos de las tarjetas de tipo de entrega
+    const lblDomicilio = document.getElementById('lbl-tipo-domicilio');
+    const lblRecoleccion = document.getElementById('lbl-tipo-recoleccion');
+    const lblApp = document.getElementById('lbl-tipo-app');
+    
+    if (lblDomicilio) {
+        if (selectedDelivery === 'domicilio') {
+            lblDomicilio.className = 'tipo-entrega-card relative flex items-center gap-2 p-2.5 rounded-xl border border-navy-400/50 bg-navy-500/10 text-white cursor-pointer transition-all shadow-sm';
+        } else {
+            lblDomicilio.className = 'tipo-entrega-card relative flex items-center gap-2 p-2.5 rounded-xl border border-white/10 bg-dark-200/50 text-gray-300 hover:text-white cursor-pointer transition-all';
+        }
+    }
+    if (lblRecoleccion) {
+        if (selectedDelivery === 'recoleccion') {
+            lblRecoleccion.className = 'tipo-entrega-card relative flex items-center gap-2 p-2.5 rounded-xl border border-amber-500/50 bg-amber-500/10 text-amber-300 cursor-pointer transition-all shadow-sm';
+        } else {
+            lblRecoleccion.className = 'tipo-entrega-card relative flex items-center gap-2 p-2.5 rounded-xl border border-white/10 bg-dark-200/50 text-gray-300 hover:text-white cursor-pointer transition-all';
+        }
+    }
+    if (lblApp) {
+        if (selectedDelivery === 'app') {
+            lblApp.className = 'tipo-entrega-card relative flex items-center gap-2 p-2.5 rounded-xl border border-emerald-500/50 bg-emerald-500/10 text-emerald-300 cursor-pointer transition-all shadow-sm';
+        } else {
+            lblApp.className = 'tipo-entrega-card relative flex items-center gap-2 p-2.5 rounded-xl border border-white/10 bg-dark-200/50 text-gray-300 hover:text-white cursor-pointer transition-all';
+        }
+    }
+
     const envioRow = document.getElementById('cart-envio-row');
     const envioVal = document.getElementById('cart-envio-val');
     
-    if (cartEnvioCheckbox && cartEnvioCheckbox.checked) {
+    if (selectedDelivery === 'domicilio') {
         const rule = reglasEnvio.find(r => totalPieces >= r.min_piezas && totalPieces <= r.max_piezas);
         if (rule) {
             shippingCost = parseFloat(rule.costo_envio || 0);
@@ -5332,12 +5637,26 @@ function renderCartItems() {
     DOM.cart.personalizacionesVal.textContent = `$${personalizacionesTotal.toFixed(2)}`;
     DOM.cart.totalVal.textContent = `$${grandTotal.toFixed(2)}`;
 
-    // Banner Estimado de Recojo en Tienda (Solo si NO es Envío a Domicilio)
+    // Banner Estimado de Recojo o Envío
     const pickupBanner = document.getElementById('cart-pickup-estimate-banner');
     const pickupText = document.getElementById('cart-pickup-estimate-text');
-    if (envio_domicilio) {
+    if (selectedDelivery === 'domicilio') {
         if (pickupBanner) pickupBanner.classList.add('hidden');
-    } else {
+    } else if (selectedDelivery === 'app') {
+        if (pickupBanner) {
+            pickupBanner.classList.remove('hidden');
+            if (pickupText) {
+                pickupText.innerHTML = `
+                    <div class="flex items-center gap-1.5 font-bold text-emerald-400">
+                        <span>🚗 Envío Express por App (DiDi / Uber / Rappi)</span>
+                    </div>
+                    <div class="text-[11px] text-gray-300 mt-1">
+                        Tu pedido será preparado en Local y la recolección con el chofer de la App se coordinará vía WhatsApp.
+                    </div>
+                `;
+            }
+        }
+    } else { // Recolección en Local
         if (pickupBanner) {
             const infoRecojo = getEstimadoRecojoInfo();
             pickupBanner.classList.remove('hidden');
@@ -5408,7 +5727,10 @@ async function submitOrder() {
 
     isSubmittingOrderLock = true;
     const btnSubmit = document.getElementById('btn-confirm-pedido') || document.getElementById('btn-cart-checkout');
-    if (btnSubmit) btnSubmit.disabled = true;
+    if (btnSubmit) {
+        btnSubmit.disabled = true;
+        btnSubmit.style.pointerEvents = 'none';
+    }
     
     const loggedUser = JSON.parse(loggedUserStr);
     const selectedClientId = loggedUser.id_cliente;
@@ -5420,6 +5742,22 @@ async function submitOrder() {
     }
     const isMayoreo = esPerfilMayoreoOMas(profile);
     
+    const selectedDeliveryRadio = document.querySelector('input[name="cart-tipo-entrega"]:checked');
+    const cartEnvioCheckbox = document.getElementById('cart-envio-domicilio');
+    const selectedDelivery = selectedDeliveryRadio ? selectedDeliveryRadio.value : (cartEnvioCheckbox && cartEnvioCheckbox.checked ? 'domicilio' : 'recoleccion');
+    const envio_domicilio = selectedDelivery === 'domicilio';
+
+    let deliveryLabelName = 'Recolección en Local 🏪';
+    let deliveryLabelWa = '🏪 Recolección en Local';
+
+    if (selectedDelivery === 'domicilio') {
+        deliveryLabelName = 'Envío a Domicilio 🏠';
+        deliveryLabelWa = '🏠 Envío a Domicilio';
+    } else if (selectedDelivery === 'app') {
+        deliveryLabelName = 'Envío por App (DiDi / Uber) 🚗';
+        deliveryLabelWa = '🚗 Envío por App (DiDi / Uber)';
+    }
+
     // Construir lista de artículos con precios calculados para el payload
     const articulos = cart.map(item => {
         const basePrice = getBasePriceForProfile(item.producto, profile, item.talla);
@@ -5436,22 +5774,28 @@ async function submitOrder() {
         
         const finalPrice = basePrice + persPrice;
         
+        let idInv = item.id_inventario || item.IdInventario || item.idInventario || '';
+        if (item.producto && Array.isArray(item.producto.tallas)) {
+            const tObj = item.producto.tallas.find(t => String(t.talla || t.Talla || t.size || t.Size || '').trim().toUpperCase() === String(item.talla || '').trim().toUpperCase());
+            if (tObj) {
+                const resolvedId = tObj.id_inventario || tObj.idInventario || tObj.IdInventario || '';
+                if (resolvedId) idInv = resolvedId;
+            }
+        }
+        
         return {
             id_producto: item.producto.id,
+            nombre: item.producto.nombre || '',
             categoria: item.producto.genero || 'Adulto',
             talla: item.talla,
             cantidad: item.cantidad,
             id_personalizacion: item.personalizacionId,
             texto_personalizado: item.texto_personalizado,
             precio_unitario_final: finalPrice,
-            id_inventario: item.id_inventario || ''
+            id_inventario: idInv
         };
     });
-    
-    const cartEnvioCheckbox = document.getElementById('cart-envio-domicilio');
-    const envio_domicilio = cartEnvioCheckbox && cartEnvioCheckbox.checked;
-    
-    let totalPieces = cart.reduce((sum, item) => sum + item.cantidad, 0);
+    const totalPieces = cart.reduce((sum, item) => sum + item.cantidad, 0);
     let shippingCost = 0;
     if (envio_domicilio) {
         const rule = reglasEnvio.find(r => totalPieces >= r.min_piezas && totalPieces <= r.max_piezas);
@@ -5464,8 +5808,11 @@ async function submitOrder() {
         id_cliente: selectedClientId,
         tipo_precio_aplicado: profile,
         articulos: articulos,
+        tipo_entrega: selectedDelivery,
+        tipo_entrega_label: deliveryLabelName,
         envio: envio_domicilio,
-        costo_envio: shippingCost
+        costo_envio: shippingCost,
+        idempotency_key: 'IDEMP-' + selectedClientId + '-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7)
     };
     
     // Mostrar spinner de carga
@@ -5479,23 +5826,44 @@ async function submitOrder() {
         }
     });
     
+    if (window.startTopLoadingBar) startTopLoadingBar();
     try {
         const response = await fetch(API_URL, {
             method: 'POST',
-            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
             body: JSON.stringify(payload)
         });
         
-        const rawText = await response.text();
-        let data = null;
-        try {
-            data = JSON.parse(rawText);
-        } catch (eParse) {
-            console.error("Respuesta no-JSON del servidor:", rawText);
-            throw new Error("El servidor devolvió una respuesta no válida. Asegúrate de actualizar el despliegue en Google Apps Script.");
-        }
+        const data = await response.json();
         
         if (data.status === 'success') {
+            // 🔄 Descontar stock en memoria optimista inmediatamente
+            try {
+                cart.forEach(item => {
+                    const pId = String(item.producto?.id || item.id_producto || "").trim().toUpperCase();
+                    const sz = String(item.talla || "").trim().toUpperCase();
+                    const qty = Number(item.cantidad || 1);
+
+                    const lists = [allProducts, adminFilteredProducts, productsData];
+                    lists.forEach(list => {
+                        if (Array.isArray(list)) {
+                            const prod = list.find(p => String(p.id || p.id_producto || "").trim().toUpperCase() === pId);
+                            if (prod && Array.isArray(prod.tallas)) {
+                                const tObj = prod.tallas.find(t => String(t.talla || t.Talla || "").trim().toUpperCase() === sz);
+                                if (tObj) {
+                                    const st = Number(tObj.stock !== undefined ? tObj.stock : (tObj.inventario || 0));
+                                    const updated = Math.max(0, st - qty);
+                                    tObj.stock = updated;
+                                    tObj.inventario = updated;
+                                }
+                            }
+                        }
+                    });
+                });
+                if (typeof renderProductsWithFilters === 'function') renderProductsWithFilters();
+            } catch (eStockMem) {
+                console.warn("Error descontando stock en memoria:", eStockMem);
+            }
+
             if (data.actualizacion_perfil && isLoggedUserVip()) {
                 const user = JSON.parse(localStorage.getItem('logged_user'));
                 user.perfil = data.actualizacion_perfil.perfil;
@@ -5508,18 +5876,19 @@ async function submitOrder() {
             }
             
             // Generar HTML de recibo de compra
-            let subtotal = 0;
             let totalQty = 0;
+            let subtotal = 0;
             let articulosHtml = '';
             
-            cart.forEach(item => {
+            cart.map(item => {
+                totalQty += item.cantidad;
                 const basePrice = getBasePriceForProfile(item.producto, profile, item.talla);
-                
                 let persPrice = 0;
-                let persName = "Ninguna";
+                let persName = 'Ninguna';
+                
                 if (item.personalizacionPrecio !== undefined && item.personalizacionPrecio !== null && Number(item.personalizacionPrecio) > 0) {
                     persPrice = parseFloat(item.personalizacionPrecio);
-                    persName = item.texto_personalizado ? `Oficial (${item.texto_personalizado})` : "Oficial";
+                    persName = item.personalizacionNombre || 'Personalizada';
                 } else if (item.personalizacionId !== 'PERS-NONE') {
                     const persObj = allPersonalizaciones.find(x => String(x.id) === String(item.personalizacionId)) || defaultPersonalizaciones.find(x => String(x.id) === String(item.personalizacionId));
                     if (persObj) {
@@ -5529,24 +5898,21 @@ async function submitOrder() {
                 }
                 
                 const finalUnitPrice = basePrice + persPrice;
-                const itemTotal = finalUnitPrice * item.cantidad;
-                
-                subtotal += itemTotal;
-                totalQty += item.cantidad;
+                const itemSubtotal = finalUnitPrice * item.cantidad;
+                subtotal += itemSubtotal;
                 
                 articulosHtml += `
-                    <div class="flex flex-col py-1.5 border-b border-white/5">
-                        <div class="flex justify-between text-xs">
-                            <div class="truncate pr-4 flex-1">
-                                <span class="font-bold text-gray-300">${item.cantidad}x</span> ${item.producto.nombre} (${item.talla})
-                                <div class="text-[9px] text-gray-500 font-medium uppercase mt-0.5">${item.producto.genero || '-'} | ${item.producto.tipo || '-'} | ${item.producto.version || '-'}</div>
-                            </div>
-                            <div class="text-right font-mono text-gray-300">$${itemTotal.toFixed(2)}</div>
+                    <div class="bg-dark-200/50 p-2.5 rounded-lg border border-white/5 text-xs space-y-1">
+                        <div class="flex justify-between font-bold text-white">
+                            <span>${item.producto.nombre}</span>
+                            <span>$${itemSubtotal.toFixed(2)}</span>
                         </div>
-                        <div class="flex justify-between text-[9px] text-gray-500 mt-0.5 pl-5">
+                        <div class="flex justify-between text-gray-400 text-[11px]">
                             <div>
-                                Base: $${basePrice.toFixed(2)} ${persPrice > 0 ? `+ Personalización (${persName}): $${persPrice.toFixed(2)}` : ''}
-                                ${item.texto_personalizado ? `<span class="text-emerald-500 font-semibold block mt-0.5">"${item.texto_personalizado}"</span>` : ''}
+                                Talla: <span class="text-gray-200 font-semibold">${item.talla}</span> | 
+                                Cant: <span class="text-gray-200 font-semibold">${item.cantidad}</span>
+                                ${item.personalizacionId !== 'PERS-NONE' ? ` | Pers: <span class="text-navy-400 font-semibold">${persName}</span>` : ''}
+                                ${item.texto_personalizado ? ` <span class="text-emerald-400 font-mono">("${item.texto_personalizado}")</span>` : ''}
                             </div>
                             <div class="text-right font-mono">$${finalUnitPrice.toFixed(2)} c/u</div>
                         </div>
@@ -5558,24 +5924,37 @@ async function submitOrder() {
             let recojoReceiptHtml = '';
             let recojoWaExtra = '';
 
-            if (!envio_domicilio) {
+            if (selectedDelivery === 'recoleccion') {
                 recojoReceiptHtml = `
                     <div class="mt-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300 leading-relaxed text-left">
                         ${infoRecojo.mensajeHtml}
                     </div>
                 `;
                 recojoWaExtra = `\n${infoRecojo.mensajeWa}\n`;
+            } else if (selectedDelivery === 'app') {
+                recojoReceiptHtml = `
+                    <div class="mt-3 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-300 leading-relaxed text-left">
+                        <div class="font-bold flex items-center gap-1">🚗 Envío Express por App (DiDi / Uber):</div>
+                        <div class="text-[11px] text-gray-300 mt-1">Recogeremos tu pedido en Local para entregarlo al chofer coordinado vía WhatsApp.</div>
+                    </div>
+                `;
+                recojoWaExtra = `\n🚗 *Modalidad:* Envío Express por App (DiDi / Uber)\n`;
             }
 
             const orderIdStr = data.id_orden || data.id || data.order_id || 'Generado';
+            const currentOrigin = window.location.origin;
+            const currentPath = window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/') + 1);
+            const statusPageUrl = `${currentOrigin}${currentPath}EstatusOrden.html?id_orden=${encodeURIComponent(orderIdStr)}`;
+
             const receiptHtml = `
                 <div class="text-center text-gray-400 font-mono text-sm tracking-wider mb-4 border border-white/10 rounded-lg py-2 bg-dark-200/50">
                     ID Orden: <span class="text-white">${orderIdStr}</span>
                 </div>
                 <div class="text-left space-y-4 text-sm mt-3 border-t border-white/10 pt-3">
-                    <div class="grid grid-cols-2 text-xs text-gray-400 gap-1">
+                    <div class="grid grid-cols-2 text-xs text-gray-400 gap-1.5">
                         <div><strong>Cliente:</strong> ${loggedUser.nombre_completo}</div>
                         <div><strong>Cantidad total:</strong> ${totalQty} playeras</div>
+                        <div class="col-span-2 pt-1"><strong>Tipo de Entrega:</strong> <span class="text-amber-300 font-bold">${deliveryLabelName}</span></div>
                     </div>
                     
                     <div class="space-y-1">
@@ -5598,15 +5977,23 @@ async function submitOrder() {
                         <span class="text-emerald-400">$${(subtotal + shippingCost).toFixed(2)}</span>
                     </div>
                     ${recojoReceiptHtml}
+                    <div class="pt-2 text-center">
+                        <a href="${statusPageUrl}" target="_blank" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-navy-600/30 hover:bg-navy-600 text-navy-300 hover:text-white border border-navy-500/40 text-xs font-bold transition-all shadow-sm">
+                            <span>🔗 Ver Estatus y Rastreo de la Orden</span>
+                        </a>
+                    </div>
                 </div>
             `;
             const waText = encodeURIComponent(
                 `*¡Hola! Acabo de realizar un nuevo pedido* 🛒👕\n\n` +
                 `*ID de Orden:* ${orderIdStr}\n` +
+                `*Cliente:* ${loggedUser.nombre_completo || ''}\n` +
                 `*Total de Jerseys:* ${totalQty} piezas\n` +
+                `*Tipo de Entrega:* ${deliveryLabelWa}\n` +
                 (envio_domicilio ? `*Costo de Envío:* ${shippingCost === 0 ? 'Gratis' : '$' + shippingCost.toFixed(2)}\n` : '') +
                 `*Total a Pagar:* $${(subtotal + shippingCost).toFixed(2)}\n` +
                 recojoWaExtra + `\n` +
+                `🔗 *Consulta el estatus y detalle de tu orden aquí:*\n${statusPageUrl}\n\n` +
                 `Quedo en espera de la confirmación. ¡Muchas gracias!`
             );
             const waUrl = `https://wa.me/5218132698182?text=${waText}`;
@@ -5683,7 +6070,10 @@ async function submitOrder() {
             }).then((result) => {
                 if (result.isConfirmed) {
                     data.conflictos.forEach(conf => {
-                        const itemIdx = cart.findIndex(i => String(i.id_inventario) === String(conf.id_inventario));
+                        const itemIdx = cart.findIndex(i => 
+                            (conf.id_inventario && String(i.id_inventario).trim().toUpperCase() === String(conf.id_inventario).trim().toUpperCase()) ||
+                            (getProductId(i.producto).toUpperCase() === String(conf.id_producto || '').trim().toUpperCase() && String(i.talla).trim().toUpperCase() === String(conf.talla || '').trim().toUpperCase())
+                        );
                         if (itemIdx !== -1) {
                             if (conf.disponible > 0) {
                                 cart[itemIdx].cantidad = conf.disponible;
@@ -5702,7 +6092,10 @@ async function submitOrder() {
                 } else {
                     data.conflictos.forEach(conf => {
                         if (conf.disponible <= 0) {
-                            const itemIdx = cart.findIndex(i => String(i.id_inventario) === String(conf.id_inventario));
+                            const itemIdx = cart.findIndex(i => 
+                                (conf.id_inventario && String(i.id_inventario).trim().toUpperCase() === String(conf.id_inventario).trim().toUpperCase()) ||
+                                (getProductId(i.producto).toUpperCase() === String(conf.id_producto || '').trim().toUpperCase() && String(i.talla).trim().toUpperCase() === String(conf.talla || '').trim().toUpperCase())
+                            );
                             if (itemIdx !== -1) {
                                 cart.splice(itemIdx, 1);
                             }
@@ -5731,6 +6124,7 @@ async function submitOrder() {
         isSubmittingOrderLock = false;
         const btnSubmit = document.getElementById('btn-confirm-pedido') || document.getElementById('btn-cart-checkout');
         if (btnSubmit) btnSubmit.disabled = false;
+        if (window.finishTopLoadingBar) finishTopLoadingBar();
     }
 }
 
@@ -5862,6 +6256,7 @@ async function fetchOrdenes() {
     if (DOM.admin.Ordenes.loadingState) DOM.admin.Ordenes.loadingState.classList.remove('hidden');
     
     const payload = { action: 'search_orders' };
+    if (window.startTopLoadingBar) startTopLoadingBar();
     
     try {
         const response = await fetch(API_URL, {
@@ -5895,10 +6290,243 @@ async function fetchOrdenes() {
         if (allFetchedOrdenes.length === 0 && DOM.admin.Ordenes.emptyState) {
             DOM.admin.Ordenes.emptyState.classList.remove('hidden');
         }
+    } finally {
+        if (window.finishTopLoadingBar) finishTopLoadingBar();
     }
 }
 
+window.copyToClipboard = function(text, label = 'Copiado') {
+    if (!text) return;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text);
+    } else {
+        const input = document.createElement('input');
+        input.value = text;
+        document.body.appendChild(input);
+        input.select();
+        document.execCommand('copy');
+        document.body.removeChild(input);
+    }
+    const Toast = Swal.mixin({
+        toast: true,
+        position: 'bottom-end',
+        showConfirmButton: false,
+        timer: 1800,
+        background: '#151515', color: '#fff'
+    });
+    Toast.fire({ icon: 'success', title: `📋 ${label}: ${text}` });
+};
+
+function isOrdenCancelada(estatus) {
+    if (!estatus) return false;
+    const est = String(estatus).trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    return est.includes('cancel') || est.includes('anulad');
+}
+
+function parseOrdenFecha(fechaStr) {
+    if (!fechaStr) return null;
+    if (fechaStr instanceof Date) return isNaN(fechaStr.getTime()) ? null : fechaStr;
+    if (typeof fechaStr === 'number') return new Date(fechaStr);
+    
+    let d = new Date(fechaStr);
+    if (!isNaN(d.getTime())) return d;
+    
+    const str = String(fechaStr).trim();
+    if (/^\d+$/.test(str)) {
+        d = new Date(Number(str));
+        if (!isNaN(d.getTime())) return d;
+    }
+
+    const parts = str.split(/[\sT]+/);
+    if (parts.length > 0) {
+        const dateParts = parts[0].split(/[\/\-]/);
+        if (dateParts.length === 3) {
+            let day, month, year;
+            if (dateParts[0].length === 4) {
+                year = parseInt(dateParts[0], 10);
+                month = parseInt(dateParts[1], 10) - 1;
+                day = parseInt(dateParts[2], 10);
+            } else {
+                day = parseInt(dateParts[0], 10);
+                month = parseInt(dateParts[1], 10) - 1;
+                year = parseInt(dateParts[2], 10);
+            }
+            let hour = 0, min = 0, sec = 0;
+            if (parts[1]) {
+                const timeParts = parts[1].split(':');
+                if (timeParts.length >= 2) {
+                    hour = parseInt(timeParts[0], 10) || 0;
+                    min = parseInt(timeParts[1], 10) || 0;
+                    sec = parseInt(timeParts[2], 10) || 0;
+                }
+            }
+            d = new Date(year, month, day, hour, min, sec);
+            if (!isNaN(d.getTime())) return d;
+        }
+    }
+    return null;
+}
+
+function matchesKpiStatusKey(status, key) {
+    if (!status) return false;
+    const est = String(status).toLowerCase().trim();
+    if (isOrdenCancelada(est)) return false;
+
+    switch (key) {
+        case 'pendiente':
+            return est.includes('pendiente');
+        case 'revisando':
+            return est.includes('revisando');
+        case 'recoger':
+            return est.includes('disponible') && est.includes('recoger');
+        case 'enviar':
+            return est.includes('disponible') && est.includes('enviar');
+        case 'enviado':
+            return est.includes('enviado') || est.includes('entregada');
+        case 'finalizada':
+            return est.includes('finalizada');
+        default:
+            return false;
+    }
+}
+
+function updateOrderKpis(orders) {
+    const list = (typeof allFetchedOrdenes !== 'undefined' && Array.isArray(allFetchedOrdenes) && allFetchedOrdenes.length > 0)
+        ? allFetchedOrdenes
+        : (orders || currentOrdenes || []);
+
+    const now = new Date();
+    
+    // 1. Rango de la Semana Actual (Lunes 00:00:00 a Domingo 23:59:59)
+    const currentDayOfWeek = now.getDay();
+    const distToMonday = currentDayOfWeek === 0 ? 6 : (currentDayOfWeek - 1);
+    
+    const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - distToMonday, 0, 0, 0, 0);
+    const endOfWeek = new Date(startOfWeek.getFullYear(), startOfWeek.getMonth(), startOfWeek.getDate() + 6, 23, 59, 59, 999);
+
+    const counts = {
+        pendiente: { orders: 0, pieces: 0 },
+        revisando: { orders: 0, pieces: 0 },
+        recoger: { orders: 0, pieces: 0 },
+        enviar: { orders: 0, pieces: 0 },
+        enviado: { orders: 0, pieces: 0 },
+        finalizada: { orders: 0, pieces: 0 }
+    };
+
+    let totalWeekOrders = 0;
+    let totalWeekPieces = 0;
+
+    list.forEach(o => {
+        // 🚫 Excluir estrictamente órdenes canceladas de las métricas de estatus
+        if (isOrdenCancelada(o.estatus)) return;
+
+        const oDate = parseOrdenFecha(o.fecha);
+        if (!oDate) return;
+
+        // Pertenece a la semana actual (Lun-Dom)?
+        if (oDate >= startOfWeek && oDate <= endOfWeek) {
+            let pzs = 0;
+            if (Array.isArray(o.articulos_carrito) && o.articulos_carrito.length > 0) {
+                o.articulos_carrito.forEach(art => { pzs += (Number(art.cantidad) || 0); });
+            } else {
+                pzs = Number(o.total_piezas || o.piezas || o.cant_piezas || 0);
+            }
+
+            totalWeekOrders++;
+            totalWeekPieces += pzs;
+
+            if (matchesKpiStatusKey(o.estatus, 'pendiente')) {
+                counts.pendiente.orders++;
+                counts.pendiente.pieces += pzs;
+            } else if (matchesKpiStatusKey(o.estatus, 'revisando')) {
+                counts.revisando.orders++;
+                counts.revisando.pieces += pzs;
+            } else if (matchesKpiStatusKey(o.estatus, 'recoger')) {
+                counts.recoger.orders++;
+                counts.recoger.pieces += pzs;
+            } else if (matchesKpiStatusKey(o.estatus, 'enviar')) {
+                counts.enviar.orders++;
+                counts.enviar.pieces += pzs;
+            } else if (matchesKpiStatusKey(o.estatus, 'enviado')) {
+                counts.enviado.orders++;
+                counts.enviado.pieces += pzs;
+            } else if (matchesKpiStatusKey(o.estatus, 'finalizada')) {
+                counts.finalizada.orders++;
+                counts.finalizada.pieces += pzs;
+            }
+        }
+    });
+
+    // Actualizar los 6 indicadores de KPI por estatus de la semana actual (Lun-Dom)
+    const keys = ['pendiente', 'revisando', 'recoger', 'enviar', 'enviado', 'finalizada'];
+    keys.forEach(key => {
+        const elOrders = document.getElementById(`kpi-status-${key}`);
+        const elPzs = document.getElementById(`kpi-status-${key}-pzs`);
+        if (elOrders) elOrders.textContent = counts[key].orders;
+        if (elPzs) elPzs.textContent = `${counts[key].pieces} pzs`;
+    });
+
+    // Mantener compatibilidad con legacy IDs si existen en el DOM
+    const elWeekOrders = document.getElementById('kpi-orders-week');
+    const elWeekPieces = document.getElementById('kpi-pieces-week');
+    if (elWeekOrders) elWeekOrders.textContent = totalWeekOrders;
+    if (elWeekPieces) elWeekPieces.textContent = totalWeekPieces;
+}
+
+let activeKpiFilterType = 'all';
+
+window.filterOrdersByKpi = function(type) {
+    if (!allFetchedOrdenes) return;
+    
+    if (activeKpiFilterType === type && type !== 'all') {
+        type = 'all';
+    }
+    activeKpiFilterType = type;
+
+    const now = new Date();
+    const currentDayOfWeek = now.getDay();
+    const distToMonday = currentDayOfWeek === 0 ? 6 : (currentDayOfWeek - 1);
+    const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - distToMonday, 0, 0, 0, 0);
+    const endOfWeek = new Date(startOfWeek.getFullYear(), startOfWeek.getMonth(), startOfWeek.getDate() + 6, 23, 59, 59, 999);
+
+    if (type === 'all') {
+        currentOrdenes = [...allFetchedOrdenes];
+    } else if (type === 'week') {
+        currentOrdenes = allFetchedOrdenes.filter(o => {
+            if (isOrdenCancelada(o.estatus)) return false;
+            const oDate = parseOrdenFecha(o.fecha);
+            return oDate && oDate >= startOfWeek && oDate <= endOfWeek;
+        });
+    } else {
+        // Filtrar por estatus específico dentro de la semana actual (Lun-Dom)
+        currentOrdenes = allFetchedOrdenes.filter(o => {
+            if (isOrdenCancelada(o.estatus)) return false;
+            const oDate = parseOrdenFecha(o.fecha);
+            if (!oDate || oDate < startOfWeek || oDate > endOfWeek) return false;
+            return matchesKpiStatusKey(o.estatus, type);
+        });
+    }
+    
+    // Resaltar la tarjeta activa en la UI
+    const cardKeys = ['pendiente', 'revisando', 'recoger', 'enviar', 'enviado', 'finalizada'];
+    cardKeys.forEach(key => {
+        const cardEl = document.getElementById(`kpi-card-${key}`);
+        if (cardEl) {
+            if (type === key) {
+                cardEl.classList.add('ring-2', 'ring-white/80', 'scale-[1.02]');
+            } else {
+                cardEl.classList.remove('ring-2', 'ring-white/80', 'scale-[1.02]');
+            }
+        }
+    });
+
+    OrdenesCurrentPage = 1;
+    renderOrdenes();
+};
+
 function renderOrdenes() {
+    updateOrderKpis(allFetchedOrdenes);
+
     const container = DOM.admin.Ordenes.listContainer;
     if (container) container.innerHTML = '';
     
@@ -5926,112 +6554,126 @@ function renderOrdenes() {
     
     ordersToRender.forEach(orden => {
         const dateObj = new Date(orden.fecha);
-        const dateStr = dateObj.toLocaleDateString() + ' ' + dateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        const dateStr = !isNaN(dateObj.getTime()) 
+            ? (dateObj.toLocaleDateString() + ' ' + dateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}))
+            : (orden.fecha || 'Sin fecha');
         
         let totalPiezas = 0;
-        let articulosHtml = '';
         if (orden.articulos_carrito && orden.articulos_carrito.length > 0) {
-            articulosHtml = orden.articulos_carrito.map(art => {
+            orden.articulos_carrito.forEach(art => {
                 totalPiezas += Number(art.cantidad) || 0;
-                
-                // Lookup product in adminProducts or productsData
-                let prod = {};
-                if (art.id_playera && typeof art.id_playera === 'object') {
-                    prod = art.id_playera;
-                } else {
-                    const prodId = art.id_producto || art.id_playera;
-                    prod = (window.adminFilteredProducts && window.adminFilteredProducts.find(p => String(p.id) === String(prodId))) 
-                        || (window.productsData && window.productsData.find(p => String(p.id) === String(prodId))) 
-                        || {};
-                }
-                
-                const imgUrl = getFirstImage(prod.foto || prod.imagen) || 'https://images.unsplash.com/photo-1577212017184-807dd6acefd6?auto=format&fit=crop&q=80&w=100';
-                const nombre = prod.nombre || `Producto ${art.id_producto || (art.id_playera && art.id_playera.id) || 'Desconocido'}`;
-                const genero = prod.genero || '-';
-                const tipo = prod.tipo || '-';
-                const version = prod.version || '-';
-                
-                const itemTotal = Number(art.subtotal_renglon);
-                const unitPrice = Number(art.precio_unitario_final) || (itemTotal / Number(art.cantidad));
-                
-                let persName = art.texto_personalizado ? 'Sí' : 'Ninguna';
-                if (art.id_personalizacion && typeof art.id_personalizacion === 'object') {
-                    if (art.id_personalizacion.id_personalizacion !== 'PERS-NONE' && art.id_personalizacion.concepto) {
-                        persName = art.id_personalizacion.concepto;
-                    } else {
-                        persName = 'Ninguna';
-                    }
-                } else if (art.id_personalizacion && art.id_personalizacion !== 'PERS-NONE') {
-                    const pObj = (window.allPersonalizaciones && window.allPersonalizaciones.find(x => String(x.id) === String(art.id_personalizacion))) 
-                        || (window.defaultPersonalizaciones && window.defaultPersonalizaciones.find(x => String(x.id) === String(art.id_personalizacion)));
-                    if (pObj) persName = pObj.nombre;
-                }
-
-                const extraCostOrder = getExtraSizePrice(art.talla);
-                let tallaOrderHtml = `<span class="text-gray-300 font-semibold">${art.talla}</span>`;
-                if (extraCostOrder > 0) {
-                    tallaOrderHtml = `<span class="text-amber-400 font-bold">${art.talla} (+$${extraCostOrder.toFixed(2)} Talla Extra)</span>`;
-                }
-
-                return `
-        <div class="flex items-center gap-3 bg-dark-200/20 p-2.5 rounded-xl border border-white/5 mb-2 last:mb-0">
-            <img src="${imgUrl}" alt="Foto" class="w-12 h-12 rounded-lg object-cover bg-dark flex-shrink-0">
-            <div class="flex-grow min-w-0">
-                <h4 class="font-bold text-white text-xs truncate leading-tight">${nombre}</h4>
-                <div class="text-[9px] text-gray-400 mt-0.5 font-medium uppercase tracking-wider">
-                    ${genero} | ${tipo} | ${version}
-                </div>
-                <div class="text-[10px] text-gray-500 mt-0.5">
-                    Talla: ${tallaOrderHtml} | 
-                    Cant: <span class="text-gray-300 font-semibold">${art.cantidad}</span>
-                </div>
-                <div class="text-[10px] text-gray-400 mt-0.5">
-                    Pers: <span class="text-navy-400 font-semibold">${persName}</span>
-                    ${art.texto_personalizado ? ` | <span class="text-emerald-400 font-mono">"${art.texto_personalizado}"</span>` : ''}
-                </div>
-            </div>
-            <div class="text-right flex-shrink-0 min-w-[70px]">
-                <div class="font-bold text-white text-xs">$${itemTotal.toFixed(2)}</div>
-                <div class="text-[9px] text-gray-500 mt-0.5">$${unitPrice.toFixed(2)} c/u</div>
-            </div>
-        </div>`;
-            }).join('');
-        } else {
-            articulosHtml = '<div class="text-xs text-gray-500 italic">Sin detalles de artículos</div>';
+            });
         }
         
-        let estatusColorClass = 'bg-gray-500/20 text-gray-400 border border-gray-500/20';
-        switch (orden.estatus) {
-            case 'Pendiente': estatusColorClass = 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/20'; break;
-            case 'Revisando': estatusColorClass = 'bg-purple-500/20 text-purple-400 border border-purple-500/20'; break;
-            case 'Disponible - Para recoger': estatusColorClass = 'bg-teal-500/20 text-teal-400 border border-teal-500/20'; break;
-            case 'Disponible - Para enviar': estatusColorClass = 'bg-blue-500/20 text-blue-400 border border-blue-500/20'; break;
-            case 'Entregada - Paqueteria':
-            case 'Finalizada': estatusColorClass = 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/20'; break;
-            case 'Cancelada': estatusColorClass = 'bg-red-500/20 text-red-400 border border-red-500/20'; break;
+        let estatusColorClass = 'bg-gray-500/10 text-gray-300 border border-gray-500/30';
+        let borderLeftClass = 'border-l-4 border-l-gray-500';
+        let estatusDotClass = 'bg-gray-400';
+
+        const est = String(orden.estatus || '').toLowerCase();
+        if (est.includes('pendiente')) {
+            estatusColorClass = 'bg-amber-500/10 text-amber-300 border border-amber-500/30';
+            borderLeftClass = 'border-l-4 border-l-amber-500';
+            estatusDotClass = 'bg-amber-400';
+        } else if (est.includes('revisando')) {
+            estatusColorClass = 'bg-purple-500/10 text-purple-300 border border-purple-500/30';
+            borderLeftClass = 'border-l-4 border-l-purple-500';
+            estatusDotClass = 'bg-purple-400';
+        } else if (est.includes('disponible') && est.includes('recoger')) {
+            estatusColorClass = 'bg-teal-500/10 text-teal-300 border border-teal-500/30';
+            borderLeftClass = 'border-l-4 border-l-teal-500';
+            estatusDotClass = 'bg-teal-400';
+        } else if (est.includes('disponible') && est.includes('enviar')) {
+            estatusColorClass = 'bg-blue-500/10 text-blue-300 border border-blue-500/30';
+            borderLeftClass = 'border-l-4 border-l-blue-500';
+            estatusDotClass = 'bg-blue-400';
+        } else if (est.includes('entregada') || est.includes('finalizada') || est.includes('paqueteria')) {
+            estatusColorClass = 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/30';
+            borderLeftClass = 'border-l-4 border-l-emerald-500';
+            estatusDotClass = 'bg-emerald-400';
+        } else if (est.includes('cancelada')) {
+            estatusColorClass = 'bg-red-500/15 text-red-400 border border-red-500/30';
+            borderLeftClass = 'border-l-4 border-l-red-500';
+            estatusDotClass = 'bg-red-400';
         }
         
-        const estatusOptionsHtml = (window.OrdenesEstatusList || ['Pendiente', 'Enviado', 'Entregado', 'Cancelada'])
-            .map(e => `<option value="${e}">${e}</option>`)
+        const estatusOptionsHtmlSelect = (window.OrdenesEstatusList || ['Pendiente', 'Revisando', 'Disponible - Para recoger', 'Disponible - Para enviar', 'Entregada - Paqueteria', 'Finalizada', 'Cancelada'])
+            .map(e => `<option value="${e}" ${e === orden.estatus ? 'selected' : ''}>${e}</option>`)
             .join('');
             
         const clientObj = window.allClients ? window.allClients.find(c => String(c.id_cliente) === String(orden.id_cliente)) : null;
-        const finalNombreCliente = orden.nombre_cliente || (clientObj ? clientObj.nombre_completo : null) || orden.id_cliente || 'Cliente Desconocido';
+        const loggedUserObj = localStorage.getItem('logged_user') ? JSON.parse(localStorage.getItem('logged_user')) : null;
+        const sessionUserFallback = loggedUserObj ? (loggedUserObj.nombre_completo || loggedUserObj.usuario) : null;
+
+        let rawClientName = (orden.nombre_cliente && orden.nombre_cliente !== 'Cliente Desconocido') ? orden.nombre_cliente : null;
+        const finalNombreCliente = rawClientName || (clientObj ? clientObj.nombre_completo : null) || orden.usuario || sessionUserFallback || orden.id_cliente || 'Usuario en Sesión';
         
+        const isSurtido419 = String(orden.id_orden).toUpperCase().includes('419') || 
+                             orden.origen === '419' || 
+                             orden.tipo_precio_aplicado === 'Surtido 419' ||
+                             orden.tipo_entrega === 'Local 419';
+
+        const totalNetoNum = isSurtido419 ? 0 : Number(orden.total_neto !== undefined ? orden.total_neto : (Number(orden.gran_total || 0) + (Number(orden.envio_costo) || 0)));
+        const isCancelada = est.includes('cancelada');
+        
+        let priceDisplayHtml = `<span class="text-emerald-400 font-mono text-xs sm:text-sm font-black">$${totalNetoNum.toFixed(2)}</span>`;
+        if (isCancelada) {
+            priceDisplayHtml = `<span class="line-through text-red-400/80 font-mono text-xs sm:text-sm font-bold" title="Sin cargo">$${totalNetoNum.toFixed(2)}</span>`;
+        }
+
+        // Determinar Origen / Entrega
+        let origenBadgeHtml = '<span class="px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-gray-300 text-[9px] font-bold shrink-0">🏪 Recolección</span>';
+        const isPos419 = String(orden.id_orden).toUpperCase().startsWith('POS419-') || orden.origen === '419';
+        const envioSolicitado = String(orden.envio_solicitado || '').trim().toLowerCase();
+        const tieneEnvio = envioSolicitado.startsWith('s') || Number(orden.envio_costo) > 0 || Number(orden.costo_envio) > 0;
+
+        if (isPos419) {
+            origenBadgeHtml = '<span class="px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[9px] font-extrabold shrink-0">💻 POS 419</span>';
+        } else if (tieneEnvio) {
+            origenBadgeHtml = '<span class="px-1.5 py-0.5 rounded bg-blue-500/10 border border-blue-500/30 text-blue-300 text-[9px] font-extrabold shrink-0">🚚 Paquetería</span>';
+        }
+
         const cardHtml = `
-            <div class="bg-dark-100 border border-white/10 rounded-xl overflow-hidden shadow-sm hover:border-navy-500/50 transition-colors">
-                <!-- Encabezado de Orden -->
-                <div onclick="openOrderDetailsModal('${orden.id_orden}')" class="p-4 bg-dark-200/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 cursor-pointer hover:bg-dark-200/70 transition-colors relative group">
-                    <div class="flex-grow">
-                        <div class="flex items-center gap-2 mb-1">
-                            <span class="font-mono text-sm font-bold text-white">${orden.id_orden}</span>
-                            <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${estatusColorClass}">${orden.estatus}</span>
+            <div class="bg-dark-100/90 border border-white/10 ${borderLeftClass} rounded-xl overflow-hidden shadow-sm hover:shadow-md hover:border-white/20 transition-all duration-200 group">
+                <div class="p-2 sm:px-3 sm:py-2.5 flex flex-col md:flex-row md:items-center justify-between gap-2">
+                    
+                    <!-- Bloque Izquierdo: ID, Copiar, Origen, Cliente y Metadatos -->
+                    <div class="flex flex-wrap items-center gap-2 min-w-0 flex-grow">
+                        <!-- ID Copiable -->
+                        <button type="button" onclick="window.copyToClipboard('${orden.id_orden}', 'ID de Orden')" class="font-mono text-[11px] sm:text-xs font-black text-white bg-black/50 hover:bg-black/80 px-2 py-0.5 rounded-md border border-white/10 flex items-center gap-1 transition-colors cursor-pointer shrink-0" title="Copiar ID de Orden">
+                            <span>${orden.id_orden}</span>
+                            <svg class="w-3 h-3 text-gray-400 group-hover:text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                        </button>
+
+                        <!-- Origen Badge -->
+                        ${origenBadgeHtml}
+
+                        <!-- Cliente -->
+                        <div onclick="openOrderDetailsModal('${orden.id_orden}')" class="flex items-center gap-1 cursor-pointer hover:underline min-w-0">
+                            <span class="text-xs font-bold text-white truncate max-w-[150px] sm:max-w-[220px]" title="${finalNombreCliente}">👤 ${finalNombreCliente}</span>
                         </div>
-                        <div class="text-xs text-gray-400">
-                            <strong>${finalNombreCliente}</strong> <span class="mx-1">|</span> ${dateStr} <span class="mx-1">|</span> <span class="text-white font-semibold">${totalPiezas} piezas</span>
-                        </div>
+
+                        <!-- Fecha y Piezas -->
+                        <span class="text-[10px] text-gray-400 font-medium hidden lg:inline-flex items-center gap-1">📅 ${dateStr}</span>
+                        <span class="px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-gray-300 font-mono font-bold text-[9px] shrink-0">📦 ${totalPiezas} pzs</span>
                     </div>
-                        <div class="text-base text-emerald-400 font-black whitespace-nowrap">$${Number(orden.total_neto !== undefined ? orden.total_neto : (Number(orden.gran_total || 0) + (Number(orden.envio_costo) || 0))).toFixed(2)}</div>
+
+                    <!-- Bloque Derecho: Selector Estatus, Precio y Detalle -->
+                    <div class="flex items-center justify-between md:justify-end gap-2 shrink-0 pt-1.5 md:pt-0 border-t md:border-t-0 border-white/5 w-full md:w-auto">
+                        <!-- Estatus Selector Compacto -->
+                        <select onchange="updateOrderStatus('${orden.id_orden}', this.value)" onclick="event.stopPropagation()" class="bg-dark-200 border border-white/10 rounded-lg px-2 py-0.5 text-[10px] sm:text-[11px] font-bold text-white focus:outline-none focus:border-amber-400 cursor-pointer transition-colors ${estatusColorClass}">
+                            ${estatusOptionsHtmlSelect}
+                        </select>
+
+                        <!-- Precio -->
+                        <div onclick="openOrderDetailsModal('${orden.id_orden}')" class="text-right min-w-[70px] cursor-pointer">
+                            ${priceDisplayHtml}
+                        </div>
+
+                        <!-- Botón Ver Detalle -->
+                        <button type="button" onclick="openOrderDetailsModal('${orden.id_orden}')" class="px-2.5 py-1 rounded-lg bg-navy-500/20 hover:bg-navy-500/50 text-navy-300 hover:text-white border border-navy-500/30 text-[11px] font-bold transition-all flex items-center gap-1 cursor-pointer shrink-0" title="Ver detalle completo de la orden">
+                            <span>👁️</span>
+                            <span class="hidden sm:inline">Detalle</span>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -6390,51 +7032,119 @@ window.deleteOrderItem = async function(id_orden, id_detalle) {
     }
 };
 
+async function promptWhatsAppNotification(id_orden, nuevo_estatus, trackingGuide, ordenOriginal) {
+    const loggedUserStr = localStorage.getItem('logged_user');
+    const loggedUser = loggedUserStr ? JSON.parse(loggedUserStr) : null;
+    const currentProfile = localStorage.getItem('current_perfil') || (loggedUser ? loggedUser.perfil : '');
+    const isAdmin = (currentProfile === 'Administrador' || currentProfile === 'Admin' || (loggedUser && (loggedUser.perfil === 'Administrador' || loggedUser.perfil === 'Admin')));
+
+    if (!isAdmin) return;
+
+    const id = String(id_orden).trim();
+    const targetOrden = (typeof currentOrdenes !== 'undefined' && Array.isArray(currentOrdenes) ? currentOrdenes.find(o => String(o.id_orden).trim() === id) : null) 
+        || (typeof allFetchedOrdenes !== 'undefined' && Array.isArray(allFetchedOrdenes) ? allFetchedOrdenes.find(o => String(o.id_orden).trim() === id) : null)
+        || ordenOriginal;
+        
+    const clientName = targetOrden?.nombre_cliente || 'Cliente';
+
+    const confirmWa = await Swal.fire({
+        title: '📱 Notificación por WhatsApp',
+        text: `¿Deseas enviar una notificación por WhatsApp a "${clientName}" sobre la actualización del pedido ${id_orden}?`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Sí, Enviar WhatsApp',
+        cancelButtonText: 'No Enviar',
+        confirmButtonColor: '#25D366',
+        cancelButtonColor: '#4b5563',
+        background: '#151515', color: '#fff'
+    });
+
+    if (confirmWa.isConfirmed) {
+        let rawPhone = targetOrden?.telefono_cliente || targetOrden?.telefono || targetOrden?.celular;
+        if (!rawPhone) {
+            const clientObj = window.allClients ? window.allClients.find(c => String(c.id_cliente) === String(targetOrden?.id_cliente)) : null;
+            rawPhone = clientObj ? (clientObj.telefono_cliente || clientObj.telefono || clientObj.celular) : null;
+        }
+
+        let finalPhone = rawPhone ? String(rawPhone).replace(/\D/g, '') : null;
+        if (finalPhone && finalPhone.length === 10) {
+            finalPhone = '52' + finalPhone;
+        }
+
+        if (!finalPhone) {
+            const { value: manualPhone } = await Swal.fire({
+                title: 'WhatsApp no encontrado',
+                text: `No se encontró número registrado para la orden ${id_orden}. Ingresa el número de WhatsApp del cliente:`,
+                input: 'text',
+                inputPlaceholder: 'Ej. 8132698182',
+                showCancelButton: true,
+                confirmButtonColor: '#25D366',
+                confirmButtonText: 'Enviar WhatsApp',
+                cancelButtonText: 'Cancelar',
+                background: '#151515', color: '#fff'
+            });
+            if (manualPhone) {
+                let clean = manualPhone.replace(/\D/g, '');
+                if (clean.length === 10) clean = '52' + clean;
+                if (clean) finalPhone = clean;
+            }
+        }
+
+        if (finalPhone) {
+            const nombreCorto = clientName.split(' ')[0];
+            const mensajeGuia = trackingGuide ? `\n\n📦 *Número de Guía / Rastreo:* ${trackingGuide}` : '';
+            const mensajeHorario = `\n\n⏰ *Horario de entrega:* 12:00 PM a 7:00 PM`;
+            const waText = encodeURIComponent(`*Actualización de Pedido* 🚚\n\nHola ${nombreCorto},\nTe informamos que el estatus de tu orden *${id_orden}* ha cambiado a: *${nuevo_estatus}*.${mensajeGuia}${mensajeHorario}\n\n¡Gracias por tu preferencia!`);
+            const waUrl = `https://wa.me/${finalPhone}?text=${waText}`;
+
+            if (typeof abrirWhatsAppAutomatico === 'function') {
+                abrirWhatsAppAutomatico(waUrl);
+            } else {
+                window.open(waUrl, '_blank');
+            }
+        }
+    }
+}
+
 async function updateOrderStatus(id_orden, nuevo_estatus) {
     if (!nuevo_estatus) return;
     
+    const id = String(id_orden).trim();
     const selects = document.querySelectorAll(`select[onchange="updateOrderStatus('${id_orden}', this.value)"]`);
     
-    const result = await Swal.fire({
-        title: '¿Cambiar estatus?',
-        text: `¿Estás seguro que deseas marcar la orden ${id_orden} como ${nuevo_estatus}?`,
-        icon: 'question',
-        showCancelButton: true,
-        confirmButtonColor: '#1d4ed8',
-        cancelButtonColor: '#3f3f46',
-        confirmButtonText: 'Sí, cambiar',
-        cancelButtonText: 'Cancelar',
-        background: '#151515', color: '#fff'
-    });
-    
-    const id = String(id_orden).trim();
-    const ordenOriginal = currentOrdenes.find(o => String(o.id_orden).trim() === id) 
-        || allFetchedOrdenes.find(o => String(o.id_orden).trim() === id)
-        || allUserOrdenesFetched.find(o => String(o.id_orden).trim() === id);
+    const ordenOriginal = (typeof currentOrdenes !== 'undefined' && Array.isArray(currentOrdenes) ? currentOrdenes.find(o => String(o.id_orden).trim() === id) : null) 
+        || (typeof allFetchedOrdenes !== 'undefined' && Array.isArray(allFetchedOrdenes) ? allFetchedOrdenes.find(o => String(o.id_orden).trim() === id) : null)
+        || (typeof allUserOrdenesFetched !== 'undefined' && Array.isArray(allUserOrdenesFetched) ? allUserOrdenesFetched.find(o => String(o.id_orden).trim() === id) : null);
 
-    if (!result.isConfirmed) {
-        selects.forEach(sel => sel.value = ordenOriginal ? ordenOriginal.estatus : "");
-        const modalSelect = document.getElementById('admin-order-details-status');
-        if (modalSelect && document.getElementById('admin-order-details-id')?.textContent === id_orden) {
-            modalSelect.value = ordenOriginal ? ordenOriginal.estatus : "";
+    const estatusPrevio = ordenOriginal ? ordenOriginal.estatus : "";
+
+    // 1. Confirmación de seguridad únicamente si se cancela la orden
+    const isCancelacion = String(nuevo_estatus).toLowerCase() === 'cancelada';
+    if (isCancelacion) {
+        const result = await Swal.fire({
+            title: '¿Cancelar orden?',
+            text: `¿Estás seguro que deseas cancelar la orden ${id_orden}? Esto devolverá los artículos al inventario.`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#dc2626',
+            cancelButtonColor: '#3f3f46',
+            confirmButtonText: 'Sí, cancelar orden',
+            cancelButtonText: 'No, mantener',
+            background: '#151515', color: '#fff'
+        });
+
+        if (!result.isConfirmed) {
+            selects.forEach(sel => sel.value = estatusPrevio);
+            const modalSelect = document.getElementById('admin-order-details-status');
+            if (modalSelect && document.getElementById('admin-order-details-id')?.textContent === id_orden) {
+                modalSelect.value = estatusPrevio;
+            }
+            return;
         }
-        return;
     }
-    
-    // Verificar si el pedido tiene envío de forma más tolerante
-    const envioSolicitado = ordenOriginal && ordenOriginal.envio_solicitado 
-        ? String(ordenOriginal.envio_solicitado).trim().toLowerCase() 
-        : "";
-        
-    const tieneEnvio = ordenOriginal && (
-        envioSolicitado.startsWith("s") || // Sí, si, S, Sí (con mala codificación)
-        Number(ordenOriginal.envio_costo) > 0 ||
-        Number(ordenOriginal.costo_envio) > 0
-    );
-    
-    // Normalizar estatus para evitar problemas de acentos y mayúsculas
+
+    // 2. Si el estatus requiere número de guía (Paquetería)
     const estatusNormalizado = String(nuevo_estatus).trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    
     let trackingGuide = "";
     if (estatusNormalizado.includes("entregada - paqueteria") || estatusNormalizado.includes("paqueteria")) {
         const { value: trackingNum } = await Swal.fire({
@@ -6456,43 +7166,168 @@ async function updateOrderStatus(id_orden, nuevo_estatus) {
         });
         
         if (!trackingNum) {
-            // Cancelar el cambio de estatus y revertir selects
-            selects.forEach(sel => sel.value = ordenOriginal ? ordenOriginal.estatus : "");
+            selects.forEach(sel => sel.value = estatusPrevio);
             const modalSelect = document.getElementById('admin-order-details-status');
             if (modalSelect && document.getElementById('admin-order-details-id')?.textContent === id_orden) {
-                modalSelect.value = ordenOriginal ? ordenOriginal.estatus : "";
+                modalSelect.value = estatusPrevio;
             }
             return;
         }
         trackingGuide = trackingNum.trim();
     }
-    
+
+    // 3. ⚡ ACTUALIZACIÓN OPTIMISTA INMEDIATA EN MEMORIA Y UI (0ms)
+    if (ordenOriginal) {
+        ordenOriginal.estatus = nuevo_estatus;
+        if (trackingGuide) ordenOriginal.guia = trackingGuide;
+    }
+    const updatesList = [currentOrdenes, allFetchedOrdenes, allUserOrdenesFetched];
+    updatesList.forEach(arr => {
+        if (Array.isArray(arr)) {
+            const found = arr.find(o => String(o.id_orden).trim() === id);
+            if (found) {
+                found.estatus = nuevo_estatus;
+                if (trackingGuide) found.guia = trackingGuide;
+            }
+        }
+    });
+
+    // Actualizar select de modal si está abierto
+    const modalSelect = document.getElementById('admin-order-details-status');
+    if (modalSelect && document.getElementById('admin-order-details-id')?.textContent === id_orden) {
+        modalSelect.value = nuevo_estatus;
+    }
+
+    // 🔄 Si es cancelación, devolver stock local en memoria de inmediato (0ms)
+    if (isCancelacion && ordenOriginal) {
+        try {
+            if (Array.isArray(ordenOriginal.articulos_carrito)) {
+                ordenOriginal.articulos_carrito.forEach(item => {
+                    let pId = "";
+                    if (item.id_playera && typeof item.id_playera === 'object') {
+                        pId = String(item.id_playera.id || item.id_playera.id_producto || "").trim().toUpperCase();
+                    } else if (item.id_playera) {
+                        pId = String(item.id_playera).trim().toUpperCase();
+                    } else if (item.id_producto) {
+                        pId = String(item.id_producto).trim().toUpperCase();
+                    }
+                    const sz = String(item.talla || "").trim().toUpperCase();
+                    const qty = Number(item.cantidad || 1);
+
+                    if (pId && sz) {
+                        // Devolver stock devuelto ÚNICAMENTE a Bodega General (allProducts)
+                        if (typeof allProducts !== 'undefined' && Array.isArray(allProducts)) {
+                            const prodGen = allProducts.find(p => String(p.id || p.id_producto || "").trim().toUpperCase() === pId);
+                            if (prodGen && Array.isArray(prodGen.tallas)) {
+                                const tObj = prodGen.tallas.find(t => String(t.talla || t.Talla || "").trim().toUpperCase() === sz);
+                                if (tObj) {
+                                    const st = Number(tObj.stock !== undefined ? tObj.stock : (tObj.inventario || 0));
+                                    tObj.stock = st + qty;
+                                    tObj.inventario = st + qty;
+                                }
+                            }
+                        }
+                        // NOTA: El stock de Local 419 NO se incrementa en cancelaciones.
+                        // El stock de Local 419 se incrementará ÚNICAMENTE al cambiar el estatus a "Finalizada".
+                    }
+                });
+                if (typeof renderProductsWithFilters === 'function') renderProductsWithFilters();
+            }
+        } catch (eRest) {
+            console.warn("Error devolviendo stock en memoria optimista:", eRest);
+        }
+    }
+
+    // Refrescar vista de órdenes de inmediato (0ms)
+    if (typeof renderOrdenes === 'function') renderOrdenes();
+
+    // Notificación Toast flotante no bloqueante (0ms)
+    const Toast = Swal.mixin({
+        toast: true,
+        position: 'top-end',
+        showConfirmButton: false,
+        timer: 2500,
+        timerProgressBar: true,
+        background: '#18181b',
+        color: '#fff'
+    });
+    Toast.fire({
+        icon: 'success',
+        title: `⚡ Orden ${id_orden}`,
+        text: `Estatus cambiado a "${nuevo_estatus}"`
+    });
+
+    // ⚡ Lanzar inmediatamente el modal de notificación por WhatsApp (0ms latencia) sin esperar respuesta de red
+    promptWhatsAppNotification(id_orden, nuevo_estatus, trackingGuide, ordenOriginal);
+
+    // 4. 🌐 PROCESAMIENTO EN SEGUNDO PLANO SIN BLOQUEAR LA PANTALLA
     const payload = {
         action: 'update_order_status',
         id_orden: id_orden,
         nuevo_estatus: nuevo_estatus,
         guia: trackingGuide
     };
-    
-    try {
-        Swal.fire({ title: 'Actualizando...', allowOutsideClick: false, background: '#151515', color: '#fff', didOpen: () => { Swal.showLoading(); }});
-        
-        const response = await fetch(API_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify(payload)
-        });
-        
+
+    fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(payload)
+    })
+    .then(async (response) => {
         const rawText = await response.text();
         let data;
         try {
             data = JSON.parse(rawText);
         } catch (jsonErr) {
             console.error("Respuesta no válida del servidor:", rawText);
-            throw new Error("El servidor devolvió una respuesta inesperada. Asegúrate de copiar el código actualizado a Google Apps Script y realizar un 'Nuevo Despliegue'.");
+            throw new Error("El servidor devolvió una respuesta inesperada.");
         }
-        
+
         if (data.status === 'success') {
+            if (isCancelacion) {
+                if (typeof fetchInitialProducts === 'function') fetchInitialProducts(true);
+                if (typeof fetchProducts419 === 'function') fetchProducts419(true);
+            }
+
+            const isFinalizada = (String(nuevo_estatus).toLowerCase() === 'finalizada' || String(nuevo_estatus).toLowerCase() === 'completada');
+            const is419Order = ordenOriginal && (
+                String(ordenOriginal.id_cliente || '').toUpperCase().includes('419') ||
+                String(ordenOriginal.tipo_precio_aplicado || '').toLowerCase().includes('419') ||
+                String(ordenOriginal.tipo_precio_aplicado || '').toLowerCase().includes('surtido') ||
+                String(id_orden).toUpperCase().includes('419')
+            );
+
+            if (isFinalizada && is419Order && Array.isArray(ordenOriginal.articulos_carrito)) {
+                ordenOriginal.articulos_carrito.forEach(async (item) => {
+                    let pId = "";
+                    if (item.id_playera && typeof item.id_playera === 'object') {
+                        pId = String(item.id_playera.id || item.id_playera.id_producto || "").trim().toUpperCase();
+                    } else if (item.id_playera) {
+                        pId = String(item.id_playera).trim().toUpperCase();
+                    } else if (item.id_producto) {
+                        pId = String(item.id_producto).trim().toUpperCase();
+                    }
+                    const sz = String(item.talla || "").trim().toUpperCase();
+                    const qty = Number(item.cantidad || 1);
+
+                    if (pId && sz) {
+                        let target419 = (allProducts419 || []).find(p => String(p.id || '').toUpperCase() === pId);
+                        let currentSt419 = 0;
+                        if (target419 && Array.isArray(target419.tallas)) {
+                            let t419 = target419.tallas.find(t => String(t.talla || '').trim().toUpperCase() === sz);
+                            if (t419) {
+                                currentSt419 = Number(t419.stock !== undefined ? t419.stock : (t419.inventario || 0)) || 0;
+                            }
+                        }
+                        const newStock419 = currentSt419 + qty;
+                        try {
+                            await updateLocal419SizeStock(pId, sz, newStock419);
+                        } catch(eStk) {}
+                    }
+                });
+                if (typeof fetchProducts419 === 'function') fetchProducts419(true);
+            }
+
             if (data.super_mayoreo_procesado) {
                 const sm = data.super_mayoreo_procesado;
                 const loggedUserStr = localStorage.getItem('logged_user');
@@ -6505,116 +7340,40 @@ async function updateOrderStatus(id_orden, nuevo_estatus) {
                             loggedUser.super_mayoreo_acum = sm.super_mayoreo_acum;
                             localStorage.setItem('logged_user', JSON.stringify(loggedUser));
                             localStorage.setItem('current_perfil', sm.perfil);
-                            updateUserLoginUI(loggedUser);
+                            if (typeof updateUserLoginUI === 'function') updateUserLoginUI(loggedUser);
                         }
                     } catch(e) {}
                 }
-                
-                if (sm.perfil === "Súper Mayoreo") {
-                    await Swal.fire({
-                        icon: 'success',
-                        title: '⭐ Perfil Súper Mayoreo Procesado',
-                        text: `La orden ha sido validada (${sm.piezas_jugador || 10} piezas Jugador). Perfil actualizado a Súper Mayoreo por 6 días.`,
-                        background: '#151515', color: '#fff',
-                        timer: 2500,
-                        showConfirmButton: false
-                    });
-                } else {
-                    await Swal.fire({ icon: 'success', title: '¡Actualizado!', text: data.message, background: '#151515', color: '#fff', timer: 1500, showConfirmButton: false });
-                }
-            } else {
-                await Swal.fire({ icon: 'success', title: '¡Actualizado!', text: data.message, background: '#151515', color: '#fff', timer: 1500, showConfirmButton: false });
-            }
-            
-            const loggedUserStr = localStorage.getItem('logged_user');
-            const loggedUser = loggedUserStr ? JSON.parse(loggedUserStr) : null;
-            const currentProfile = localStorage.getItem('current_perfil') || (loggedUser ? loggedUser.perfil : '');
-            const isAdmin = (currentProfile === 'Administrador' || currentProfile === 'Admin' || (loggedUser && (loggedUser.perfil === 'Administrador' || loggedUser.perfil === 'Admin')));
-
-            // Solo preguntar si el perfil del usuario activo es Administrador
-            if (isAdmin) {
-                const targetOrden = currentOrdenes.find(o => String(o.id_orden).trim() === String(id_orden).trim()) 
-                    || allFetchedOrdenes.find(o => String(o.id_orden).trim() === String(id_orden).trim())
-                    || ordenOriginal;
-                
-                const clientName = targetOrden?.nombre_cliente || 'Cliente';
-
-                const confirmWa = await Swal.fire({
-                    title: '📱 Notificación por WhatsApp',
-                    text: `¿Deseas enviar una notificación por WhatsApp a "${clientName}" sobre la actualización del pedido ${id_orden}?`,
-                    icon: 'question',
-                    showCancelButton: true,
-                    confirmButtonText: 'Sí, Enviar WhatsApp',
-                    cancelButtonText: 'No Enviar',
-                    confirmButtonColor: '#25D366',
-                    cancelButtonColor: '#4b5563',
-                    background: '#151515', color: '#fff'
-                });
-
-                if (confirmWa.isConfirmed) {
-                    let rawPhone = targetOrden?.telefono_cliente || targetOrden?.telefono || targetOrden?.celular;
-                    if (!rawPhone) {
-                        const clientObj = window.allClients ? window.allClients.find(c => String(c.id_cliente) === String(targetOrden?.id_cliente)) : null;
-                        rawPhone = clientObj ? (clientObj.telefono_cliente || clientObj.telefono || clientObj.celular) : null;
-                    }
-
-                    let finalPhone = rawPhone ? String(rawPhone).replace(/\D/g, '') : null;
-                    if (finalPhone && finalPhone.length === 10) {
-                        finalPhone = '52' + finalPhone;
-                    }
-
-                    if (!finalPhone) {
-                        const { value: manualPhone } = await Swal.fire({
-                            title: 'WhatsApp no encontrado',
-                            text: `No se encontró número registrado para la orden ${id_orden}. Ingresa el número de WhatsApp del cliente:`,
-                            input: 'text',
-                            inputPlaceholder: 'Ej. 8132698182',
-                            showCancelButton: true,
-                            confirmButtonColor: '#25D366',
-                            confirmButtonText: 'Enviar WhatsApp',
-                            cancelButtonText: 'Cancelar',
-                            background: '#151515', color: '#fff'
-                        });
-                        if (manualPhone) {
-                            let clean = manualPhone.replace(/\D/g, '');
-                            if (clean.length === 10) clean = '52' + clean;
-                            if (clean) finalPhone = clean;
-                        }
-                    }
-
-                    if (finalPhone) {
-                        const nombreCorto = clientName.split(' ')[0];
-                        const mensajeGuia = trackingGuide ? `\n\n📦 *Número de Guía / Rastreo:* ${trackingGuide}` : '';
-                        const waText = encodeURIComponent(`*Actualización de Pedido* 🚚\n\nHola ${nombreCorto},\nTe informamos que el estatus de tu orden *${id_orden}* ha cambiado a: *${nuevo_estatus}*.${mensajeGuia}\n\n¡Gracias por tu preferencia en Jerseys 419!`);
-                        const waUrl = `https://wa.me/${finalPhone}?text=${waText}`;
-
-                        if (typeof abrirWhatsAppAutomatico === 'function') {
-                            abrirWhatsAppAutomatico(waUrl);
-                        } else {
-                            window.open(waUrl, '_blank');
-                        }
-                    }
-                }
-            }
-
-            const idx = currentOrdenes.findIndex(o => o.id_orden === id_orden);
-            if (idx !== -1) {
-                currentOrdenes[idx].estatus = nuevo_estatus;
-                renderOrdenes();
             }
         } else {
-            throw new Error(data.message || 'Error al actualizar.');
+            throw new Error(data.message || 'Error al actualizar estatus en servidor.');
         }
-    } catch (error) {
-        console.error('Error updating status:', error);
-        const ordenOriginal = currentOrdenes.find(o => o.id_orden === id_orden) || allFetchedOrdenes.find(o => o.id_orden === id_orden);
-        selects.forEach(sel => sel.value = ordenOriginal ? ordenOriginal.estatus : "");
+    })
+    .catch((error) => {
+        console.error('Error actualizando estatus:', error);
+
+        // Revertir cambio optimista en memoria
+        updatesList.forEach(arr => {
+            if (Array.isArray(arr)) {
+                const found = arr.find(o => String(o.id_orden).trim() === id);
+                if (found) found.estatus = estatusPrevio;
+            }
+        });
+        if (typeof renderOrdenes === 'function') renderOrdenes();
+
+        selects.forEach(sel => sel.value = estatusPrevio);
         const modalSelect = document.getElementById('admin-order-details-status');
         if (modalSelect && document.getElementById('admin-order-details-id')?.textContent === id_orden) {
-            modalSelect.value = ordenOriginal ? ordenOriginal.estatus : "";
+            modalSelect.value = estatusPrevio;
         }
-        Swal.fire({ icon: 'error', title: 'Error', text: error.message, background: '#151515', color: '#fff' });
-    }
+
+        Swal.fire({
+            icon: 'error',
+            title: 'Error al Guardar',
+            text: `No se pudo guardar la orden en el servidor (${error.message}). Se ha revertido el estatus.`,
+            background: '#151515', color: '#fff'
+        });
+    });
 }
 
 // ============================================================================
@@ -6879,6 +7638,7 @@ async function fetchUserOrdenes(force = false) {
         return allFetchedOrdenes.filter(o => String(o.id_cliente).trim() === String(loggedUser.id_cliente).trim());
     }
     
+    if (window.startTopLoadingBar) startTopLoadingBar();
     try {
         const response = await fetch(API_URL, {
             method: 'POST',
@@ -6901,6 +7661,8 @@ async function fetchUserOrdenes(force = false) {
     } catch (e) {
         console.error('Error in fetchUserOrdenes:', e);
         return [];
+    } finally {
+        if (window.finishTopLoadingBar) finishTopLoadingBar();
     }
 }
 
@@ -7001,6 +7763,9 @@ function renderUserOrdenesList() {
         const dateObj = new Date(orden.fecha);
         const formattedDate = !isNaN(dateObj) ? dateObj.toLocaleDateString('es-MX', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Fecha Inválida';
         
+        const isSurtido419User = String(orden.id_orden).toUpperCase().includes('419') || orden.origen === '419' || orden.tipo_precio_aplicado === 'Surtido 419';
+        const userOrderTotal = isSurtido419User ? 0 : Number(orden.total_neto !== undefined ? orden.total_neto : (Number(orden.gran_total || 0) + (Number(orden.envio_costo) || 0)));
+        
         card.innerHTML = `
             <div class="flex flex-col gap-1">
                 <div class="flex items-center gap-3">
@@ -7011,7 +7776,7 @@ function renderUserOrdenesList() {
                 <div class="flex items-center gap-3 mt-2 text-xs font-semibold text-gray-300">
                     <span class="flex items-center gap-1.5"><svg class="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path></svg>${numItems} artícul${numItems !== 1 ? 'os' : 'o'}</span>
                     <span class="text-gray-600">•</span>
-                    <span class="text-emerald-400 font-bold">Total: $${Number(orden.total_neto !== undefined ? orden.total_neto : (Number(orden.gran_total || 0) + (Number(orden.envio_costo) || 0))).toFixed(2)}</span>
+                    <span class="text-emerald-400 font-bold">Total: $${userOrderTotal.toFixed(2)}</span>
                 </div>
             </div>
             <div class="w-full sm:w-auto mt-2 sm:mt-0 flex gap-2 justify-end">
@@ -8477,6 +9242,7 @@ async function loadSupplierOrders() {
     if (tbody) tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-gray-400"><div class="w-8 h-8 border-4 border-navy-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>Cargando pedidos a proveedor...</td></tr>`;
     if (emptyState) emptyState.classList.add('hidden');
     
+    if (window.startTopLoadingBar) startTopLoadingBar();
     try {
         const response = await fetch(API_URL, {
             method: 'POST',
@@ -8497,6 +9263,8 @@ async function loadSupplierOrders() {
             emptyState.classList.remove('hidden');
             emptyState.querySelector('p').textContent = 'No se pudieron cargar los pedidos. Intenta nuevamente.';
         }
+    } finally {
+        if (window.finishTopLoadingBar) finishTopLoadingBar();
     }
 }
 window.loadSupplierOrders = loadSupplierOrders;
@@ -9049,6 +9817,52 @@ window.confirmSupplierStockMigration = confirmSupplierStockMigration;
 // ==========================================
 let allProducts419 = [];
 let isLocal419Loading = false;
+let ytProgressInterval = null;
+
+function startTopLoadingBar() {
+    const bar = document.getElementById('yt-top-loading-bar');
+    if (!bar) return;
+
+    if (ytProgressInterval) clearInterval(ytProgressInterval);
+
+    bar.style.transition = 'width 200ms cubic-bezier(0.4, 0, 0.2, 1), opacity 200ms ease';
+    bar.style.opacity = '1';
+    bar.style.width = '20%';
+
+    let currentProgress = 20;
+    ytProgressInterval = setInterval(() => {
+        if (currentProgress < 75) {
+            currentProgress += Math.random() * 8 + 4;
+            bar.style.width = `${Math.min(currentProgress, 75)}%`;
+        } else if (currentProgress < 92) {
+            currentProgress += Math.random() * 2 + 0.5;
+            bar.style.width = `${Math.min(currentProgress, 92)}%`;
+        }
+    }, 200);
+}
+window.startTopLoadingBar = startTopLoadingBar;
+
+function finishTopLoadingBar() {
+    const bar = document.getElementById('yt-top-loading-bar');
+    if (!bar) return;
+
+    if (ytProgressInterval) {
+        clearInterval(ytProgressInterval);
+        ytProgressInterval = null;
+    }
+
+    bar.style.transition = 'width 180ms cubic-bezier(0, 0, 0.2, 1), opacity 250ms ease-out 180ms';
+    bar.style.width = '100%';
+
+    setTimeout(() => {
+        bar.style.opacity = '0';
+        setTimeout(() => {
+            bar.style.transition = 'none';
+            bar.style.width = '0%';
+        }, 300);
+    }, 200);
+}
+window.finishTopLoadingBar = finishTopLoadingBar;
 
 async function fetchProducts419(force = false) {
     if (isLocal419Loading && !force) return;
@@ -9090,6 +9904,7 @@ async function fetchProducts419(force = false) {
     }
 
     isLocal419Loading = true;
+    startTopLoadingBar();
 
     try {
         const [jerseyRes, artRes] = await Promise.all([
@@ -9165,6 +9980,7 @@ async function fetchProducts419(force = false) {
         }
     } finally {
         isLocal419Loading = false;
+        finishTopLoadingBar();
     }
 }
 window.fetchProducts419 = fetchProducts419;
@@ -9223,7 +10039,7 @@ function renderInventario419Grid(products) {
         if (tallasArray.length > 0) {
             sizeBoxesHtml = tallasArray.map(tObj => {
                 const sz = String(tObj.talla || '').toUpperCase();
-                const shortSz = sz.includes('(') ? (sz.split('(')[0].trim() || sz) : sz;
+                const shortSz = formatShortTallaLabel(sz);
                 const cant = Number(tObj.stock || 0);
                 totalStock419 += cant;
                 const hasStock = cant > 0;
@@ -9368,12 +10184,12 @@ function updateNewTalla419Select(producto) {
 
     const genero = producto.genero || 'Hombre';
     const tallasGenericas = getTallasForGender(genero);
+    const existentes = producto.tallas || [];
 
-    // Obtener tallas ya agregadas a este jersey (en memoria o registradas)
-    const existentes = (producto.tallas || []).map(t => String(t.talla || '').trim().toUpperCase());
-
-    // Filtrar para dejar SOLAMENTE las tallas que AÚN NO se han agregado
-    const disponibles = tallasGenericas.filter(t => !existentes.includes(String(t || '').trim().toUpperCase()));
+    const disponibles = tallasGenericas.filter(t => {
+        const yaExiste = existentes.some(ex => isSameTalla(ex.talla, t));
+        return !yaExiste;
+    });
 
     if (disponibles.length === 0) {
         selectNew.innerHTML = `<option value="" disabled selected>Todas las tallas agregadas</option>`;
@@ -9442,7 +10258,10 @@ function closeLocal419InventoryModal() {
     modal.querySelector('.transform').classList.add('scale-95');
     setTimeout(() => {
         modal.classList.add('hidden');
-        document.body.style.overflow = '';
+        const full419Modal = document.getElementById('local419-inventario-modal');
+        if (!full419Modal || full419Modal.classList.contains('hidden')) {
+            document.body.style.overflow = '';
+        }
         currentJersey419ToManage = null;
     }, 300);
 }
@@ -9497,6 +10316,13 @@ function renderLocal419InventorySizes(prod) {
 
     // Escuchar cambios locales en los inputs (input directo)
     document.querySelectorAll('.input-stock-419-local-val').forEach(input => {
+        input.addEventListener('focus', (e) => e.target.select());
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                handleSaveBatchTallas419();
+            }
+        });
         input.addEventListener('input', (e) => {
             const idx = parseInt(e.target.getAttribute('data-idx'));
             const val = parseInt(e.target.value);
@@ -9598,7 +10424,60 @@ function handleAddNewTalla419(e) {
     });
 }
 
-async function handleSaveBatchTallas419() {
+function addAllStandardTallas419() {
+    if (!currentJersey419ToManage) return;
+
+    const genero = currentJersey419ToManage.genero || 'Hombre';
+    const tallasGenericas = getTallasForGender(genero);
+    const inputStockEl = document.getElementById('new-stock-419-val');
+    const stockVal = parseInt(inputStockEl ? inputStockEl.value : 0);
+    const finalStock = isNaN(stockVal) || stockVal < 0 ? 0 : stockVal;
+
+    if (!currentJersey419ToManage.tallas) currentJersey419ToManage.tallas = [];
+
+    let addedCount = 0;
+    tallasGenericas.forEach(sz => {
+        const existing = currentJersey419ToManage.tallas.find(t => isSameTalla(t.talla, sz));
+        if (!existing) {
+            currentJersey419ToManage.tallas.push({
+                id_inventario: 'TEMP_419_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+                id_producto: currentJersey419ToManage.id,
+                talla: sz,
+                categoria: currentJersey419ToManage.genero || 'Adultos',
+                stock: finalStock,
+                isNew: true
+            });
+            addedCount++;
+        }
+    });
+
+    renderLocal419InventorySizes(currentJersey419ToManage);
+    updateNewTalla419Select(currentJersey419ToManage);
+
+    const Toast = Swal.mixin({
+        toast: true,
+        position: 'bottom-end',
+        showConfirmButton: false,
+        timer: 2500,
+        background: '#141416',
+        color: '#fff'
+    });
+
+    if (addedCount > 0) {
+        Toast.fire({
+            icon: 'success',
+            title: `⚡ Se agregaron ${addedCount} tallas (${tallasGenericas.join(', ')}). Presiona "Actualizar Datos" para guardar.`
+        });
+    } else {
+        Toast.fire({
+            icon: 'info',
+            title: `Todas las tallas de ${genero} ya están en la lista.`
+        });
+    }
+}
+window.addAllStandardTallas419 = addAllStandardTallas419;
+
+function handleSaveBatchTallas419() {
     if (!currentJersey419ToManage) return;
 
     // Sincronizar existencias leídas de los inputs
@@ -9610,59 +10489,111 @@ async function handleSaveBatchTallas419() {
         }
     });
 
-    const btnSubmit = document.getElementById('btn-submit-save-tallas-419');
-    if (!btnSubmit) return;
+    const idPlayera = currentJersey419ToManage.id || currentJersey419ToManage.id_articulo;
+    const tallasToSave = JSON.parse(JSON.stringify(currentJersey419ToManage.tallas || []));
 
-    const originalText = btnSubmit.innerHTML;
-    btnSubmit.disabled = true;
-    btnSubmit.innerHTML = `
-        <div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin inline-block mr-1"></div>
-        <span>Guardando Datos...</span>
-    `;
+    // ⚡ 1. ACTUALIZACIÓN OPTIMISTA EN MEMORIA DE INMEDIATO (0ms Latencia Visual)
+    const localTarget = (allProducts419 || []).find(p => String(p.id || p.id_articulo).toUpperCase() === String(idPlayera).toUpperCase());
+    if (localTarget) {
+        localTarget.tallas = JSON.parse(JSON.stringify(tallasToSave));
+    }
 
+    // ⚡ 2. CERRAR MODAL Y RE-RENDERIZAR CATÁLOGO DE INMEDIATO
+    closeLocal419InventoryModal();
+    if (typeof renderInventario419Grid === 'function') {
+        renderInventario419Grid(allProducts419);
+    }
+
+    // ⚡ 3. NOTIFICACIÓN TOAST INMEDIATA
+    const Toast = Swal.mixin({
+        toast: true,
+        position: 'bottom-end',
+        showConfirmButton: false,
+        timer: 2000,
+        background: '#141416',
+        color: '#fff'
+    });
+    Toast.fire({
+        icon: 'success',
+        title: '⚡ Existencias actualizadas en Local 419'
+    });
+
+    // ⚡ 4. GUARDADO ASÍNCRONO EN SEGUNDO PLANO (BACKGROUND FETCH SIN BLOQUEAR UI)
     try {
-        const idPlayera = currentJersey419ToManage.id || currentJersey419ToManage.id_articulo;
-        const tallasToSave = currentJersey419ToManage.tallas || [];
+        const payload = {
+            action: 'save_batch_tallas',
+            origen: '419',
+            id_playera: idPlayera,
+            genero: currentJersey419ToManage.genero || 'Adultos',
+            tallas: tallasToSave.map(t => ({
+                id_inventario: t.id_inventario || '',
+                talla: t.talla,
+                stock: t.stock !== undefined ? t.stock : (t.inventario || 0),
+                categoria: t.categoria || currentJersey419ToManage.genero || 'Adultos'
+            }))
+        };
 
-        // Guardar cada talla en backend usando el servicio updateLocal419SizeStock
-        for (const t of tallasToSave) {
-            await updateLocal419SizeStock(idPlayera, t.talla, t.stock);
-        }
-
-        Swal.fire({
-            icon: 'success',
-            title: '¡Inventario 419 Guardado!',
-            text: 'Los cambios de existencias en Local 419 se actualizaron correctamente.',
-            background: '#151515', color: '#fff',
-            timer: 1800, showConfirmButton: false
+        fetch(API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify(payload)
+        }).then(res => res.text()).then(resText => {
+            let resObj = null;
+            try { resObj = JSON.parse(resText); } catch(e) {}
+            if (resObj && resObj.status === 'error') {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error al Guardar en Local 419',
+                    text: resObj.message || 'No se pudieron guardar los cambios en la base de datos.',
+                    background: '#151515', color: '#fff'
+                });
+            } else {
+                try { localStorage.removeItem('local419_products_cache_v1'); } catch (eC) {}
+            }
+        }).catch(err => {
+            console.error("Error en fondo guardando inventario batch 419:", err);
+            Swal.fire({
+                icon: 'warning',
+                title: 'Error de Conexión',
+                text: 'No se pudo sincronizar con el servidor. Revisa tu conexión a internet.',
+                background: '#151515', color: '#fff'
+            });
         });
-
-        closeLocal419InventoryModal();
-        fetchProducts419(true);
     } catch (err) {
-        console.error("Error al guardar inventario batch 419:", err);
-        Swal.fire({
-            icon: 'error',
-            title: 'Error al Guardar',
-            text: err.message || 'No se pudieron actualizar las existencias.',
-            background: '#151515', color: '#fff'
-        });
-    } finally {
-        btnSubmit.disabled = false;
-        btnSubmit.innerHTML = originalText;
+        console.error("Error al disparar guardado en fondo 419:", err);
     }
 }
 
+
+
+let openedPosFromInventario419 = false;
+
 function openInventario419View() {
     const modal = document.getElementById('local419-inventario-modal');
-    if (!modal) return;
+    if (!modal) {
+        console.error("No se encontró el elemento #local419-inventario-modal");
+        return;
+    }
+
+    if (document.activeElement && typeof document.activeElement.blur === 'function') {
+        document.activeElement.blur();
+    }
+
+    // Si el modal de POS estaba abierto, cerrarlo suavemente
+    const posModal = document.getElementById('modal-pos-local419');
+    if (posModal && !posModal.classList.contains('hidden')) {
+        posModal.classList.add('opacity-0');
+        setTimeout(() => { posModal.classList.add('hidden'); }, 300);
+    }
 
     document.body.style.overflow = 'hidden';
     modal.classList.remove('hidden');
     void modal.offsetWidth;
     modal.classList.remove('opacity-0');
 
-    fetchProducts419();
+    if (typeof fetchProducts419 === 'function') {
+        fetchProducts419();
+    }
 }
 window.openInventario419View = openInventario419View;
 
@@ -9684,16 +10615,17 @@ window.closeInventario419View = closeInventario419View;
 document.addEventListener('click', (e) => {
     const posBtn = e.target.closest('.action-local419-pos');
     if (posBtn) {
-        closeInventario419View();
-        if (typeof openPos419Modal === 'function') openPos419Modal();
+        const isInsideInventario = !!posBtn.closest('#local419-inventario-modal');
+        if (typeof openPos419Modal === 'function') openPos419Modal(isInsideInventario);
         if (typeof closemobileMenu === 'function') closemobileMenu();
         return;
     }
 
     const ordenarBtn = e.target.closest('.action-local419-ordenar');
     if (ordenarBtn) {
-        closeInventario419View();
-        if (typeof openPos419Modal === 'function') openPos419Modal();
+        if (typeof closeInventario419View === 'function') closeInventario419View();
+        if (typeof closePos419Modal === 'function') closePos419Modal();
+        if (typeof switchView === 'function') switchView('jerseys-pedido');
         if (typeof closemobileMenu === 'function') closemobileMenu();
         return;
     }
@@ -9857,7 +10789,8 @@ function switchPOS419MobileTab(tab) {
 }
 window.switchPOS419MobileTab = switchPOS419MobileTab;
 
-async function openPos419Modal() {
+async function openPos419Modal(fromInventarioView = false) {
+    openedPosFromInventario419 = !!fromInventarioView;
     const modal = document.getElementById('modal-pos-local419');
     if (!modal) return;
 
@@ -9884,16 +10817,75 @@ async function openPos419Modal() {
     renderPos419Catalog();
     renderPos419Cart();
 
-    // 4. Mostrar modal
+    // 4. Mostrar modal con transición fluida
     document.body.style.overflow = 'hidden';
     modal.classList.remove('hidden');
     void modal.offsetWidth;
     modal.classList.remove('opacity-0');
+
+    // Si veníamos de la vista de inventario (Image 2), ocultarla suavemente detrás
+    if (fromInventarioView) {
+        setTimeout(() => {
+            const invModal = document.getElementById('local419-inventario-modal');
+            if (invModal && !modal.classList.contains('hidden')) {
+                invModal.classList.add('hidden', 'opacity-0');
+            }
+        }, 320);
+    }
 }
 window.openPos419Modal = openPos419Modal;
 
 function closePos419Modal() {
     const modal = document.getElementById('modal-pos-local419');
+    if (modal) {
+        // Solo reabrir la vista de inventario si el POS fue abierto desde dentro del modal de inventario
+        if (openedPosFromInventario419 && typeof window.openInventario419View === 'function') {
+            window.openInventario419View();
+        } else {
+            document.body.style.overflow = '';
+        }
+
+        modal.classList.add('opacity-0');
+        setTimeout(() => {
+            modal.classList.add('hidden');
+        }, 300);
+    }
+}
+window.closePos419Modal = closePos419Modal;
+
+// =========================================================================
+// 📋 MÓDULO DE AUDITORÍA Y CUADRE DE INVENTARIO (LOCAL 419 & GENERAL)
+// =========================================================================
+let auditTarget = '419'; // '419' o 'general'
+let auditItemsMap = {};
+
+window.openAuditoriaModal = async function(target = '419') {
+    const modal = document.getElementById('modal-auditoria-inventario');
+    if (!modal) return;
+
+    auditTarget = target;
+
+    // ⚡ ABRIR MODAL INMEDIATAMENTE (0ms de latencia)
+    modal.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+    void modal.offsetWidth;
+    modal.classList.remove('opacity-0');
+
+    const barcodeInput = document.getElementById('audit-barcode-input');
+    if (barcodeInput) {
+        barcodeInput.focus();
+        barcodeInput.oninput = (e) => window.handleAuditoriaInput(e.target.value);
+    }
+
+    try {
+        await window.switchAuditoriaTarget(auditTarget);
+    } catch (eA) {
+        console.error("Error al preparar auditoría:", eA);
+    }
+};
+
+window.closeAuditoriaModal = function() {
+    const modal = document.getElementById('modal-auditoria-inventario');
     if (modal) {
         modal.classList.add('opacity-0');
         setTimeout(() => {
@@ -9901,10 +10893,768 @@ function closePos419Modal() {
             document.body.style.overflow = '';
         }, 300);
     }
-}
-window.closePos419Modal = closePos419Modal;
+};
+
+window.switchAuditoriaTarget = async function(target) {
+    auditTarget = target;
+    const btn419 = document.getElementById('btn-audit-target-419');
+    const btnGen = document.getElementById('btn-audit-target-gen');
+
+    if (auditTarget === '419') {
+        if (btn419) btn419.className = 'px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all border bg-amber-500 text-black border-amber-400 shadow-md';
+        if (btnGen) btnGen.className = 'px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all border bg-white/5 text-gray-300 hover:text-white border-white/10';
+        
+        if (!allProducts419 || allProducts419.length === 0) {
+            if (typeof fetchProducts419 === 'function') await fetchProducts419();
+        }
+    } else {
+        if (btnGen) btnGen.className = 'px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all border bg-blue-600 text-white border-blue-400 shadow-md';
+        if (btn419) btn419.className = 'px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all border bg-white/5 text-gray-300 hover:text-white border-white/10';
+        
+        if (!allProducts || allProducts.length === 0) {
+            if (typeof fetchInitialProducts === 'function') await fetchInitialProducts();
+        }
+    }
+
+    const draftKey = `audit_draft_${auditTarget}`;
+    let loadedDraft = false;
+    try {
+        const draftStr = localStorage.getItem(draftKey);
+        if (draftStr) {
+            const parsed = JSON.parse(draftStr);
+            if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
+                auditItemsMap = parsed;
+                loadedDraft = true;
+            }
+        }
+    } catch(e) {}
+
+    if (!loadedDraft) {
+        window.loadAuditoriaSystemProducts();
+    }
+
+    window.renderAuditoriaTable();
+};
+
+window.loadAuditoriaSystemProducts = function() {
+    auditItemsMap = {};
+    const sourceProducts = (auditTarget === '419') ? (allProducts419 || []) : (allProducts || []);
+
+    sourceProducts.forEach(prod => {
+        const prodId = prod.id || prod.id_playera || prod.id_articulo;
+        const nombre = prod.nombre || prod.equipo || 'Producto';
+        const foto = prod.foto || prod.imagen || '';
+        const precio = Number(prod.precio_menudeo || prod.precio || 0);
+        const isArt = !!prod.es_articulo;
+        const tallasArr = Array.isArray(prod.tallas) ? prod.tallas : [];
+
+        tallasArr.forEach(tObj => {
+            const sz = String(tObj.talla || 'M').toUpperCase();
+            const stockSys = Number(tObj.stock !== undefined ? tObj.stock : tObj.inventario || 0);
+            const itemKey = `${prodId}_${sz}`;
+
+            auditItemsMap[itemKey] = {
+                id: prodId,
+                id_playera: prod.id_playera || prodId,
+                id_articulo: prod.id_articulo || prodId,
+                nombre: nombre,
+                talla: sz,
+                stock_sistema: stockSys,
+                stock_contado: 0,
+                foto: foto,
+                es_articulo: isArt,
+                precio: precio
+            };
+        });
+    });
+};
+
+window.renderAuditoriaTable = function() {
+    const container = document.getElementById('audit-items-container');
+    const filterStatus = document.getElementById('audit-filter-status') ? document.getElementById('audit-filter-status').value : 'todos';
+    const searchInput = document.getElementById('audit-barcode-input');
+    const q = searchInput ? searchInput.value.trim().toLowerCase() : '';
+
+    if (!container) return;
+
+    let items = Object.values(auditItemsMap);
+
+    let totalSistema = 0;
+    let totalContado = 0;
+    let piezasFaltantes = 0;
+    let piezasSobrantes = 0;
+    let difMonetaria = 0;
+
+    items.forEach(item => {
+        totalSistema += item.stock_sistema;
+        totalContado += item.stock_contado;
+        const diff = item.stock_contado - item.stock_sistema;
+        if (diff < 0) piezasFaltantes += Math.abs(diff);
+        if (diff > 0) piezasSobrantes += diff;
+        difMonetaria += (diff * item.precio);
+    });
+
+    const elSistema = document.getElementById('audit-stat-sistema');
+    const elContado = document.getElementById('audit-stat-contado');
+    const elFaltantes = document.getElementById('audit-stat-faltantes');
+    const elSobrantes = document.getElementById('audit-stat-sobrantes');
+    const elMonetario = document.getElementById('audit-diferencia-monetaria');
+
+    if (elSistema) elSistema.textContent = `${totalSistema} pzs`;
+    if (elContado) elContado.textContent = `${totalContado} pzs`;
+    if (elFaltantes) elFaltantes.textContent = `${piezasFaltantes} pzs`;
+    if (elSobrantes) elSobrantes.textContent = `${piezasSobrantes} pzs`;
+    if (elMonetario) {
+        const formattedDif = (difMonetaria >= 0 ? '+$' : '-$') + Math.abs(difMonetaria).toFixed(2);
+        elMonetario.textContent = `Ajuste monetario: ${formattedDif}`;
+        elMonetario.className = `text-xs font-bold ${difMonetaria < 0 ? 'text-red-400' : (difMonetaria > 0 ? 'text-amber-400' : 'text-gray-400')}`;
+    }
+
+    if (q) {
+        items = items.filter(i => {
+            const targetText = `${i.nombre} ${i.talla} ${i.id}`.toLowerCase();
+            return targetText.includes(q);
+        });
+    }
+
+    if (filterStatus === 'diferencias') {
+        items = items.filter(i => i.stock_contado !== i.stock_sistema);
+    } else if (filterStatus === 'faltantes') {
+        items = items.filter(i => i.stock_contado < i.stock_sistema);
+    } else if (filterStatus === 'sobrantes') {
+        items = items.filter(i => i.stock_contado > i.stock_sistema);
+    } else if (filterStatus === 'cuadrados') {
+        items = items.filter(i => i.stock_contado === i.stock_sistema);
+    }
+
+    if (items.length === 0) {
+        container.innerHTML = `<div class="text-center py-8 text-gray-500 text-xs italic">No hay registros que coincidan con el filtro seleccionado.</div>`;
+        return;
+    }
+
+    const html = items.map(item => {
+        const itemKey = `${item.id}_${item.talla}`;
+        const diff = item.stock_contado - item.stock_sistema;
+        const imgUrl = getFirstImage(item.foto || '');
+
+        let statusBadge = '';
+        if (diff === 0) {
+            statusBadge = `<span class="bg-emerald-500/20 text-emerald-400 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-500/30">🟢 Cuadrado</span>`;
+        } else if (diff > 0) {
+            statusBadge = `<span class="bg-amber-500/20 text-amber-300 text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-500/30">🟡 Sobrante (+${diff})</span>`;
+        } else {
+            statusBadge = `<span class="bg-red-500/20 text-red-400 text-[10px] font-bold px-2 py-0.5 rounded-full border border-red-500/30">🔴 Faltante (${diff})</span>`;
+        }
+
+        return `
+            <div class="p-2.5 flex items-center justify-between gap-3 hover:bg-white/5 transition-colors rounded-lg">
+                <div class="flex items-center gap-3 min-w-0">
+                    <img src="${imgUrl}" class="w-10 h-10 object-cover rounded-lg bg-dark-200 border border-white/10 flex-shrink-0" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1577212017184-807dd6acefd6?auto=format&fit=crop&q=80&w=150';">
+                    <div class="min-w-0">
+                        <div class="flex items-center gap-2">
+                            <h4 class="font-bold text-white text-xs truncate">${item.nombre}</h4>
+                            ${statusBadge}
+                        </div>
+                        <div class="flex items-center gap-3 mt-0.5 text-[10px] text-gray-400">
+                            <span class="bg-white/10 px-1.5 py-0.2 rounded font-bold text-gray-200">Talla: ${item.talla}</span>
+                            <span>Sistema: <strong class="text-white">${item.stock_sistema}</strong></span>
+                            <span>Contado: <strong class="text-emerald-400">${item.stock_contado}</strong></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2 flex-shrink-0">
+                    <div class="flex items-center bg-black/50 border border-emerald-500/30 rounded-lg overflow-hidden">
+                        <button type="button" onclick="window.updateAuditoriaQty('${itemKey}', -1)" class="w-7 h-7 flex items-center justify-center text-gray-300 hover:text-white hover:bg-white/10 font-bold cursor-pointer">-</button>
+                        <input type="number" min="0" value="${item.stock_contado}" onchange="window.setAuditoriaQty('${itemKey}', this.value)" class="w-10 text-center text-xs font-bold text-emerald-400 bg-transparent focus:outline-none">
+                        <button type="button" onclick="window.updateAuditoriaQty('${itemKey}', 1)" class="w-7 h-7 flex items-center justify-center text-gray-300 hover:text-white hover:bg-white/10 font-bold cursor-pointer">+</button>
+                    </div>
+                    <button type="button" onclick="window.setAuditoriaQty('${itemKey}', ${item.stock_sistema})" class="px-2 py-1 bg-white/5 hover:bg-white/10 text-[10px] font-semibold text-gray-300 rounded-lg border border-white/10 cursor-pointer" title="Igualar al Sistema">
+                        Match
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    container.innerHTML = html;
+};
+
+window.updateAuditoriaQty = function(itemKey, delta) {
+    if (auditItemsMap[itemKey]) {
+        const newQty = Math.max(0, auditItemsMap[itemKey].stock_contado + delta);
+        auditItemsMap[itemKey].stock_contado = newQty;
+        window.renderAuditoriaTable();
+        window.saveAuditoriaDraftSilently();
+    }
+};
+
+window.setAuditoriaQty = function(itemKey, value) {
+    if (auditItemsMap[itemKey]) {
+        const newQty = Math.max(0, parseInt(value) || 0);
+        auditItemsMap[itemKey].stock_contado = newQty;
+        window.renderAuditoriaTable();
+        window.saveAuditoriaDraftSilently();
+    }
+};
+
+window.handleAuditoriaInput = function(query) {
+    window.renderAuditoriaTable();
+};
+
+window.incrementAuditoriaItemByProduct = function(product, sizeName) {
+    if (!product || !sizeName) return;
+    const prodId = product.id || product.id_playera || product.id_articulo;
+    const sz = String(sizeName).toUpperCase();
+    const itemKey = `${prodId}_${sz}`;
+
+    if (!auditItemsMap[itemKey]) {
+        const stockSys = (product.tallas || []).find(t => String(t.talla).toUpperCase() === sz);
+        auditItemsMap[itemKey] = {
+            id: prodId,
+            id_playera: product.id_playera || prodId,
+            id_articulo: product.id_articulo || prodId,
+            nombre: product.nombre || product.equipo || 'Producto',
+            talla: sz,
+            stock_sistema: stockSys ? Number(stockSys.stock || stockSys.inventario || 0) : 0,
+            stock_contado: 1,
+            foto: product.foto || product.imagen || '',
+            es_articulo: !!product.es_articulo,
+            precio: Number(product.precio_menudeo || product.precio || 0)
+        };
+    } else {
+        auditItemsMap[itemKey].stock_contado += 1;
+    }
+
+    window.renderAuditoriaTable();
+    window.saveAuditoriaDraftSilently();
+
+    const toast = Swal.mixin({ toast: true, position: 'bottom-end', showConfirmButton: false, timer: 1500, background: '#151515', color: '#fff' });
+    toast.fire({ icon: 'success', title: `+1 Físico: ${product.nombre || product.equipo} (${sz}) ➔ Contado: ${auditItemsMap[itemKey].stock_contado}` });
+};
+
+window.saveAuditoriaDraftSilently = function() {
+    try {
+        const draftKey = `audit_draft_${auditTarget}`;
+        localStorage.setItem(draftKey, JSON.stringify(auditItemsMap));
+    } catch(e) {}
+};
+
+window.saveAuditoriaDraft = function() {
+    window.saveAuditoriaDraftSilently();
+    Swal.fire({
+        toast: true, position: 'top-end', icon: 'success',
+        title: 'Borrador guardado localmente', showConfirmButton: false, timer: 1800,
+        background: '#151515', color: '#fff'
+    });
+};
+
+window.resetAuditoriaCount = async function() {
+    const res = await Swal.fire({
+        title: '¿Reiniciar Conteo de Auditoría?',
+        text: 'Esto pondrá todos los conteos físicos en 0 para esta ubicación.',
+        icon: 'warning', showCancelButton: true,
+        confirmButtonColor: '#ef4444', cancelButtonColor: '#3f3f46',
+        confirmButtonText: 'Sí, reiniciar', cancelButtonText: 'Cancelar',
+        background: '#151515', color: '#fff'
+    });
+
+    if (!res.isConfirmed) return;
+
+    window.loadAuditoriaSystemProducts();
+    const draftKey = `audit_draft_${auditTarget}`;
+    localStorage.removeItem(draftKey);
+    window.renderAuditoriaTable();
+};
+
+window.submitAuditoriaCuadre = async function() {
+    const items = Object.values(auditItemsMap);
+    if (items.length === 0) {
+        Swal.fire({ icon: 'info', title: 'Sin artículos', text: 'No hay productos en la lista para auditar.', background: '#151515', color: '#fff' });
+        return;
+    }
+
+    const itemsDiscrepantes = items.filter(i => i.stock_contado !== i.stock_sistema);
+    const totalContado = items.reduce((acc, i) => acc + i.stock_contado, 0);
+
+    const result = await Swal.fire({
+        title: '⚡ ¿Confirmar Cuadre de Inventario?',
+        html: `
+            Se ajustarán existencias en <b>${auditTarget === '419' ? 'Local 419' : 'Inventario General'}</b>.<br>
+            Total Piezas Físicas Contadas: <b>${totalContado} pzs</b>.<br>
+            Registros con desajuste: <b class="text-amber-400">${itemsDiscrepantes.length}</b>.<br><br>
+            <span class="text-xs text-gray-400">Esta acción sobrescribirá el stock del sistema con el conteo físico real.</span>
+        `,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#10b981',
+        cancelButtonColor: '#3f3f46',
+        confirmButtonText: 'Sí, aplicar cuadre',
+        cancelButtonText: 'Cancelar',
+        background: '#151515', color: '#ffffff',
+        customClass: { popup: 'border border-emerald-500/30 rounded-2xl' }
+    });
+
+    if (!result.isConfirmed) return;
+
+    Swal.fire({
+        title: 'Aplicando cuadre...',
+        text: 'Actualizando existencias y registrando auditoría en Google Sheets',
+        allowOutsideClick: false,
+        background: '#151515', color: '#ffffff',
+        didOpen: () => { Swal.showLoading(); }
+    });
+
+    const notasInput = document.getElementById('audit-notas-input');
+    const notasVal = notasInput ? notasInput.value.trim() : '';
+
+    try {
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({
+                action: 'guardar_cuadre_inventario',
+                token: localStorage.getItem('session_token') || '',
+                usuario: localStorage.getItem('logged_user') ? JSON.parse(localStorage.getItem('logged_user')).usuario : 'Admin',
+                origen: auditTarget,
+                notas: notasVal,
+                items: items
+            })
+        });
+
+        const resData = await response.json();
+
+        if (resData.status === 'success') {
+            const draftKey = `audit_draft_${auditTarget}`;
+            localStorage.removeItem(draftKey);
+
+            window.closeAuditoriaModal();
+
+            if (typeof fetchProducts419 === 'function') fetchProducts419(true);
+            if (typeof fetchInitialProducts === 'function') fetchInitialProducts(true);
+
+            Swal.fire({
+                icon: 'success',
+                title: '¡Cuadre Aplicado Exitosamente!',
+                text: resData.message || `Folio de Auditoría: ${resData.folio_auditoria}`,
+                background: '#151515', color: '#ffffff', confirmButtonColor: '#10b981'
+            });
+        } else {
+            Swal.fire({
+                icon: 'error',
+                title: 'Error al Cuadrar',
+                text: resData.message || 'Ocurrió un problema al guardar los cambios en Google Sheets.',
+                background: '#151515', color: '#ffffff', confirmButtonColor: '#ef4444'
+            });
+        }
+    } catch (err) {
+        console.error("Error al aplicar cuadre:", err);
+        Swal.fire({
+            icon: 'error',
+            title: 'Error de Red',
+            text: 'No se pudo conectar con el servidor: ' + err.message,
+            background: '#151515', color: '#ffffff', confirmButtonColor: '#ef4444'
+        });
+    }
+};
+
+// =========================================================================
+// 🔄 MÓDULO DE TRASPASO DE INVENTARIO (LOCAL 419 ➔ INVENTARIO GENERAL)
+// =========================================================================
+let traspaso419List = [];
+
+window.openTraspaso419Modal = async function() {
+    const modal = document.getElementById('modal-traspaso-419-general');
+    if (!modal) return;
+
+    traspaso419List = [];
+    const notesInput = document.getElementById('traspaso-notas-input');
+    const searchInput = document.getElementById('traspaso-search-input');
+    const resultsContainer = document.getElementById('traspaso-search-results');
+    
+    if (notesInput) notesInput.value = '';
+    if (searchInput) searchInput.value = '';
+    if (resultsContainer) {
+        resultsContainer.innerHTML = '';
+        resultsContainer.classList.add('hidden');
+    }
+
+    renderTraspasoItemsList();
+
+    // ⚡ ABRIR EL MODAL INMEDIATAMENTE (0ms de latencia)
+    modal.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+    void modal.offsetWidth;
+    modal.classList.remove('opacity-0');
+
+    if (searchInput) {
+        searchInput.focus();
+        searchInput.oninput = (e) => window.handleTraspasoSearchInput(e.target.value);
+    }
+
+    // Cargar productos en segundo plano si aún no han sido cargados
+    if (!allProducts419 || allProducts419.length === 0) {
+        if (typeof fetchProducts419 === 'function') {
+            try {
+                await fetchProducts419();
+            } catch (eF) {
+                console.error("Error al cargar productos 419 para traspaso:", eF);
+            }
+        }
+    }
+};
+window.openTraspasoModal = window.openTraspaso419Modal;
+
+window.closeTraspaso419Modal = function() {
+    const modal = document.getElementById('modal-traspaso-419-general');
+    if (modal) {
+        modal.classList.add('opacity-0');
+        setTimeout(() => {
+            modal.classList.add('hidden');
+            document.body.style.overflow = '';
+        }, 300);
+    }
+};
+
+window.renderTraspasoItemsList = function() {
+    const container = document.getElementById('traspaso-items-container');
+    const badge = document.getElementById('traspaso-items-badge');
+    const totalModEl = document.getElementById('traspaso-total-modelos');
+    const totalPzsEl = document.getElementById('traspaso-total-piezas');
+
+    if (!container) return;
+
+    if (traspaso419List.length === 0) {
+        container.innerHTML = `
+            <div class="text-center py-8 text-gray-500 text-xs italic">
+                Usa el buscador arriba o escanea prendas del Local 419 para agregarlas al lote de traspaso.
+            </div>
+        `;
+        if (badge) badge.textContent = '0 piezas';
+        if (totalModEl) totalModEl.textContent = '0';
+        if (totalPzsEl) totalPzsEl.textContent = '0 PZS';
+        return;
+    }
+
+    let totalPiezas = 0;
+    const html = traspaso419List.map((item, idx) => {
+        totalPiezas += item.cantidad;
+        const imgUrl = getFirstImage(item.foto || item.imagen || '');
+        const shortTalla = formatShortTallaLabel(item.talla);
+        return `
+            <div class="p-3 flex items-center justify-between gap-3 hover:bg-white/5 transition-colors rounded-xl bg-dark-200/50 border border-white/5 mb-1.5 shadow-sm">
+                <div class="flex items-center gap-3 min-w-0">
+                    <img src="${imgUrl}" class="w-12 h-12 object-cover rounded-xl bg-dark border border-white/10 flex-shrink-0 shadow-md">
+                    <div class="min-w-0">
+                        <h4 class="font-bold text-white text-xs sm:text-sm truncate">${item.nombre}</h4>
+                        <div class="flex flex-wrap items-center gap-2 mt-1 text-[10px] text-gray-400">
+                            <span class="bg-blue-500/20 text-blue-300 border border-blue-500/30 px-2 py-0.5 rounded-md font-extrabold" title="${item.talla}">Talla: ${shortTalla}</span>
+                            <span class="text-amber-400 font-semibold bg-amber-500/10 px-1.5 py-0.5 rounded">Stock 419: ${item.stock419}</span>
+                            <span class="text-gray-300 font-semibold bg-white/5 px-1.5 py-0.5 rounded">General: ${item.stockGen}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3 flex-shrink-0">
+                    <div class="flex items-center bg-black/60 border border-blue-500/30 rounded-lg overflow-hidden shadow-inner">
+                        <button type="button" onclick="window.updateTraspasoQty(${idx}, -1)" class="w-7 h-7 flex items-center justify-center text-gray-300 hover:text-white hover:bg-white/10 font-black cursor-pointer">-</button>
+                        <span class="w-8 text-center text-xs font-black text-blue-400">${item.cantidad}</span>
+                        <button type="button" onclick="window.updateTraspasoQty(${idx}, 1)" class="w-7 h-7 flex items-center justify-center text-gray-300 hover:text-white hover:bg-white/10 font-bold cursor-pointer">+</button>
+                    </div>
+                    <button type="button" onclick="window.removeTraspasoItem(${idx})" class="text-gray-500 hover:text-red-400 transition-colors p-1.5 bg-white/5 hover:bg-red-500/10 rounded-lg border border-white/5 hover:border-red-500/20 cursor-pointer" title="Quitar de la lista">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    container.innerHTML = html;
+    if (badge) badge.textContent = `${totalPiezas} pieza${totalPiezas !== 1 ? 's' : ''}`;
+    if (totalModEl) totalModEl.textContent = traspaso419List.length;
+    if (totalPzsEl) totalPzsEl.textContent = `${totalPiezas} PZS`;
+};
+
+window.updateTraspasoQty = function(index, delta) {
+    if (index < 0 || index >= traspaso419List.length) return;
+    const item = traspaso419List[index];
+    const newQty = item.cantidad + delta;
+    if (newQty <= 0) {
+        traspaso419List.splice(index, 1);
+    } else if (newQty > item.stock419) {
+        Swal.fire({
+            icon: 'warning', title: 'Límite de stock',
+            text: `No puedes traspasar más de las ${item.stock419} piezas disponibles en Local 419.`,
+            background: '#151515', color: '#fff', confirmButtonColor: '#f59e0b'
+        });
+        item.cantidad = item.stock419;
+    } else {
+        item.cantidad = newQty;
+    }
+    renderTraspasoItemsList();
+};
+
+window.removeTraspasoItem = function(index) {
+    if (index >= 0 && index < traspaso419List.length) {
+        traspaso419List.splice(index, 1);
+        renderTraspasoItemsList();
+    }
+};
+
+window.clearTraspasoList = function() {
+    traspaso419List = [];
+    renderTraspasoItemsList();
+};
+
+window.handleTraspasoSearchInput = function(query) {
+    const container = document.getElementById('traspaso-search-results');
+    if (!container) return;
+
+    const q = String(query || '').trim().toLowerCase();
+    if (!q) {
+        container.innerHTML = '';
+        container.classList.add('hidden');
+        return;
+    }
+
+    const typeFilter = document.getElementById('traspaso-filter-tipo') ? document.getElementById('traspaso-filter-tipo').value : 'todos';
+
+    const matches = (allProducts419 || []).filter(p => {
+        if (typeFilter === 'jerseys' && p.es_articulo) return false;
+        if (typeFilter === 'articulos' && !p.es_articulo) return false;
+
+        const targetText = `${p.nombre || ''} ${p.equipo || ''} ${p.tipo || ''} ${p.version || ''} ${p.genero || ''} ${p.id || ''} ${p.id_playera || ''} ${p.id_articulo || ''}`;
+        return matchText(targetText, q);
+    }).slice(0, 50);
+
+    if (matches.length === 0) {
+        container.innerHTML = `<div class="p-4 text-xs text-gray-400 italic text-center">No se encontraron productos en Local 419 para "${query}"</div>`;
+        container.classList.remove('hidden');
+        return;
+    }
+
+    const html = matches.map(prod => {
+        const imgUrl = getFirstImage(prod.foto || prod.imagen || '');
+        const prodId = prod.id || prod.id_playera || prod.id_articulo;
+        const genderColorClass = getGenderColorClass(prod.genero);
+
+        const tallasHtml = (prod.tallas || []).map(t => {
+            const stk = t.stock !== undefined ? t.stock : t.inventario || 0;
+            const isAvail = stk > 0;
+            const shortLabel = formatShortTallaLabel(t.talla);
+            return `
+                <button type="button" onclick="window.addTraspasoItemFromProductById('${prodId}', '${t.talla}')" 
+                        class="px-2 py-1 text-[10px] font-bold rounded-lg transition-all flex items-center gap-1 ${isAvail ? 'bg-amber-500/20 text-amber-300 hover:bg-amber-500 hover:text-black border border-amber-500/40 cursor-pointer shadow-sm' : 'bg-dark-200 text-gray-600 border border-white/5 cursor-not-allowed opacity-40'}"
+                        ${!isAvail ? 'disabled' : ''} title="${t.talla} (Disponible: ${stk})">
+                    <span>${shortLabel}</span>
+                    <span class="opacity-75 bg-black/40 px-1 py-0.2 rounded text-[9px] font-extrabold">${stk}</span>
+                </button>
+            `;
+        }).join('');
+
+        return `
+            <div class="p-3 bg-dark-200/90 border border-white/10 hover:border-blue-400/40 rounded-xl transition-all mb-2 flex flex-col gap-2 shadow-lg">
+                <div class="flex items-center justify-between gap-3">
+                    <div class="flex items-center gap-3 min-w-0">
+                        <img src="${imgUrl}" class="w-12 h-12 object-cover rounded-xl bg-dark border border-white/10 flex-shrink-0 shadow-md">
+                        <div class="min-w-0">
+                            <div class="flex items-center gap-2">
+                                <h4 class="text-xs sm:text-sm font-black text-white truncate">${prod.nombre || prod.equipo}</h4>
+                                <span class="px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase border ${genderColorClass}">${prod.genero || 'UNISEX'}</span>
+                            </div>
+                            <p class="text-[10px] text-gray-400 mt-0.5 flex items-center gap-2">
+                                <span class="text-gray-300 font-semibold">${prod.tipo || 'JERSEY'}</span>
+                                ${prod.version ? `<span>• ${prod.version}</span>` : ''}
+                            </p>
+                        </div>
+                    </div>
+                    <button type="button" onclick="window.addAllTraspasoStockFromProductById('${prodId}')" class="px-2.5 py-1.5 bg-blue-500/20 hover:bg-blue-600 text-blue-300 hover:text-white font-bold text-[10px] rounded-lg border border-blue-500/30 transition-all flex items-center gap-1 cursor-pointer flex-shrink-0 shadow-sm">
+                        <span>+ Agregar Todo</span>
+                    </button>
+                </div>
+                <div class="flex flex-wrap gap-1.5 items-center pt-1 border-t border-white/5">
+                    ${tallasHtml}
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    container.innerHTML = html;
+    container.classList.remove('hidden');
+};
+
+window.addAllTraspasoStockFromProductById = function(productId) {
+    const prod = (allProducts419 || []).find(p => String(p.id || p.id_playera || p.id_articulo) === String(productId));
+    if (!prod || !Array.isArray(prod.tallas)) return;
+
+    let addedCount = 0;
+    prod.tallas.forEach(t => {
+        const stk = t.stock !== undefined ? t.stock : t.inventario || 0;
+        if (stk > 0) {
+            window.addTraspasoItemFromProduct(prod, t.talla);
+            addedCount++;
+        }
+    });
+
+    if (addedCount > 0) {
+        const searchInput = document.getElementById('traspaso-search-input');
+        const resultsContainer = document.getElementById('traspaso-search-results');
+        if (searchInput) searchInput.value = '';
+        if (resultsContainer) {
+            resultsContainer.innerHTML = '';
+            resultsContainer.classList.add('hidden');
+        }
+    }
+};
+
+window.addTraspasoItemFromProductById = function(productId, sizeName) {
+    const prod = (allProducts419 || []).find(p => String(p.id || p.id_playera || p.id_articulo) === String(productId));
+    if (prod) {
+        window.addTraspasoItemFromProduct(prod, sizeName);
+        const searchInput = document.getElementById('traspaso-search-input');
+        const resultsContainer = document.getElementById('traspaso-search-results');
+        if (searchInput) searchInput.value = '';
+        if (resultsContainer) {
+            resultsContainer.innerHTML = '';
+            resultsContainer.classList.add('hidden');
+        }
+    }
+};
+
+window.addTraspasoItemFromProduct = function(product, sizeName) {
+    if (!product || !sizeName) return;
+    const stock419Obj = (product.tallas || []).find(t => String(t.talla || '').toUpperCase() === String(sizeName).toUpperCase());
+    const stock419Val = stock419Obj ? (stock419Obj.stock !== undefined ? stock419Obj.stock : stock419Obj.inventario || 0) : 0;
+
+    if (stock419Val <= 0) {
+        const toast = Swal.mixin({ toast: true, position: 'bottom-end', showConfirmButton: false, timer: 2000, background: '#151515', color: '#fff' });
+        toast.fire({ icon: 'error', title: `Sin stock en Local 419: ${product.nombre} (${sizeName})` });
+        return;
+    }
+
+    const genProduct = (allProducts || []).find(p => String(p.id || p.id_playera || p.id_articulo) === String(product.id || product.id_playera || product.id_articulo));
+    const genSizeObj = genProduct ? (genProduct.tallas || []).find(t => String(t.talla || '').toUpperCase() === String(sizeName).toUpperCase()) : null;
+    const stockGenVal = genSizeObj ? (genSizeObj.stock !== undefined ? genSizeObj.stock : genSizeObj.inventario || 0) : 0;
+
+    const existingIndex = traspaso419List.findIndex(item => 
+        String(item.id || item.id_playera || item.id_articulo) === String(product.id || product.id_playera || product.id_articulo) &&
+        String(item.talla).toUpperCase() === String(sizeName).toUpperCase()
+    );
+
+    if (existingIndex !== -1) {
+        const item = traspaso419List[existingIndex];
+        if (item.cantidad + 1 > item.stock419) {
+            Swal.fire({
+                icon: 'warning', title: 'Límite alcanzado',
+                text: `Ya agregaste la cantidad máxima disponible (${item.stock419} pzs) para ${product.nombre} Talla ${sizeName}.`,
+                background: '#151515', color: '#fff', confirmButtonColor: '#f59e0b'
+            });
+            return;
+        }
+        item.cantidad += 1;
+    } else {
+        traspaso419List.push({
+            id: product.id || product.id_playera || product.id_articulo,
+            id_playera: product.id_playera || product.id,
+            id_articulo: product.id_articulo || product.id,
+            nombre: product.nombre || product.equipo || 'Producto',
+            talla: sizeName,
+            cantidad: 1,
+            stock419: stock419Val,
+            stockGen: stockGenVal,
+            foto: product.foto || product.imagen || '',
+            es_articulo: !!product.es_articulo
+        });
+    }
+
+    renderTraspasoItemsList();
+    const toast = Swal.mixin({ toast: true, position: 'bottom-end', showConfirmButton: false, timer: 1800, background: '#151515', color: '#fff' });
+    toast.fire({ icon: 'success', title: `✓ Agregado para traspaso: ${product.nombre} (${sizeName})` });
+};
+
+window.submitTraspaso419AGeneral = async function() {
+    if (traspaso419List.length === 0) {
+        Swal.fire({
+            icon: 'info', title: 'Lista vacía', text: 'Agrega al menos una prenda para realizar el traspaso.',
+            background: '#151515', color: '#fff', confirmButtonColor: '#3b82f6'
+        });
+        return;
+    }
+
+    const totalPiezas = traspaso419List.reduce((acc, i) => acc + i.cantidad, 0);
+    const result = await Swal.fire({
+        title: '¿Confirmar Traspaso a General?',
+        html: `Se enviarán <b>${totalPiezas} pieza(s)</b> de <b>${traspaso419List.length} modelo(s)</b> desde Local 419 hacia el Inventario General.<br><br><span class="text-xs text-gray-400">Las existencias en Local 419 disminuirán y se sumarán al inventario global.</span>`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#2563eb',
+        cancelButtonColor: '#3f3f46',
+        confirmButtonText: 'Sí, ejecutar traspaso',
+        cancelButtonText: 'Cancelar',
+        background: '#151515', color: '#ffffff',
+        customClass: { popup: 'border border-blue-500/30 rounded-2xl' }
+    });
+
+    if (!result.isConfirmed) return;
+
+    Swal.fire({
+        title: 'Procesando traspaso...',
+        text: 'Actualizando existencias en Google Sheets',
+        allowOutsideClick: false,
+        background: '#151515', color: '#ffffff',
+        didOpen: () => { Swal.showLoading(); }
+    });
+
+    const notesInput = document.getElementById('traspaso-notas-input');
+    const notasVal = notesInput ? notesInput.value.trim() : '';
+
+    try {
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({
+                action: 'transferir_inventario_419_a_general',
+                token: localStorage.getItem('session_token') || '',
+                usuario: localStorage.getItem('logged_user') ? JSON.parse(localStorage.getItem('logged_user')).usuario : 'Admin',
+                notas: notasVal,
+                items: traspaso419List
+            })
+        });
+
+        const resData = await response.json();
+
+        if (resData.status === 'success') {
+            closeTraspaso419Modal();
+
+            if (typeof fetchProducts419 === 'function') fetchProducts419(true);
+            if (typeof fetchInitialProducts === 'function') fetchInitialProducts(true);
+
+            Swal.fire({
+                icon: 'success',
+                title: '¡Traspaso Completado!',
+                text: resData.message || `Se traspasaron ${totalPiezas} piezas a Inventario General. Folio: ${resData.folio_traspaso}`,
+                background: '#151515', color: '#ffffff', confirmButtonColor: '#2563eb'
+            });
+        } else {
+            Swal.fire({
+                icon: 'error',
+                title: 'Error en Traspaso',
+                text: resData.message || 'Ocurrió un error al procesar el traspaso en Google Sheets.',
+                background: '#151515', color: '#ffffff', confirmButtonColor: '#ef4444'
+            });
+        }
+    } catch (err) {
+        console.error("Error al transferir inventario:", err);
+        Swal.fire({
+            icon: 'error',
+            title: 'Error de Red',
+            text: 'No se pudo conectar con el servidor: ' + err.message,
+            background: '#151515', color: '#ffffff', confirmButtonColor: '#ef4444'
+        });
+    }
+};
 
 async function loadClientsForPOS() {
+    if (window.startTopLoadingBar) startTopLoadingBar();
     try {
         const res = await fetch(API_URL, {
             method: 'POST',
@@ -9916,6 +11666,8 @@ async function loadClientsForPOS() {
         }
     } catch (e) {
         console.error("Error al obtener clientes desde la hoja Clientes para POS:", e);
+    } finally {
+        if (window.finishTopLoadingBar) finishTopLoadingBar();
     }
 }
 
@@ -10010,6 +11762,102 @@ window.onSelectPOS419ClientFromSearch = (idCli) => {
     if (searchContainer) searchContainer.classList.add('hidden');
 };
 
+window.openPos419UnidentifiedItemModal = function(customName = 'Producto Sin Identificar') {
+    const modal = document.getElementById('modal-pos419-unidentified-item');
+    if (!modal) return;
+
+    const nombreInput = document.getElementById('pos419-unidentified-nombre');
+    const precioInput = document.getElementById('pos419-unidentified-precio');
+    const qtyInput = document.getElementById('pos419-unidentified-qty');
+    const tallaSelect = document.getElementById('pos419-unidentified-talla');
+
+    if (nombreInput) nombreInput.value = customName || 'Producto Sin Identificar';
+    if (precioInput) precioInput.value = '';
+    if (qtyInput) qtyInput.value = '1';
+    if (tallaSelect) tallaSelect.value = 'Única';
+
+    modal.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+    void modal.offsetWidth;
+    modal.classList.remove('opacity-0');
+    const box = modal.querySelector('.transform');
+    if (box) {
+        box.classList.remove('scale-95');
+        box.classList.add('scale-100');
+    }
+
+    if (precioInput) precioInput.focus();
+};
+
+window.closePos419UnidentifiedItemModal = function() {
+    const modal = document.getElementById('modal-pos419-unidentified-item');
+    if (!modal) return;
+    modal.classList.add('opacity-0');
+    const box = modal.querySelector('.transform');
+    if (box) {
+        box.classList.remove('scale-100');
+        box.classList.add('scale-95');
+    }
+    setTimeout(() => {
+        modal.classList.add('hidden');
+    }, 300);
+};
+
+window.submitPos419UnidentifiedItem = function(e) {
+    if (e) e.preventDefault();
+
+    const nombreInput = document.getElementById('pos419-unidentified-nombre');
+    const precioInput = document.getElementById('pos419-unidentified-precio');
+    const qtyInput = document.getElementById('pos419-unidentified-qty');
+    const tallaSelect = document.getElementById('pos419-unidentified-talla');
+    const generoSelect = document.getElementById('pos419-unidentified-genero');
+
+    const nombre = nombreInput && nombreInput.value ? nombreInput.value.trim() : 'Producto Sin Identificar';
+    const precio = parseFloat(precioInput ? precioInput.value : 0);
+    const cantidad = parseInt(qtyInput ? qtyInput.value : 1) || 1;
+    const talla = tallaSelect ? tallaSelect.value : 'Única';
+    const genero = generoSelect ? generoSelect.value : 'Unisex';
+
+    if (isNaN(precio) || precio <= 0) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Precio Requerido',
+            text: 'Por favor ingresa un precio unitario mayor a $0.00',
+            background: '#151515', color: '#fff'
+        });
+        return;
+    }
+
+    const uniqueId = `CUSTOM-419-${Date.now()}`;
+
+    pos419Cart.push({
+        id_playera: uniqueId,
+        is_unidentified: true,
+        nombre: nombre,
+        tipo: 'Art. Varios',
+        version: 'Manual',
+        genero: genero,
+        foto: 'https://images.unsplash.com/photo-1577212017184-807dd6acefd6?auto=format&fit=crop&q=80&w=150',
+        talla: talla,
+        cantidad: cantidad,
+        precio_menudeo: precio,
+        precio_mayoreo: precio,
+        precio_mayoreo_super: precio,
+        tipo_personalizacion: 'PERS-NONE',
+        personalizacion_texto: ''
+    });
+
+    closePos419UnidentifiedItemModal();
+    recalculatePos419Cart();
+
+    const toast = Swal.mixin({ toast: true, position: 'bottom-end', showConfirmButton: false, timer: 2000, background: '#151515', color: '#fff' });
+    toast.fire({ icon: 'success', title: `✓ Agregado: ${nombre} ($${precio.toFixed(2)})` });
+
+    if (window.innerWidth < 768) {
+        switchPOS419MobileTab('cart');
+    }
+};
+
 function renderPos419Catalog() {
     const gridContainer = document.getElementById('pos419-catalog-grid');
     if (!gridContainer) return;
@@ -10028,8 +11876,31 @@ function renderPos419Catalog() {
         return matchText(targetStr, q);
     });
     
+    const unidentifiedCardHtml = `
+        <div class="bg-gradient-to-br from-amber-500/10 via-dark-200/50 to-dark-200/50 border border-amber-500/30 hover:border-amber-400 rounded-xl p-3 space-y-2 transition-all flex flex-col justify-between shadow-lg">
+            <div class="flex items-start gap-3">
+                <div class="w-14 h-14 flex-shrink-0 bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-lg flex items-center justify-center text-xl font-bold">
+                    📦
+                </div>
+                <div class="min-w-0 flex-grow">
+                    <div class="flex items-center justify-between gap-1">
+                        <h4 class="text-xs font-black text-amber-300 leading-tight truncate">PRODUCTO SIN IDENTIFICAR</h4>
+                    </div>
+                    <div class="text-[10px] text-gray-400 truncate mt-0.5">Venta rápida manual / Varios</div>
+                    <div class="text-[9px] text-amber-400/80 font-mono mt-0.5">Precio y concepto libre</div>
+                </div>
+            </div>
+            <div class="pt-2 border-t border-amber-500/20">
+                <button type="button" onclick="window.openPos419UnidentifiedItemModal()" class="w-full py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-extrabold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"></path></svg>
+                    <span>Configurar y Agregar</span>
+                </button>
+            </div>
+        </div>
+    `;
+
     if (filtered.length === 0) {
-        gridContainer.innerHTML = `<div class="col-span-full text-center py-10 text-gray-500 italic text-xs">No hay prendas disponibles en Local 419 que coincidan.</div>`;
+        gridContainer.innerHTML = unidentifiedCardHtml + `<div class="col-span-full text-center py-10 text-gray-500 italic text-xs">No hay prendas disponibles en Local 419 que coincidan.</div>`;
         return;
     }
 
@@ -10049,7 +11920,7 @@ function renderPos419Catalog() {
         else currentTier = 'Menudeo';
     }
     
-    gridContainer.innerHTML = filtered.map(prod => {
+    gridContainer.innerHTML = unidentifiedCardHtml + filtered.map(prod => {
         const rawImg = getFirstImage(prod.foto || prod.imagen) || 'https://images.unsplash.com/photo-1577212017184-807dd6acefd6?auto=format&fit=crop&q=80&w=400';
         const imgUrl = getOptimizedImageUrl(rawImg, 300);
         const equipoNombre = (prod.nombre || prod.equipo || 'JERSEY').toUpperCase();
@@ -10074,7 +11945,7 @@ function renderPos419Catalog() {
         let sizeButtonsHtml = '';
         tallasArray.forEach(tObj => {
             const sz = String(tObj.talla || '').toUpperCase();
-            const shortSz = sz.includes('(') ? (sz.split('(')[0].trim() || sz) : sz;
+            const shortSz = formatShortTallaLabel(sz);
             const avail419 = Number(tObj.stock || 0);
             
             const inCartItem = pos419Cart.find(ci => ci.id_playera === prod.id && ci.talla === sz);
@@ -10180,7 +12051,7 @@ function updatePos419ItemQty(idx, delta) {
     const prod = (allProducts419 || []).find(p => String(p.id) === String(item.id_playera));
     const tallasArray = prod && Array.isArray(prod.tallas) ? prod.tallas : [];
     const tObj = tallasArray.find(x => String(x.talla).trim().toUpperCase() === String(item.talla).trim().toUpperCase());
-    const maxStock = tObj ? Number(tObj.stock || 0) : 99;
+    const maxStock = item.is_unidentified ? 999 : (tObj ? Number(tObj.stock || 0) : 99);
     
     const newQty = item.cantidad + delta;
     if (newQty <= 0) {
@@ -10617,198 +12488,215 @@ function renderPos419Cart() {
     }).join('');
 }
 
+let isSubmittingPos419Lock = false;
+
 async function submitPos419Order() {
+    if (isSubmittingPos419Lock) return;
     if (pos419Cart.length === 0) return;
     
-    const metodoPago = document.getElementById('pos419-payment-method')?.value || 'Efectivo';
-    
-    let subtotalItems = 0;
-    pos419Cart.forEach(i => subtotalItems += (i.subtotal || 0));
-    
-    let totalPieces = 0;
-    pos419Cart.forEach(i => totalPieces += i.cantidad);
+    isSubmittingPos419Lock = true;
+    try {
+        const metodoPago = document.getElementById('pos419-payment-method')?.value || 'Efectivo';
+        
+        let subtotalItems = 0;
+        pos419Cart.forEach(i => subtotalItems += (i.subtotal || 0));
+        
+        let totalPieces = 0;
+        pos419Cart.forEach(i => totalPieces += i.cantidad);
 
-    const discountValEl = document.getElementById('pos419-discount-val');
-    const discountInputVal = discountValEl ? parseFloat(discountValEl.value || 0) : 0;
+        const discountValEl = document.getElementById('pos419-discount-val');
+        const discountInputVal = discountValEl ? parseFloat(discountValEl.value || 0) : 0;
 
-    let descuentoMonto = 0;
-    if (!isNaN(discountInputVal) && discountInputVal > 0) {
-        descuentoMonto = Math.min(subtotalItems, discountInputVal);
-    }
+        let descuentoMonto = 0;
+        if (!isNaN(discountInputVal) && discountInputVal > 0) {
+            descuentoMonto = Math.min(subtotalItems, discountInputVal);
+        }
 
-    const basePrendas = Math.max(0, subtotalItems - descuentoMonto);
-    const metodoPagoEl = document.getElementById('pos419-payment-method');
-    const metodoPagoVal = metodoPagoEl ? metodoPagoEl.value : 'Efectivo';
-    const isTerminal = (metodoPagoVal.toLowerCase().indexOf('tarjeta') !== -1 || metodoPagoVal.toLowerCase().indexOf('terminal') !== -1);
-    const comisionTerminalMonto = isTerminal ? (basePrendas * 0.05) : 0;
+        const basePrendas = Math.max(0, subtotalItems - descuentoMonto);
+        const metodoPagoEl = document.getElementById('pos419-payment-method');
+        const metodoPagoVal = metodoPagoEl ? metodoPagoEl.value : 'Efectivo';
+        const isTerminal = (metodoPagoVal.toLowerCase().indexOf('tarjeta') !== -1 || metodoPagoVal.toLowerCase().indexOf('terminal') !== -1);
+        const comisionTerminalMonto = isTerminal ? (basePrendas * 0.05) : 0;
 
-    const granTotal = basePrendas + comisionTerminalMonto;
+        const granTotal = basePrendas + comisionTerminalMonto;
 
-    // Obtener datos de pago en efectivo
-    const isEfectivo = metodoPagoVal.toLowerCase().includes('efectivo');
-    const cashReceivedInput = document.getElementById('pos419-cash-received-val');
-    let cashReceivedVal = (cashReceivedInput && isEfectivo) ? parseFloat(cashReceivedInput.value || 0) : 0;
+        // Obtener datos de pago en efectivo
+        const isEfectivo = metodoPagoVal.toLowerCase().includes('efectivo');
+        const cashReceivedInput = document.getElementById('pos419-cash-received-val');
+        let cashReceivedVal = (cashReceivedInput && isEfectivo) ? parseFloat(cashReceivedInput.value || 0) : 0;
 
-    // Ventana Emergente Obligatoria para Cobro en Efectivo
-    if (isEfectivo) {
-        const cashModalRes = await Swal.fire({
-            title: '💵 Cobro en Efectivo',
-            html: `
-                <div class="text-left space-y-3 py-1">
-                    <div class="bg-black/40 p-3 rounded-xl border border-white/10 flex items-center justify-between">
-                        <span class="text-xs text-gray-400 font-bold uppercase">Total a Cobrar:</span>
-                        <span class="text-lg font-black text-amber-400 font-mono">$${granTotal.toFixed(2)}</span>
-                    </div>
+        // Ventana Emergente Obligatoria para Cobro en Efectivo
+        if (isEfectivo) {
+            const cashModalRes = await Swal.fire({
+                title: '💵 Cobro en Efectivo',
+                html: `
+                    <div class="text-left space-y-3 py-1">
+                        <div class="bg-black/40 p-3 rounded-xl border border-white/10 flex items-center justify-between">
+                            <span class="text-xs text-gray-400 font-bold uppercase">Total a Cobrar:</span>
+                            <span class="text-lg font-black text-amber-400 font-mono">$${granTotal.toFixed(2)}</span>
+                        </div>
 
-                    <div>
-                        <label class="block text-xs font-bold text-gray-300 mb-1">¿Con cuánto dinero paga el cliente? ($):</label>
-                        <div class="relative">
-                            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-400 font-extrabold text-sm">$</span>
-                            <input type="number" id="swal-pos419-cash-input" step="0.01" value="${cashReceivedVal > 0 ? cashReceivedVal : ''}" placeholder="${granTotal.toFixed(2)}" class="w-full bg-dark-200 border-2 border-emerald-500/50 rounded-xl pl-7 pr-3 py-2.5 text-base font-black text-emerald-300 focus:outline-none focus:border-emerald-400 font-mono">
+                        <div>
+                            <label class="block text-xs font-bold text-gray-300 mb-1">¿Con cuánto dinero paga el cliente? ($):</label>
+                            <div class="relative">
+                                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-400 font-extrabold text-sm">$</span>
+                                <input type="number" id="swal-pos419-cash-input" step="0.01" value="${cashReceivedVal > 0 ? cashReceivedVal : ''}" placeholder="${granTotal.toFixed(2)}" class="w-full bg-dark-200 border-2 border-emerald-500/50 rounded-xl pl-7 pr-3 py-2.5 text-base font-black text-emerald-300 focus:outline-none focus:border-emerald-400 font-mono">
+                            </div>
+                        </div>
+
+                        <!-- Botones de Acceso Rápido -->
+                        <div class="flex flex-wrap gap-1.5 pt-1">
+                            <button type="button" onclick="const inp = document.getElementById('swal-pos419-cash-input'); if(inp){ inp.value = ${granTotal.toFixed(2)}; inp.dispatchEvent(new Event('input')); }" class="px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 rounded-lg text-xs font-bold transition-all cursor-pointer">Exacto ($${granTotal.toFixed(2)})</button>
+                            <button type="button" onclick="const inp = document.getElementById('swal-pos419-cash-input'); if(inp){ inp.value = 100; inp.dispatchEvent(new Event('input')); }" class="px-2.5 py-1 bg-white/5 hover:bg-white/10 text-white border border-white/10 rounded-lg text-xs font-bold transition-all cursor-pointer">$100</button>
+                            <button type="button" onclick="const inp = document.getElementById('swal-pos419-cash-input'); if(inp){ inp.value = 200; inp.dispatchEvent(new Event('input')); }" class="px-2.5 py-1 bg-white/5 hover:bg-white/10 text-white border border-white/10 rounded-lg text-xs font-bold transition-all cursor-pointer">$200</button>
+                            <button type="button" onclick="const inp = document.getElementById('swal-pos419-cash-input'); if(inp){ inp.value = 500; inp.dispatchEvent(new Event('input')); }" class="px-2.5 py-1 bg-white/5 hover:bg-white/10 text-white border border-white/10 rounded-lg text-xs font-bold transition-all cursor-pointer">$500</button>
+                            <button type="button" onclick="const inp = document.getElementById('swal-pos419-cash-input'); if(inp){ inp.value = 1000; inp.dispatchEvent(new Event('input')); }" class="px-2.5 py-1 bg-white/5 hover:bg-white/10 text-white border border-white/10 rounded-lg text-xs font-bold transition-all cursor-pointer">$1,000</button>
+                        </div>
+
+                        <div id="swal-pos419-change-box" class="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl flex items-center justify-between transition-colors">
+                            <span class="text-xs font-bold text-emerald-400 uppercase">Cambio a Entregar:</span>
+                            <span id="swal-pos419-change-val" class="text-lg font-black text-emerald-300 font-mono">$0.00</span>
                         </div>
                     </div>
+                `,
+                icon: 'info',
+                showCancelButton: true,
+                confirmButtonText: 'Confirmar Pago y Cobrar',
+                cancelButtonText: 'Cancelar',
+                confirmButtonColor: '#10b981',
+                cancelButtonColor: '#374151',
+                background: '#151515', color: '#fff',
+                didOpen: () => {
+                    const inp = document.getElementById('swal-pos419-cash-input');
+                    const changeBox = document.getElementById('swal-pos419-change-val');
+                    const changeContainer = document.getElementById('swal-pos419-change-box');
 
-                    <!-- Botones de Acceso Rápido -->
-                    <div class="flex flex-wrap gap-1.5 pt-1">
-                        <button type="button" onclick="const inp = document.getElementById('swal-pos419-cash-input'); if(inp){ inp.value = ${granTotal.toFixed(2)}; inp.dispatchEvent(new Event('input')); }" class="px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 rounded-lg text-xs font-bold transition-all cursor-pointer">Exacto ($${granTotal.toFixed(2)})</button>
-                        <button type="button" onclick="const inp = document.getElementById('swal-pos419-cash-input'); if(inp){ inp.value = 100; inp.dispatchEvent(new Event('input')); }" class="px-2.5 py-1 bg-white/5 hover:bg-white/10 text-white border border-white/10 rounded-lg text-xs font-bold transition-all cursor-pointer">$100</button>
-                        <button type="button" onclick="const inp = document.getElementById('swal-pos419-cash-input'); if(inp){ inp.value = 200; inp.dispatchEvent(new Event('input')); }" class="px-2.5 py-1 bg-white/5 hover:bg-white/10 text-white border border-white/10 rounded-lg text-xs font-bold transition-all cursor-pointer">$200</button>
-                        <button type="button" onclick="const inp = document.getElementById('swal-pos419-cash-input'); if(inp){ inp.value = 500; inp.dispatchEvent(new Event('input')); }" class="px-2.5 py-1 bg-white/5 hover:bg-white/10 text-white border border-white/10 rounded-lg text-xs font-bold transition-all cursor-pointer">$500</button>
-                        <button type="button" onclick="const inp = document.getElementById('swal-pos419-cash-input'); if(inp){ inp.value = 1000; inp.dispatchEvent(new Event('input')); }" class="px-2.5 py-1 bg-white/5 hover:bg-white/10 text-white border border-white/10 rounded-lg text-xs font-bold transition-all cursor-pointer">$1,000</button>
-                    </div>
+                    const updateCalc = () => {
+                        const val = parseFloat(inp.value || 0);
+                        if (val >= granTotal) {
+                            const cambio = val - granTotal;
+                            changeBox.textContent = `$${cambio.toFixed(2)}`;
+                            changeContainer.className = 'p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl flex items-center justify-between';
+                            changeBox.className = 'text-lg font-black text-emerald-300 font-mono';
+                        } else if (val > 0) {
+                            const falta = granTotal - val;
+                            changeBox.textContent = `Falta: $${falta.toFixed(2)}`;
+                            changeContainer.className = 'p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-center justify-between';
+                            changeBox.className = 'text-base font-bold text-amber-400 font-mono';
+                        } else {
+                            changeBox.textContent = '$0.00';
+                            changeContainer.className = 'p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl flex items-center justify-between';
+                            changeBox.className = 'text-lg font-black text-emerald-300 font-mono';
+                        }
+                    };
 
-                    <div id="swal-pos419-change-box" class="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl flex items-center justify-between transition-colors">
-                        <span class="text-xs font-bold text-emerald-400 uppercase">Cambio a Entregar:</span>
-                        <span id="swal-pos419-change-val" class="text-lg font-black text-emerald-300 font-mono">$0.00</span>
-                    </div>
+                    if (inp) {
+                        inp.focus();
+                        inp.addEventListener('input', updateCalc);
+                        updateCalc();
+                    }
+                },
+                preConfirm: () => {
+                    const inp = document.getElementById('swal-pos419-cash-input');
+                    const val = parseFloat(inp ? inp.value : 0);
+                    if (isNaN(val) || val < granTotal) {
+                        Swal.showValidationMessage(`El pago ingresado ($${(val || 0).toFixed(2)}) debe ser mayor o igual al Total ($${granTotal.toFixed(2)})`);
+                        return false;
+                    }
+                    return val;
+                }
+            });
+
+            if (!cashModalRes.isConfirmed) return;
+            cashReceivedVal = parseFloat(cashModalRes.value || 0);
+
+            // Sincronizar input en la barra lateral
+            if (cashReceivedInput) cashReceivedInput.value = cashReceivedVal.toFixed(2);
+            recalculatePos419Cart();
+        }
+
+        const cambioEntregadoVal = (isEfectivo && cashReceivedVal >= granTotal) ? (cashReceivedVal - granTotal) : 0;
+        
+        let appliedTier = 'Menudeo';
+        const clientPerfil = pos419Client.perfil || 'Menudeo';
+        const isMostrador = pos419Client.id_cliente === 'CLI-MOSTRADOR';
+        
+        if (isMostrador) {
+            if (totalPieces >= 12) appliedTier = 'Súper Mayoreo';
+            else if (totalPieces >= 6) appliedTier = 'Mayoreo';
+            else appliedTier = 'Menudeo';
+        } else {
+            if (clientPerfil === 'Súper Mayoreo' || totalPieces >= 12) appliedTier = 'Súper Mayoreo';
+            else if (clientPerfil === 'Mayoreo' || totalPieces >= 6) appliedTier = 'Mayoreo';
+            else appliedTier = 'Menudeo';
+        }
+
+        const finalClientName = (isMostrador && pos419Client.nombre_mostrador_custom)
+            ? `Cliente Mostrador - ${pos419Client.nombre_mostrador_custom}`
+            : pos419Client.nombre_completo;
+
+        let discountSummaryHtml = `<p>Subtotal prendas: <strong class="text-gray-300 font-mono">$${subtotalItems.toFixed(2)}</strong></p>`;
+        if (descuentoMonto > 0) {
+            discountSummaryHtml += `<p>Descuento especial: <strong class="text-emerald-400 font-mono">-$${descuentoMonto.toFixed(2)}</strong></p>`;
+        }
+        if (comisionTerminalMonto > 0) {
+            discountSummaryHtml += `<p>Comisión Terminal (5%): <strong class="text-sky-400 font-mono">+$${comisionTerminalMonto.toFixed(2)}</strong></p>`;
+        }
+        if (isEfectivo && cashReceivedVal > 0) {
+            discountSummaryHtml += `<p>Pago Recibido (Efectivo): <strong class="text-emerald-400 font-mono">$${cashReceivedVal.toFixed(2)}</strong></p>`;
+            discountSummaryHtml += `<p>Cambio a Entregar: <strong class="text-emerald-300 font-mono">$${cambioEntregadoVal.toFixed(2)}</strong></p>`;
+        }
+        
+        const confirmRes = await Swal.fire({
+            title: '¿Confirmar Venta en Local 419?',
+            html: `
+                <div class="text-left space-y-2 text-xs text-gray-300 py-2">
+                    <p>Cliente: <strong class="text-white">${finalClientName}</strong></p>
+                    <p>Piezas: <strong class="text-white">${totalPieces} pzas</strong></p>
+                    <p>Nivel de Precio: <strong class="text-amber-400">${appliedTier}</strong></p>
+                    <p>Método de Pago: <strong class="text-emerald-400">${metodoPagoVal}</strong></p>
+                    ${discountSummaryHtml}
+                    <p class="text-sm font-bold text-white pt-2 border-t border-white/10">Total a Cobrar: <span class="text-amber-400 font-mono">$${granTotal.toFixed(2)}</span></p>
                 </div>
             `,
-            icon: 'info',
+            icon: 'question',
             showCancelButton: true,
-            confirmButtonText: 'Confirmar Pago y Cobrar',
+            confirmButtonText: 'Sí, Cobrar y Generar Orden',
             cancelButtonText: 'Cancelar',
-            confirmButtonColor: '#10b981',
+            confirmButtonColor: '#f59e0b',
             cancelButtonColor: '#374151',
-            background: '#151515', color: '#fff',
-            didOpen: () => {
-                const inp = document.getElementById('swal-pos419-cash-input');
-                const changeBox = document.getElementById('swal-pos419-change-val');
-                const changeContainer = document.getElementById('swal-pos419-change-box');
-
-                const updateCalc = () => {
-                    const val = parseFloat(inp.value || 0);
-                    if (val >= granTotal) {
-                        const cambio = val - granTotal;
-                        changeBox.textContent = `$${cambio.toFixed(2)}`;
-                        changeContainer.className = 'p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl flex items-center justify-between';
-                        changeBox.className = 'text-lg font-black text-emerald-300 font-mono';
-                    } else if (val > 0) {
-                        const falta = granTotal - val;
-                        changeBox.textContent = `Falta: $${falta.toFixed(2)}`;
-                        changeContainer.className = 'p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-center justify-between';
-                        changeBox.className = 'text-base font-bold text-amber-400 font-mono';
-                    } else {
-                        changeBox.textContent = '$0.00';
-                        changeContainer.className = 'p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl flex items-center justify-between';
-                        changeBox.className = 'text-lg font-black text-emerald-300 font-mono';
-                    }
-                };
-
-                if (inp) {
-                    inp.focus();
-                    inp.addEventListener('input', updateCalc);
-                    updateCalc();
+            background: '#151515', color: '#fff'
+        });
+        
+        if (!confirmRes.isConfirmed) return;
+        
+        // ⚡ 1. DESCUENTO BIDIRECCIONAL OPTIMISTA EN MEMORIA (0ms Latencia)
+        let syncedCount = 0;
+        pos419Cart.forEach(cartItem => {
+            const prod419 = (allProducts419 || []).find(p => String(p.id || '').toUpperCase() === String(cartItem.id_playera || '').toUpperCase());
+            if (prod419 && Array.isArray(prod419.tallas)) {
+                const tObj419 = prod419.tallas.find(t => String(t.talla || '').trim().toUpperCase() === String(cartItem.talla || '').trim().toUpperCase());
+                if (tObj419) {
+                    const st = Number(tObj419.stock !== undefined ? tObj419.stock : tObj419.inventario || 0);
+                    tObj419.stock = Math.max(0, st - cartItem.cantidad);
+                    tObj419.inventario = Math.max(0, st - cartItem.cantidad);
                 }
-            },
-            preConfirm: () => {
-                const inp = document.getElementById('swal-pos419-cash-input');
-                const val = parseFloat(inp ? inp.value : 0);
-                if (isNaN(val) || val < granTotal) {
-                    Swal.showValidationMessage(`El pago ingresado ($${(val || 0).toFixed(2)}) debe ser mayor o igual al Total ($${granTotal.toFixed(2)})`);
-                    return false;
-                }
-                return val;
             }
         });
 
-        if (!cashModalRes.isConfirmed) return;
-        cashReceivedVal = parseFloat(cashModalRes.value || 0);
+        // Actualizar vistas en pantalla de inmediato
+        if (typeof renderProducts === 'function') renderProducts();
+        if (typeof renderInventario419Grid === 'function') renderInventario419Grid(allProducts419);
 
-        // Sincronizar input en la barra lateral
-        if (cashReceivedInput) cashReceivedInput.value = cashReceivedVal.toFixed(2);
-        recalculatePos419Cart();
-    }
+        const customName = (pos419Client.nombre_mostrador_custom || '').trim();
+        const clientIdToSend = isMostrador
+            ? (customName ? `CLI-MOSTRADOR-${customName}` : 'CLI-MOSTRADOR-Cliente Mostrador')
+            : pos419Client.id_cliente;
 
-    const cambioEntregadoVal = (isEfectivo && cashReceivedVal >= granTotal) ? (cashReceivedVal - granTotal) : 0;
-    
-    let appliedTier = 'Menudeo';
-    const clientPerfil = pos419Client.perfil || 'Menudeo';
-    const isMostrador = pos419Client.id_cliente === 'CLI-MOSTRADOR';
-    
-    if (isMostrador) {
-        if (totalPieces >= 12) appliedTier = 'Súper Mayoreo';
-        else if (totalPieces >= 6) appliedTier = 'Mayoreo';
-        else appliedTier = 'Menudeo';
-    } else {
-        if (clientPerfil === 'Súper Mayoreo' || totalPieces >= 12) appliedTier = 'Súper Mayoreo';
-        else if (clientPerfil === 'Mayoreo' || totalPieces >= 6) appliedTier = 'Mayoreo';
-        else appliedTier = 'Menudeo';
-    }
-
-    const finalClientName = (isMostrador && pos419Client.nombre_mostrador_custom)
-        ? `Cliente Mostrador - ${pos419Client.nombre_mostrador_custom}`
-        : pos419Client.nombre_completo;
-
-    let discountSummaryHtml = `<p>Subtotal prendas: <strong class="text-gray-300 font-mono">$${subtotalItems.toFixed(2)}</strong></p>`;
-    if (descuentoMonto > 0) {
-        discountSummaryHtml += `<p>Descuento especial: <strong class="text-emerald-400 font-mono">-$${descuentoMonto.toFixed(2)}</strong></p>`;
-    }
-    if (comisionTerminalMonto > 0) {
-        discountSummaryHtml += `<p>Comisión Terminal (5%): <strong class="text-sky-400 font-mono">+$${comisionTerminalMonto.toFixed(2)}</strong></p>`;
-    }
-    if (isEfectivo && cashReceivedVal > 0) {
-        discountSummaryHtml += `<p>Pago Recibido (Efectivo): <strong class="text-emerald-400 font-mono">$${cashReceivedVal.toFixed(2)}</strong></p>`;
-        discountSummaryHtml += `<p>Cambio a Entregar: <strong class="text-emerald-300 font-mono">$${cambioEntregadoVal.toFixed(2)}</strong></p>`;
-    }
-    
-    const confirmRes = await Swal.fire({
-        title: '¿Confirmar Venta en Local 419?',
-        html: `
-            <div class="text-left space-y-2 text-xs text-gray-300 py-2">
-                <p>Cliente: <strong class="text-white">${finalClientName}</strong></p>
-                <p>Piezas: <strong class="text-white">${totalPieces} pzas</strong></p>
-                <p>Nivel de Precio: <strong class="text-amber-400">${appliedTier}</strong></p>
-                <p>Método de Pago: <strong class="text-emerald-400">${metodoPagoVal}</strong></p>
-                ${discountSummaryHtml}
-                <p class="text-sm font-bold text-white pt-2 border-t border-white/10">Total a Cobrar: <span class="text-amber-400 font-mono">$${granTotal.toFixed(2)}</span></p>
-            </div>
-        `,
-        icon: 'question',
-        showCancelButton: true,
-        confirmButtonText: 'Sí, Cobrar y Generar Orden',
-        cancelButtonText: 'Cancelar',
-        confirmButtonColor: '#f59e0b',
-        cancelButtonColor: '#374151',
-        background: '#151515', color: '#fff'
-    });
-    
-    if (!confirmRes.isConfirmed) return;
-    
-    Swal.fire({
-        title: 'Registrando Venta...',
-        text: 'Descontando inventario de Local 419 y generando orden...',
-        allowOutsideClick: false,
-        background: '#151515', color: '#fff',
-        didOpen: () => Swal.showLoading()
-    });
-    
-    const customName = (pos419Client.nombre_mostrador_custom || '').trim();
-    const clientIdToSend = isMostrador
-        ? (customName ? `CLI-MOSTRADOR-${customName}` : 'CLI-MOSTRADOR-Cliente Mostrador')
-        : pos419Client.id_cliente;
-    
-    try {
+        const generatedOrderId = 'POS419-' + Date.now().toString().slice(-6) + '-' + Math.floor(Math.random() * 900 + 100);
+        
         const payload = {
+            id_orden_temp: generatedOrderId,
             action: 'create_pos_419_order',
             id_cliente: clientIdToSend,
             nombre_cliente: finalClientName,
@@ -10821,6 +12709,7 @@ async function submitPos419Order() {
             comision_terminal: comisionTerminalMonto,
             descuento_tipo: descuentoMonto > 0 ? "Monto" : "Ninguno",
             total_cobrado: granTotal,
+            idempotency_key: 'IDEMP-POS-' + clientIdToSend + '-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7),
             items: pos419Cart.map(i => ({
                 id_playera: i.id_playera,
                 talla: i.talla,
@@ -10833,74 +12722,69 @@ async function submitPos419Order() {
                 subtotal: i.subtotal
             }))
         };
-        
-        const response = await fetch(API_URL, {
-            method: 'POST',
-            body: JSON.stringify(payload)
+
+        // 🛡️ 2. ENCOLAR EN MEMORIA LOCAL SEGURA (pos_sync_queue) ANTES DEL ENVÍO
+        let syncQueue = [];
+        try { syncQueue = JSON.parse(localStorage.getItem('pos_sync_queue') || '[]'); } catch (e) { syncQueue = []; }
+        syncQueue.push(payload);
+        try { localStorage.setItem('pos_sync_queue', JSON.stringify(syncQueue)); } catch (e) {}
+
+        window.updatePosSyncStatusUI();
+
+        // Guardar datos del ticket
+        const lastTicketData = {
+            id_orden: generatedOrderId,
+            fecha: new Date().toLocaleString('es-MX', { timeZone: 'America/Mexico_City' }),
+            cliente: finalClientName,
+            metodo_pago: metodoPagoVal,
+            monto_recibido: cashReceivedVal,
+            cambio_entregado: cambioEntregadoVal,
+            subtotal: subtotalItems,
+            descuento: descuentoMonto,
+            comision_terminal: comisionTerminalMonto,
+            gran_total: granTotal,
+            items: pos419Cart.map(i => ({
+                id_playera: i.nombre || i.id_playera,
+                talla: i.talla,
+                cantidad: i.cantidad,
+                precio_unitario: i.precio_unitario_aplicado,
+                subtotal: i.subtotal,
+                detalles_personalizacion: i.personalizacion_texto || ''
+            }))
+        };
+        window.lastPos419TicketData = lastTicketData;
+
+        // ⚡ 3. CONFIRMACIÓN Y EXPEDICIÓN DE TICKET DE INMEDIATO
+        await Swal.fire({
+            icon: 'success',
+            title: '¡Venta Registrada con Éxito!',
+            html: `
+                <div class="text-center space-y-3 py-2">
+                    <p class="text-xs text-gray-300">Folio Venta: <strong class="text-white font-mono">${generatedOrderId}</strong></p>
+                    <p class="text-sm font-bold text-amber-400 font-mono">Cobrado: $${granTotal.toFixed(2)} (${metodoPagoVal})</p>
+                    ${cashReceivedVal > 0 ? `<p class="text-xs text-emerald-400 font-bold font-mono">Recibido: $${cashReceivedVal.toFixed(2)} | Cambio: $${cambioEntregadoVal.toFixed(2)}</p>` : ''}
+                    <p class="text-[11px] text-emerald-400">✓ Piezas descontadas de Local 419 ${syncedCount > 0 ? `y sincronizadas simultáneamente con General` : ''}</p>
+                    <button type="button" onclick="window.printPos419Ticket()" class="w-full py-2.5 px-4 bg-amber-500 hover:bg-amber-400 text-black font-extrabold text-xs uppercase tracking-wider rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                        Imprimir Ticket (Xprinter XP-N160I-BT)
+                    </button>
+                </div>
+            `,
+            confirmButtonColor: '#10b981',
+            confirmButtonText: 'Listo',
+            background: '#151515', color: '#fff'
         });
         
-        const resData = await response.json();
+        pos419Cart = [];
+        if (discountValEl) discountValEl.value = '';
+        if (cashReceivedInput) cashReceivedInput.value = '';
+        recalculatePos419Cart();
         
-        if (resData.status === 'success') {
-            try {
-                localStorage.removeItem('local419_products_cache_v1');
-            } catch (eC) {}
-            
-            fetchProducts419(true);
-            if (typeof fetchInitialProducts === 'function') fetchInitialProducts(true);
-            
-            const lastTicketData = {
-                id_orden: resData.id_orden,
-                fecha: new Date().toLocaleString('es-MX', { timeZone: 'America/Mexico_City' }),
-                cliente: finalClientName,
-                metodo_pago: metodoPagoVal,
-                monto_recibido: cashReceivedVal,
-                cambio_entregado: cambioEntregadoVal,
-                subtotal: subtotalItems,
-                descuento: descuentoMonto,
-                comision_terminal: comisionTerminalMonto,
-                gran_total: granTotal,
-                items: pos419Cart.map(i => ({
-                    id_playera: i.nombre || i.id_playera,
-                    talla: i.talla,
-                    cantidad: i.cantidad,
-                    precio_unitario: i.precio_unitario_aplicado,
-                    subtotal: i.subtotal,
-                    detalles_personalizacion: i.personalizacion_texto || ''
-                }))
-            };
-            window.lastPos419TicketData = lastTicketData;
+        closePos419Modal();
+        openInventario419View();
 
-            await Swal.fire({
-                icon: 'success',
-                title: '¡Venta Registrada con Éxito!',
-                html: `
-                    <div class="text-center space-y-3 py-2">
-                        <p class="text-xs text-gray-300">Folio Orden: <strong class="text-white font-mono">${resData.id_orden}</strong></p>
-                        <p class="text-sm font-bold text-amber-400 font-mono">Cobrado: $${granTotal.toFixed(2)} (${metodoPagoVal})</p>
-                        ${cashReceivedVal > 0 ? `<p class="text-xs text-emerald-400 font-bold font-mono">Recibido: $${cashReceivedVal.toFixed(2)} | Cambio: $${cambioEntregadoVal.toFixed(2)}</p>` : ''}
-                        <p class="text-[11px] text-emerald-400">✓ Piezas descontadas del stock de Local 419</p>
-                        <button type="button" onclick="window.printPos419Ticket()" class="w-full py-2.5 px-4 bg-amber-500 hover:bg-amber-400 text-black font-extrabold text-xs uppercase tracking-wider rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
-                            Imprimir Ticket (Xprinter XP-N160I-BT)
-                        </button>
-                    </div>
-                `,
-                confirmButtonColor: '#10b981',
-                confirmButtonText: 'Listo',
-                background: '#151515', color: '#fff'
-            });
-            
-            pos419Cart = [];
-            if (discountValEl) discountValEl.value = '';
-            if (cashReceivedInput) cashReceivedInput.value = '';
-            recalculatePos419Cart();
-            
-            closePos419Modal();
-            openInventario419View();
-        } else {
-            throw new Error(resData.message || 'Error al registrar venta');
-        }
+        // ⚡ 4. PROCESAR ENVIÓ A GOOGLE SHEETS EN SEGUNDO PLANO (NON-BLOCKING)
+        window.processPosSyncQueueInBg();
     } catch (err) {
         console.error("Error al registrar venta POS 419:", err);
         Swal.fire({
@@ -10909,9 +12793,108 @@ async function submitPos419Order() {
             text: err.message || 'No se pudo procesar la orden en Local 419.',
             background: '#151515', color: '#fff'
         });
+    } finally {
+        isSubmittingPos419Lock = false;
     }
 }
 window.submitPos419Order = submitPos419Order;
+
+// 🛡️ WORKER DE SEGUNDO PLANO Y TOLERANCIA A FALLOS (pos_sync_queue)
+window.updatePosSyncStatusUI = function() {
+    const badgeEl = document.getElementById('pos419-sync-status-badge');
+    if (!badgeEl) return;
+
+    let queue = [];
+    try { queue = JSON.parse(localStorage.getItem('pos_sync_queue') || '[]'); } catch (e) { queue = []; }
+
+    if (queue.length === 0) {
+        badgeEl.className = 'px-2.5 py-1 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-extrabold flex items-center gap-1.5 shadow-sm';
+        badgeEl.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span><span>🟢 Sincronizado</span>`;
+    } else {
+        badgeEl.className = 'px-2.5 py-1 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-extrabold flex items-center gap-1.5 shadow-sm cursor-pointer hover:bg-amber-500/30';
+        badgeEl.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span><span>🟡 ${queue.length} Pendiente(s) [ Reintentar ]</span>`;
+        badgeEl.onclick = function() { window.processPosSyncQueueInBg(true); };
+    }
+};
+
+window.isProcessingPosQueue = false;
+window.processPosSyncQueueInBg = async function(userTriggered = false) {
+    if (window.isProcessingPosQueue) return;
+
+    let queue = [];
+    try { queue = JSON.parse(localStorage.getItem('pos_sync_queue') || '[]'); } catch (e) { queue = []; }
+    if (queue.length === 0) {
+        window.updatePosSyncStatusUI();
+        if (userTriggered) {
+            Swal.fire({ icon: 'success', title: 'Todo Sincronizado', text: 'No hay ventas pendientes en cola local.', background: '#151515', color: '#fff', timer: 1500, showConfirmButton: false });
+        }
+        return;
+    }
+
+    window.isProcessingPosQueue = true;
+    window.updatePosSyncStatusUI();
+
+    let updatedQueue = [...queue];
+    for (let i = 0; i < queue.length; i++) {
+        const itemPayload = queue[i];
+        try {
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify(itemPayload)
+            });
+            const data = await response.json();
+            if (data && (data.status === 'success' || data.id_orden)) {
+                // Éxito: Remover de la cola
+                updatedQueue = updatedQueue.filter(q => q.id_orden_temp !== itemPayload.id_orden_temp && q.idempotency_key !== itemPayload.idempotency_key);
+                try { localStorage.setItem('pos_sync_queue', JSON.stringify(updatedQueue)); } catch (e) {}
+
+                // Si el item tenía productos sincronizados con General, enviar también el descuento de General
+                if (Array.isArray(itemPayload.items)) {
+                    itemPayload.items.forEach(it => {
+                        const prodGen = (allProducts || []).find(p => String(p.id || '').toUpperCase() === String(it.id_playera || '').toUpperCase());
+                        if (prodGen && Array.isArray(prodGen.tallas)) {
+                            fetch(API_URL, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                                body: JSON.stringify({
+                                    action: 'update_stock_talla',
+                                    origen: 'general',
+                                    id_playera: it.id_playera,
+                                    talla: it.talla,
+                                    cantidad: Math.max(0, Number(it.cantidad || 1)),
+                                    operacion: 'descontar'
+                                })
+                            }).catch(errG => console.warn("Error en fondo guardando descuento general:", errG));
+                        }
+                    });
+                }
+            }
+        } catch (errReq) {
+            console.warn("Fallo de red/servidor al procesar en cola:", errReq);
+            break; // Detener bucle si hay fallo de red
+        }
+    }
+
+    window.isProcessingPosQueue = false;
+    window.updatePosSyncStatusUI();
+
+    if (typeof fetchProducts419 === 'function') fetchProducts419(true);
+    if (typeof fetchInitialProducts === 'function') fetchInitialProducts(true);
+
+    if (userTriggered) {
+        if (updatedQueue.length === 0) {
+            Swal.fire({ icon: 'success', title: '¡Sincronización Exitosa!', text: 'Todas las ventas de la cola fueron guardadas en Google Sheets.', background: '#151515', color: '#fff', confirmButtonColor: '#10b981' });
+        } else {
+            Swal.fire({ icon: 'warning', title: 'Reintento Parcial', text: `Quedan ${updatedQueue.length} venta(s) pendientes por reconexión.`, background: '#151515', color: '#fff', confirmButtonColor: '#f59e0b' });
+        }
+    }
+};
+
+window.addEventListener('online', () => {
+    console.log("🌐 Conexión a internet restablecida. Procesando cola de ventas POS...");
+    window.processPosSyncQueueInBg();
+});
 
 const defaultTicketConfig = {
     nombreTienda: 'JERSEYS 419',
@@ -11062,7 +13045,7 @@ window.updateLiveTicketPreview = function() {
             </div>
             <div style="display: flex; justify-content: space-between; margin-bottom: 3px;">
                 <strong>FORMA DE PAGO:</strong>
-                <span>(X) EFECTIVO ( ) TRANSF ( ) TC</span>
+                <span>EFECTIVO</span>
             </div>
             <div style="display: flex; justify-content: space-between;">
                 <span>SU PAGO (EFECTIVO):</span>
@@ -11104,12 +13087,13 @@ window.updateLiveTicketPreview = function() {
 
     try {
         if (typeof JsBarcode === 'function') {
-            JsBarcode("#live-ticket-barcode-svg", "ORD-419-802389", {
+            JsBarcode("#live-ticket-barcode-svg", "ORD419802389", {
                 format: "CODE128",
-                width: 1.1,
-                height: 22,
+                width: 1.2,
+                height: 24,
                 displayValue: true,
-                fontSize: 8.5,
+                text: "ORD-419-802389",
+                fontSize: 9,
                 margin: 0
             });
         }
@@ -11124,7 +13108,10 @@ window.openTicketConfigModal = async function() {
     const localCfg = window.getTicketConfig();
     populateTicketFields(localCfg);
     window.updateLiveTicketPreview();
+    document.body.style.overflow = 'hidden';
     modal.classList.remove('hidden');
+    void modal.offsetWidth;
+    modal.classList.remove('opacity-0');
 
     // 2. Consultar Google Sheets API en segundo plano y actualizar campos
     try {
@@ -11262,7 +13249,7 @@ function printPos419Ticket(dataCustom) {
             </div>
             <div style="display: flex; justify-content: space-between; margin-bottom: 3px;">
                 <strong>FORMA DE PAGO:</strong>
-                <span>(${isEfectivo ? 'X' : ' '}) EFECTIVO (${isTransf ? 'X' : ' '}) TRANSF (${isTC ? 'X' : ' '}) TC</span>
+                <span>${metodoPagoStr}</span>
             </div>
             ${isEfectivo && montoRecibido > 0 ? `
             <div style="display: flex; justify-content: space-between;">
@@ -11375,12 +13362,15 @@ function printPos419Ticket(dataCustom) {
             printed = true;
             try {
                 if (iframe.contentWindow.JsBarcode) {
-                    iframe.contentWindow.JsBarcode("#ticket-folio-barcode-svg", folioStr, {
+                    const barcodeValue = String(folioStr).replace(/[^A-Z0-9]/gi, '');
+                    iframe.contentWindow.JsBarcode("#ticket-folio-barcode-svg", barcodeValue, {
                         format: "CODE128",
                         width: 1.3,
-                        height: 24,
+                        height: 25,
                         displayValue: true,
-                        fontSize: 9,
+                        text: folioStr,
+                        fontSize: 9.5,
+                        fontOptions: "bold",
                         margin: 0
                     });
                 }
@@ -11413,12 +13403,15 @@ function printPos419Ticket(dataCustom) {
         printContainer.classList.remove('hidden');
         try {
             if (typeof JsBarcode === 'function') {
-                JsBarcode("#ticket-folio-barcode-svg", folioStr, {
+                const barcodeValueFallback = String(folioStr).replace(/[^A-Z0-9]/gi, '');
+                JsBarcode("#ticket-folio-barcode-svg", barcodeValueFallback, {
                     format: "CODE128",
                     width: 1.3,
-                    height: 24,
+                    height: 25,
                     displayValue: true,
-                    fontSize: 9,
+                    text: folioStr,
+                    fontSize: 9.5,
+                    fontOptions: "bold",
                     margin: 0
                 });
             }
@@ -11474,6 +13467,7 @@ async function fetchArticulos() {
         listContainer.innerHTML = `<div class="text-center py-6 text-xs text-gray-400">Cargando artículos deportivos...</div>`;
     }
 
+    if (window.startTopLoadingBar) startTopLoadingBar();
     try {
         const response = await fetch(API_URL, {
             method: 'POST',
@@ -11489,6 +13483,8 @@ async function fetchArticulos() {
     } catch (err) {
         console.error("Error al consultar artículos deportivos:", err);
         if (listContainer) listContainer.innerHTML = `<div class="text-center py-6 text-xs text-red-400">Error al cargar artículos.</div>`;
+    } finally {
+        if (window.finishTopLoadingBar) finishTopLoadingBar();
     }
 }
 window.fetchArticulos = fetchArticulos;
@@ -12019,12 +14015,55 @@ let currentStickerAvailableSizes = [];
 let stickerBatchCounts = {};
 let html5QrScannerInstance = null;
 let currentStickerIsGeneralCatalog = false;
+let stickerInventoryMode = 'general'; // 'general' u '419'
+
+window.switchStickerInventoryMode = function(mode) {
+    stickerInventoryMode = mode;
+    currentStickerIsGeneralCatalog = (mode === 'general');
+    currentStickerData = null; // 🌟 Resetear prenda previamente seleccionada
+    
+    const btnGen = document.getElementById('btn-sticker-mode-gen');
+    const btn419 = document.getElementById('btn-sticker-mode-419');
+
+    if (mode === '419') {
+        if (btn419) btn419.className = 'flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 bg-amber-500 text-black shadow-md cursor-pointer';
+        if (btnGen) btnGen.className = 'flex-1 py-2 px-3 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 bg-white/5 text-gray-300 hover:text-white hover:bg-white/10 border border-white/10 cursor-pointer';
+        
+        if ((!allProducts419 || allProducts419.length === 0) && typeof fetchProducts419 === 'function') {
+            fetchProducts419();
+        }
+    } else {
+        if (btnGen) btnGen.className = 'flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 bg-amber-500 text-black shadow-md cursor-pointer';
+        if (btn419) btn419.className = 'flex-1 py-2 px-3 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 bg-white/5 text-gray-300 hover:text-white hover:bg-white/10 border border-white/10 cursor-pointer';
+    }
+
+    // Limpiar buscador y lista de resultados
+    const searchInput = document.getElementById('sticker-product-search-input');
+    const searchResults = document.getElementById('sticker-product-search-results');
+    if (searchInput) searchInput.value = '';
+    if (searchResults) { searchResults.innerHTML = ''; searchResults.classList.add('hidden'); }
+
+    // Limpiar datos en memoria y restablecer UI en blanco
+    openPrintStickerModal(null, mode === 'general');
+};
 
 window.openPrintStickerModal = function(itemData, isGeneralCatalog = false) {
     currentStickerIsGeneralCatalog = (isGeneralCatalog === true);
+    stickerInventoryMode = currentStickerIsGeneralCatalog ? 'general' : '419';
     currentStickerData = itemData || null;
     const modal = document.getElementById('modal-print-barcode-labels');
     if (!modal) return;
+
+    // Actualizar apariencia visual de botones de origen de inventario
+    const btnGen = document.getElementById('btn-sticker-mode-gen');
+    const btn419 = document.getElementById('btn-sticker-mode-419');
+    if (stickerInventoryMode === '419') {
+        if (btn419) btn419.className = 'flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 bg-amber-500 text-black shadow-md cursor-pointer';
+        if (btnGen) btnGen.className = 'flex-1 py-2 px-3 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 bg-white/5 text-gray-300 hover:text-white hover:bg-white/10 border border-white/10 cursor-pointer';
+    } else {
+        if (btnGen) btnGen.className = 'flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 bg-amber-500 text-black shadow-md cursor-pointer';
+        if (btn419) btn419.className = 'flex-1 py-2 px-3 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 bg-white/5 text-gray-300 hover:text-white hover:bg-white/10 border border-white/10 cursor-pointer';
+    }
 
     // Configurar listener para buscador interno de prendas si no está asignado
     const searchInput = document.getElementById('sticker-product-search-input');
@@ -12054,7 +14093,10 @@ window.openPrintStickerModal = function(itemData, isGeneralCatalog = false) {
         stickerBatchCounts = {};
         renderStickerSizesBatchUI([]);
         window.updateStickerPreviewFromUI();
+        document.body.style.overflow = 'hidden';
         modal.classList.remove('hidden');
+        void modal.offsetWidth;
+        modal.classList.remove('opacity-0');
         return;
     }
 
@@ -12087,13 +14129,21 @@ window.openPrintStickerModal = function(itemData, isGeneralCatalog = false) {
     const priceBadgeEl = document.getElementById('sticker-price-badge-val');
     if (priceBadgeEl) priceBadgeEl.textContent = `$${precioNum.toFixed(2)}`;
 
-    // Obtener lista de tallas disponibles
+    // Obtener lista de tallas disponibles respetando el origen seleccionado
     let availableSizes = [];
     const mainCatalog419 = (typeof allProducts419 !== 'undefined' && Array.isArray(allProducts419)) ? allProducts419 : (window.allProducts419 || []);
     const mainCatalogGen = (typeof allProducts !== 'undefined' && Array.isArray(allProducts)) ? allProducts : (window.allProducts || []);
-    const fullProd = mainCatalog419.find(p => String(p.id || p.id_articulo || p.id_playera).toUpperCase() === String(itemData.id || itemData.id_playera).toUpperCase())
-        || mainCatalogGen.find(p => String(p.id || p.id_articulo || p.id_playera).toUpperCase() === String(itemData.id || itemData.id_playera).toUpperCase())
-        || itemData;
+    
+    let fullProd = null;
+    if (stickerInventoryMode === '419') {
+        fullProd = mainCatalog419.find(p => String(p.id || p.id_articulo || p.id_playera).toUpperCase() === String(itemData.id || itemData.id_playera).toUpperCase())
+            || mainCatalogGen.find(p => String(p.id || p.id_articulo || p.id_playera).toUpperCase() === String(itemData.id || itemData.id_playera).toUpperCase())
+            || itemData;
+    } else {
+        fullProd = mainCatalogGen.find(p => String(p.id || p.id_articulo || p.id_playera).toUpperCase() === String(itemData.id || itemData.id_playera).toUpperCase())
+            || mainCatalog419.find(p => String(p.id || p.id_articulo || p.id_playera).toUpperCase() === String(itemData.id || itemData.id_playera).toUpperCase())
+            || itemData;
+    }
 
     if (fullProd && Array.isArray(fullProd.tallas) && fullProd.tallas.length > 0) {
         availableSizes = fullProd.tallas.map(t => {
@@ -12116,28 +14166,19 @@ window.openPrintStickerModal = function(itemData, isGeneralCatalog = false) {
 
     currentStickerAvailableSizes = availableSizes;
 
-    // REGLA: Todas las piezas inician strictly en 0 al ingresar
+    // REGLA: Todas las piezas inician en 0 al ingresar
     stickerBatchCounts = {};
     availableSizes.forEach(sObj => {
         stickerBatchCounts[sObj.talla] = 0;
     });
 
-    const priceToggleRow = document.getElementById('sticker-price-toggle-row');
-    if (priceToggleRow) {
-        if (currentStickerIsGeneralCatalog) {
-            priceToggleRow.classList.add('hidden');
-        } else {
-            priceToggleRow.classList.remove('hidden');
-        }
-    }
-
-    const showPriceCheck = document.getElementById('sticker-show-price-check');
-    if (showPriceCheck) showPriceCheck.checked = false;
-
     renderStickerSizesBatchUI(availableSizes);
     window.updateStickerPreviewFromUI();
 
+    document.body.style.overflow = 'hidden';
     modal.classList.remove('hidden');
+    void modal.offsetWidth;
+    modal.classList.remove('opacity-0');
 };
 
 function filterStickerProductSearch(query) {
@@ -12154,21 +14195,16 @@ function filterStickerProductSearch(query) {
     const catalog419 = (typeof allProducts419 !== 'undefined' && Array.isArray(allProducts419)) ? allProducts419 : (window.allProducts419 || []);
     const catalogGen = (typeof allProducts !== 'undefined' && Array.isArray(allProducts)) ? allProducts : (window.allProducts || []);
 
-    const combinedMap = new Map();
-    [...catalog419, ...catalogGen].forEach(p => {
-        if (p && (p.id || p.id_playera) && !combinedMap.has(String(p.id || p.id_playera).toUpperCase())) {
-            combinedMap.set(String(p.id || p.id_playera).toUpperCase(), p);
-        }
-    });
-    const fullCatalog = Array.from(combinedMap.values());
+    const targetList = (stickerInventoryMode === '419') ? catalog419 : catalogGen;
+    const is419 = (stickerInventoryMode === '419');
 
-    const filtered = fullCatalog.filter(p => {
+    const filtered = (targetList || []).filter(p => {
         const targetStr = `${p.equipo || ''} ${p.nombre || ''} ${p.tipo || ''} ${p.version || ''} ${p.genero || ''} ${p.id || ''}`;
         return matchText(targetStr, q);
-    }).slice(0, 8);
+    }).slice(0, 50);
 
     if (filtered.length === 0) {
-        searchResults.innerHTML = `<div class="p-3 text-xs text-gray-500 text-center italic">No se encontraron playeras en el inventario.</div>`;
+        searchResults.innerHTML = `<div class="p-3 text-xs text-gray-500 text-center italic">No se encontraron playeras en el inventario (${is419 ? 'Local 419' : 'General'}).</div>`;
     } else {
         searchResults.innerHTML = filtered.map(p => {
             const rawImg = typeof getFirstImage === 'function' ? getFirstImage(p.foto || p.imagen) : (p.foto || p.imagen);
@@ -12179,7 +14215,10 @@ function filterStickerProductSearch(query) {
                 <div class="flex items-center gap-2.5">
                     <img src="${imgUrl}" alt="${p.nombre || p.equipo}" class="w-9 h-11 object-cover rounded-lg border border-white/10 bg-dark-300 shrink-0">
                     <div>
-                        <div class="text-xs font-bold text-white">${p.nombre || p.equipo}</div>
+                        <div class="text-xs font-bold text-white flex items-center gap-1.5">
+                            <span>${p.nombre || p.equipo}</span>
+                            <span class="text-[9px] font-extrabold px-1.5 py-0.2 rounded ${is419 ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'}">${is419 ? '419' : 'General'}</span>
+                        </div>
                         <div class="text-[10px] text-gray-400 font-mono">ID: ${p.id || p.id_playera} | ${p.tipo || ''} ${p.genero || ''}</div>
                     </div>
                 </div>
@@ -12196,11 +14235,12 @@ window.selectStickerProductFromSearch = function(idProd) {
     const catalogGen = (typeof allProducts !== 'undefined' && Array.isArray(allProducts)) ? allProducts : (window.allProducts || []);
     
     const idTarget = String(idProd || '').trim().toUpperCase();
-    const target = catalog419.find(p => String(p.id || p.id_articulo || p.id_playera || '').trim().toUpperCase() === idTarget)
-        || catalogGen.find(p => String(p.id || p.id_articulo || p.id_playera || '').trim().toUpperCase() === idTarget);
+    const target = (stickerInventoryMode === '419')
+        ? (catalog419.find(p => String(p.id || p.id_articulo || p.id_playera || '').trim().toUpperCase() === idTarget) || catalogGen.find(p => String(p.id || p.id_articulo || p.id_playera || '').trim().toUpperCase() === idTarget))
+        : (catalogGen.find(p => String(p.id || p.id_articulo || p.id_playera || '').trim().toUpperCase() === idTarget) || catalog419.find(p => String(p.id || p.id_articulo || p.id_playera || '').trim().toUpperCase() === idTarget));
 
     if (target) {
-        openPrintStickerModal(target, currentStickerIsGeneralCatalog);
+        openPrintStickerModal(target, stickerInventoryMode === 'general');
     } else {
         console.warn("No se encontró el producto con ID:", idProd);
     }
@@ -12324,20 +14364,20 @@ function updateStickerTotalBatchCount() {
 }
 
 function formatStickerTalla(rawTalla) {
-    if (!rawTalla) return { display: 'M', fontSize: '14px' };
+    if (!rawTalla) return { display: 'M', fontSize: '26px' };
     let clean = String(rawTalla).trim().toUpperCase();
 
     // Formatear descripciones largas de niño como "16 (2 A 4 AÑOS)" -> "16 (2-4A)"
     clean = clean.replace(/(\d+)\s*\(\s*(\d+)\s*A\s*(\d+)\s*AÑOS?\s*\)/gi, '$1 ($2-$3A)');
     clean = clean.replace(/(\d+)\s*\(\s*(\d+)\s*-\s*(\d+)\s*AÑOS?\s*\)/gi, '$1 ($2-$3A)');
 
-    let fontSize = '14px';
+    let fontSize = '26px';
     if (clean.length > 9) {
-        fontSize = '8.5px';
+        fontSize = '12px';
     } else if (clean.length > 5) {
-        fontSize = '10px';
+        fontSize = '15px';
     } else if (clean.length > 3) {
-        fontSize = '11.5px';
+        fontSize = '20px';
     }
     return { display: clean, fontSize: fontSize };
 }
@@ -12357,7 +14397,7 @@ window.updateStickerPreviewFromUI = function() {
     const activeSize = Object.keys(stickerBatchCounts).find(sz => stickerBatchCounts[sz] > 0) || (currentStickerAvailableSizes[0] ? currentStickerAvailableSizes[0].talla : 'M');
     const tFormatted = formatStickerTalla(activeSize);
 
-    const nombreStr = currentStickerData.nombre || currentStickerData.equipo || currentStickerData.id_playera || 'Playera Jerseys 419';
+    const nombreStr = currentStickerData.nombre || currentStickerData.equipo || currentStickerData.id_playera || 'Playera Jerseys';
     const tipoStr = currentStickerData.tipo || 'Regular';
     const versionStr = currentStickerData.version || 'Aficionado';
     const generoRaw = currentStickerData.genero || 'Hombre';
@@ -12369,50 +14409,32 @@ window.updateStickerPreviewFromUI = function() {
         ? sObj.id_inventario
         : `${currentStickerData.id || currentStickerData.id_playera || 'INV419'}-${activeSize}`;
 
-    if (currentStickerIsGeneralCatalog) {
-        replicaContainer.innerHTML = `
-            <div style="width: 100%; height: 100%; padding: 1mm 1.5mm; box-sizing: border-box; background: #ffffff; color: #000000; display: flex; flex-direction: column; justify-content: space-between; align-items: center; overflow: hidden; font-family: sans-serif;">
-                <div style="width: 100%; flex-shrink: 0; padding-bottom: 2px; border-bottom: 1px solid #000000; display: flex; justify-content: center; align-items: center; box-sizing: border-box; line-height: 1;">
-                    <span style="font-size: 9px; font-weight: 900; color: #000000 !important; white-space: nowrap; text-transform: uppercase; letter-spacing: 0.5px;">TALLA: <strong style="font-size: ${tFormatted.fontSize} !important; font-weight: 900 !important; color: #000000 !important;">${tFormatted.display}</strong></span>
-                </div>
-                <div style="font-size: 7.5px; font-weight: 800; text-align: center; color: #000000; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; margin-top: 3px; margin-bottom: 1px; letter-spacing: 0.2px;">
-                    ${generoStr} • ${versionStr} • ${tipoStr}
-                </div>
-                <svg id="sticker-preview-barcode-svg" style="width: 100%; max-height: 28px;"></svg>
+    replicaContainer.innerHTML = `
+        <div style="width: 100%; height: 100%; padding: 0.8mm 1mm; box-sizing: border-box; background: #ffffff; color: #000000; display: flex; flex-direction: column; justify-content: space-between; align-items: center; overflow: hidden; font-family: sans-serif; text-align: center;">
+            <div style="font-size: 8px; font-weight: 900; text-align: center; color: #000000; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; margin-top: 0px; line-height: 1;">
+                ${nombreStr} • ${generoStr} • ${versionStr} • ${tipoStr}
             </div>
-        `;
-    } else {
-        replicaContainer.innerHTML = `
-            <div style="width: 100%; height: 100%; padding: 1mm 1.5mm; box-sizing: border-box; background: #ffffff; color: #000000; display: flex; flex-direction: column; justify-content: space-between; align-items: center; overflow: hidden; font-family: sans-serif;">
-                <div style="width: 100%; flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #000000; padding-bottom: 1px; line-height: 1;">
-                    <span style="letter-spacing: 0.5px; font-size: 8.5px; font-weight: 900; color: #000000; white-space: nowrap; flex-shrink: 0;">JERSEYS 419</span>
-                    <div style="display: flex; align-items: center; gap: 2px; font-weight: 900; color: #000000; font-size: 8px; white-space: nowrap; flex-shrink: 0;">
-                        <span>TALLA:</span>
-                        <strong style="display: inline-block; background-color: #000000 !important; color: #ffffff !important; padding: 1px 5px !important; font-size: ${tFormatted.fontSize} !important; font-weight: 900 !important; border-radius: 3px !important; line-height: 1 !important; white-space: nowrap;">${tFormatted.display}</strong>
-                    </div>
-                </div>
-                <div style="font-size: 8.5px; font-weight: bold; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; margin-top: 1px;">
-                    ${nombreStr}
-                </div>
-                <div style="font-size: 7.5px; font-weight: bold; text-align: center; color: #222222; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; margin-top: -1px;">
-                    ${generoStr} • ${versionStr} • ${tipoStr}
-                </div>
-                ${showPrice ? `
-                <div style="font-size: 9px; font-weight: 900; text-align: center; margin-top: -1px;">
-                    $${precioNum.toFixed(2)}
-                </div>
-                ` : ''}
-                <svg id="sticker-preview-barcode-svg" style="width: 100%; max-height: 26px;"></svg>
+            ${showPrice ? `
+            <div style="font-size: 9px; font-weight: 900; text-align: center; margin-top: 0px;">
+                $${precioNum.toFixed(2)}
             </div>
-        `;
-    }
+            ` : ''}
+            <div style="width: 100%; display: flex; justify-content: center; align-items: center; gap: 4px; margin-top: 0px; margin-bottom: 0px; line-height: 1;">
+                <span style="font-size: 11px; font-weight: 900; color: #000000 !important; text-transform: uppercase; letter-spacing: 0.5px;">TALLA:</span>
+                <strong style="display: inline-block; background-color: #000000 !important; color: #ffffff !important; padding: 1px 8px !important; font-size: ${tFormatted.fontSize} !important; font-weight: 900 !important; border-radius: 5px !important; line-height: 1 !important; white-space: nowrap; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;">
+                    ${tFormatted.display}
+                </strong>
+            </div>
+            <svg id="sticker-preview-barcode-svg" style="width: 100%; max-height: 26px;"></svg>
+        </div>
+    `;
 
     try {
         if (typeof JsBarcode === 'function') {
             JsBarcode("#sticker-preview-barcode-svg", barcodeVal, {
                 format: "CODE128",
                 width: 1.4,
-                height: currentStickerIsGeneralCatalog ? 23 : 22,
+                height: 22,
                 displayValue: true,
                 fontSize: 9,
                 margin: 0
@@ -12437,7 +14459,7 @@ window.confirmPrintStickers = function() {
     const printContainer = document.getElementById('sticker-barcode-print-area');
     if (!printContainer) return;
 
-    const nombreStr = currentStickerData.nombre || currentStickerData.equipo || currentStickerData.id_playera || 'Playera Jerseys 419';
+    const nombreStr = currentStickerData.nombre || currentStickerData.equipo || currentStickerData.id_playera || 'Playera';
     const tipoStr = currentStickerData.tipo || 'Regular';
     const versionStr = currentStickerData.version || 'Aficionado';
     const generoRaw = currentStickerData.genero || 'Hombre';
@@ -12473,43 +14495,25 @@ window.confirmPrintStickers = function() {
     let labelsHtml = '';
     labelsToPrint.forEach((lbl, i) => {
         const tFormatted = formatStickerTalla(lbl.talla);
-        if (currentStickerIsGeneralCatalog) {
-            labelsHtml += `
-                <div style="width: 51mm; height: 25mm; max-width: 51mm; max-height: 25mm; padding: 1.5mm 2mm; box-sizing: border-box; background: #ffffff; color: #000000; display: flex; flex-direction: column; justify-content: space-between; align-items: center; page-break-after: always; overflow: hidden; font-family: sans-serif;">
-                    <div style="width: 100%; flex-shrink: 0; padding-bottom: 2px; border-bottom: 1px solid #000000; display: flex; justify-content: center; align-items: center; box-sizing: border-box; line-height: 1;">
-                        <span style="font-size: 9px; font-weight: 900; color: #000000 !important; white-space: nowrap; text-transform: uppercase; letter-spacing: 0.5px;">TALLA: <strong style="font-size: ${tFormatted.fontSize} !important; font-weight: 900 !important; color: #000000 !important;">${tFormatted.display}</strong></span>
-                    </div>
-                    <div style="font-size: 7.5px; font-weight: 800; text-align: center; color: #000000; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; margin-top: 3px; margin-bottom: 1px; letter-spacing: 0.2px;">
-                        ${generoStr} • ${versionStr} • ${tipoStr}
-                    </div>
-                    <svg class="barcode-svg-instance-${i}" style="width: 100%; max-height: 12.5mm;"></svg>
+        labelsHtml += `
+            <div style="width: 51mm; height: 25mm; max-width: 51mm; max-height: 25mm; padding: 0.8mm 1mm; box-sizing: border-box; background: #ffffff; color: #000000; display: flex; flex-direction: column; justify-content: space-between; align-items: center; page-break-after: always; overflow: hidden; font-family: sans-serif; text-align: center;">
+                <div style="font-size: 8px; font-weight: 900; text-align: center; color: #000000; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; margin-top: 0px; line-height: 1;">
+                    ${nombreStr} • ${generoStr} • ${versionStr} • ${tipoStr}
                 </div>
-            `;
-        } else {
-            labelsHtml += `
-                <div style="width: 51mm; height: 25mm; max-width: 51mm; max-height: 25mm; padding: 1.5mm 2mm; box-sizing: border-box; background: #ffffff; color: #000000; display: flex; flex-direction: column; justify-content: space-between; align-items: center; page-break-after: always; overflow: hidden; font-family: sans-serif;">
-                    <div style="width: 100%; flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #000000; padding-bottom: 1px; line-height: 1;">
-                        <span style="letter-spacing: 0.5px; font-size: 8.5px; font-weight: 900; color: #000000; white-space: nowrap; flex-shrink: 0;">JERSEYS 419</span>
-                        <div style="display: flex; align-items: center; gap: 2px; font-weight: 900; color: #000000; font-size: 8px; white-space: nowrap; flex-shrink: 0;">
-                            <span>TALLA:</span>
-                            <strong style="display: inline-block; background-color: #000000 !important; color: #ffffff !important; padding: 1px 5px !important; font-size: ${tFormatted.fontSize} !important; font-weight: 900 !important; border-radius: 3px !important; line-height: 1 !important; white-space: nowrap; -webkit-print-color-adjust: exact; print-color-adjust: exact;">${tFormatted.display}</strong>
-                        </div>
-                    </div>
-                    <div style="font-size: 8.5px; font-weight: bold; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%;">
-                        ${nombreStr}
-                    </div>
-                    <div style="font-size: 7.5px; font-weight: bold; text-align: center; color: #222222; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; margin-top: -1px;">
-                        ${generoStr} • ${versionStr} • ${tipoStr}
-                    </div>
-                    ${showPrice ? `
-                    <div style="font-size: 9px; font-weight: 900; text-align: center; margin-top: -1px;">
-                        $${precioNum.toFixed(2)}
-                    </div>
-                    ` : ''}
-                    <svg class="barcode-svg-instance-${i}" style="width: 100%; max-height: 11mm;"></svg>
+                ${showPrice ? `
+                <div style="font-size: 9px; font-weight: 900; text-align: center; margin-top: 0px;">
+                    $${precioNum.toFixed(2)}
                 </div>
-            `;
-        }
+                ` : ''}
+                <div style="width: 100%; display: flex; justify-content: center; align-items: center; gap: 4px; margin-top: 0px; margin-bottom: 0px; line-height: 1;">
+                    <span style="font-size: 11px; font-weight: 900; color: #000000 !important; text-transform: uppercase; letter-spacing: 0.5px;">TALLA:</span>
+                    <strong style="display: inline-block; background-color: #000000 !important; color: #ffffff !important; padding: 1px 8px !important; font-size: ${tFormatted.fontSize} !important; font-weight: 900 !important; border-radius: 5px !important; line-height: 1 !important; white-space: nowrap; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;">
+                        ${tFormatted.display}
+                    </strong>
+                </div>
+                <svg class="barcode-svg-instance-${i}" style="width: 100%; max-height: 12mm;"></svg>
+            </div>
+        `;
     });
 
     printContainer.innerHTML = labelsHtml;
@@ -12633,6 +14637,32 @@ window.handleScannedBarcode = function(scannedCode) {
         } else {
             const toast = Swal.mixin({ toast: true, position: 'bottom-end', showConfirmButton: false, timer: 2000, background: '#151515', color: '#fff' });
             toast.fire({ icon: 'error', title: `Código no registrado: ${cleanCode}` });
+        }
+        return;
+    }
+
+    const auditModal = document.getElementById('modal-auditoria-inventario');
+    const isAuditOpen = auditModal && !auditModal.classList.contains('hidden');
+
+    if (isAuditOpen) {
+        if (foundItem) {
+            window.incrementAuditoriaItemByProduct(foundItem, foundItem.talla || 'M');
+        } else {
+            const toast = Swal.mixin({ toast: true, position: 'bottom-end', showConfirmButton: false, timer: 2000, background: '#151515', color: '#fff' });
+            toast.fire({ icon: 'error', title: `Código no registrado: ${cleanCode}` });
+        }
+        return;
+    }
+
+    const traspasoModal = document.getElementById('modal-traspaso-419-general');
+    const isTraspasoOpen = traspasoModal && !traspasoModal.classList.contains('hidden');
+
+    if (isTraspasoOpen) {
+        if (foundItem) {
+            window.addTraspasoItemFromProduct(foundItem, foundItem.talla || 'M');
+        } else {
+            const toast = Swal.mixin({ toast: true, position: 'bottom-end', showConfirmButton: false, timer: 2000, background: '#151515', color: '#fff' });
+            toast.fire({ icon: 'error', title: `Código no registrado en Local 419: ${cleanCode}` });
         }
         return;
     }
@@ -12799,6 +14829,1170 @@ document.addEventListener('input', function(e) {
         }
     }
 }, true);
+
+// =========================================================================
+// 📦 MÓDULO FRONTEND: PEDIDO MASIVO DE REABASTECIMIENTO (LOCAL 419 VS GENERAL)
+// =========================================================================
+let masivoFaltantesList = [];
+let masivoCartMap = {};
+
+window.openPedidoMasivo419Modal = async function() {
+    const modal = document.getElementById('modal-pedido-masivo-419');
+    if (!modal) return;
+
+    modal.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+    void modal.offsetWidth;
+    modal.classList.remove('opacity-0');
+    const box = modal.querySelector('.transform');
+    if (box) {
+        box.classList.remove('scale-95');
+        box.classList.add('scale-100');
+    }
+
+    if (typeof fetchProducts419 === 'function' && (!allProducts419 || allProducts419.length === 0)) {
+        await fetchProducts419();
+    }
+    if (typeof fetchInitialProducts === 'function' && (!allProducts || allProducts.length === 0)) {
+        await fetchInitialProducts();
+    }
+
+    window.calculateMasivoFaltantes();
+    window.populateMasivoFilters();
+    window.renderPedidoMasivoGrid();
+};
+
+window.closePedidoMasivo419Modal = function() {
+    const modal = document.getElementById('modal-pedido-masivo-419');
+    if (!modal) return;
+    modal.classList.add('opacity-0');
+    const box = modal.querySelector('.transform');
+    if (box) {
+        box.classList.remove('scale-100');
+        box.classList.add('scale-95');
+    }
+    setTimeout(() => {
+        modal.classList.add('hidden');
+        document.body.style.overflow = '';
+    }, 300);
+};
+
+window.calculateMasivoFaltantes = function() {
+    masivoFaltantesList = [];
+    masivoCartMap = {};
+
+    const genCatalog = (allProducts && allProducts.length > 0) ? allProducts : (window.allProducts || []);
+    const localCatalog = (allProducts419 && allProducts419.length > 0) ? allProducts419 : (window.allProducts419 || []);
+
+    genCatalog.forEach(prodGen => {
+        const prod419 = localCatalog.find(p => String(p.id || p.id_playera || '').toUpperCase() === String(prodGen.id || prodGen.id_playera || '').toUpperCase());
+        const tallasGen = Array.isArray(prodGen.tallas) ? prodGen.tallas : [];
+
+        tallasGen.forEach(tGen => {
+            const szGen = String(tGen.talla || '').trim().toUpperCase();
+            const stockGen = Number(tGen.stock !== undefined ? tGen.stock : (tGen.inventario || 0)) || 0;
+            if (stockGen <= 0) return;
+
+            let stock419 = 0;
+            if (prod419 && Array.isArray(prod419.tallas)) {
+                const t419 = prod419.tallas.find(t => String(t.talla || '').trim().toUpperCase() === szGen);
+                stock419 = t419 ? (Number(t419.stock !== undefined ? t419.stock : (t419.inventario || 0)) || 0) : 0;
+            }
+
+            if (stock419 <= 0) {
+                const itemKey = `${prodGen.id || prodGen.id_playera}_${szGen}`;
+                const defaultQty = Math.min(1, stockGen);
+
+                const faltanteItem = {
+                    key: itemKey,
+                    id: prodGen.id || prodGen.id_playera,
+                    id_inventario: tGen.id_inventario || '',
+                    nombre: prodGen.nombre || prodGen.equipo || 'Jersey',
+                    equipo: prodGen.equipo || '',
+                    tipo: prodGen.tipo || 'Aficionado',
+                    version: prodGen.version || 'Regular',
+                    genero: prodGen.genero || 'Hombre',
+                    foto: getFirstImage(prodGen.foto || prodGen.imagen || ''),
+                    talla: szGen,
+                    stock419: stock419,
+                    stockGen: stockGen
+                };
+
+                masivoFaltantesList.push(faltanteItem);
+
+                masivoCartMap[itemKey] = {
+                    item: faltanteItem,
+                    qtySelected: defaultQty,
+                    checked: true
+                };
+            }
+        });
+    });
+};
+
+window.populateMasivoFilters = function() {
+    const selVer = document.getElementById('masivo-filter-version');
+    const selGen = document.getElementById('masivo-filter-genero');
+
+    if (selVer) {
+        const versiones = Array.from(new Set(masivoFaltantesList.map(i => i.version).filter(Boolean))).sort();
+        selVer.innerHTML = `<option value="">Versión (Todas)</option>` + versiones.map(v => `<option value="${v}">${v}</option>`).join('');
+    }
+    if (selGen) {
+        const generos = Array.from(new Set(masivoFaltantesList.map(i => i.genero).filter(Boolean))).sort();
+        selGen.innerHTML = `<option value="">Género (Todos)</option>` + generos.map(g => `<option value="${g}">${g}</option>`).join('');
+    }
+};
+
+window.renderPedidoMasivoGrid = function() {
+    const tbody = document.getElementById('masivo-table-body');
+    const emptyState = document.getElementById('masivo-table-empty');
+    if (!tbody) return;
+
+    const qInput = document.getElementById('masivo-filter-search');
+    const vSelect = document.getElementById('masivo-filter-version');
+    const gSelect = document.getElementById('masivo-filter-genero');
+
+    const query = qInput ? qInput.value : '';
+    const selVer = vSelect ? vSelect.value : '';
+    const selGen = gSelect ? gSelect.value : '';
+
+    const filtered = masivoFaltantesList.filter(item => {
+        if (selVer && item.version !== selVer) return false;
+        if (selGen && item.genero !== selGen) return false;
+        if (query) {
+            const fullStr = `${item.nombre} ${item.equipo} ${item.tipo} ${item.version} ${item.genero} ${item.id} ${item.talla}`;
+            return matchText(fullStr, query);
+        }
+        return true;
+    });
+
+    if (filtered.length === 0) {
+        tbody.innerHTML = '';
+        if (emptyState) emptyState.classList.remove('hidden');
+    } else {
+        if (emptyState) emptyState.classList.add('hidden');
+
+        tbody.innerHTML = filtered.map(item => {
+            const entry = masivoCartMap[item.key] || { qtySelected: 1, checked: true };
+            const imgUrl = getOptimizedImageUrl(item.foto, 100);
+            const shortTalla = formatShortTallaLabel(item.talla);
+            const genColor = getGenderColorClass(item.genero);
+
+            return `
+                <tr class="hover:bg-white/5 transition-colors ${entry.checked ? 'bg-amber-500/5' : ''}">
+                    <td class="px-3 py-2.5 text-center">
+                        <input type="checkbox" ${entry.checked ? 'checked' : ''} onchange="window.toggleMasivoRowCheck('${item.key}', this.checked)" class="w-4 h-4 text-amber-500 rounded border-white/20 bg-dark-100 focus:ring-amber-500 cursor-pointer">
+                    </td>
+                    <td class="px-3 py-2.5">
+                        <div class="flex items-center gap-2.5">
+                            <img src="${imgUrl}" class="w-10 h-10 object-cover rounded-lg bg-dark-200 border border-white/10 flex-shrink-0">
+                            <div class="min-w-0">
+                                <h4 class="font-bold text-white text-xs truncate leading-tight">${item.nombre}</h4>
+                                <span class="text-[10px] text-gray-500 font-mono">ID: ${item.id}</span>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-3 py-2.5">
+                        <div class="flex flex-wrap gap-1">
+                            <span class="px-1.5 py-0.5 text-[9px] font-bold uppercase bg-dark-200 text-gray-300 rounded border border-white/10">${item.version}</span>
+                            <span class="px-1.5 py-0.5 text-[9px] font-bold uppercase ${genColor} rounded border">${item.genero}</span>
+                        </div>
+                    </td>
+                    <td class="px-3 py-2.5 text-center font-bold">
+                        <span class="bg-white/10 px-2 py-1 rounded-md text-amber-300 font-mono text-xs">${shortTalla}</span>
+                    </td>
+                    <td class="px-3 py-2.5 text-center">
+                        <span class="px-2 py-0.5 text-[10px] font-extrabold rounded bg-red-500/10 text-red-400 border border-red-500/20">0 (Agotado)</span>
+                    </td>
+                    <td class="px-3 py-2.5 text-center">
+                        <span class="px-2 py-0.5 text-[10px] font-extrabold rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 font-mono">${item.stockGen} pcs</span>
+                    </td>
+                    <td class="px-3 py-2.5 text-center">
+                        <div class="flex items-center justify-center gap-1">
+                            <button type="button" onclick="window.updateMasivoItemQty('${item.key}', -1)" class="w-6 h-6 bg-white/5 hover:bg-white/10 text-gray-300 rounded font-bold text-xs flex items-center justify-center border border-white/10 cursor-pointer">-</button>
+                            <input type="number" min="0" max="${item.stockGen}" value="${entry.qtySelected}" onchange="window.setMasivoItemQtyDirect('${item.key}', this.value)" class="w-12 bg-dark-100 border border-amber-500/30 rounded py-1 text-center font-bold text-amber-300 text-xs focus:outline-none focus:border-amber-400 font-mono">
+                            <button type="button" onclick="window.updateMasivoItemQty('${item.key}', 1)" class="w-6 h-6 bg-amber-500/20 hover:bg-amber-500 text-amber-300 hover:text-black rounded font-bold text-xs flex items-center justify-center border border-amber-500/30 cursor-pointer">+</button>
+                            <button type="button" onclick="window.setMasivoItemQtyDirect('${item.key}', ${item.stockGen})" class="px-1.5 py-1 bg-white/5 hover:bg-white/10 text-[9px] font-bold text-gray-300 rounded border border-white/10 cursor-pointer" title="Máximo disponible en Bodega">Max</button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    window.updateMasivoMetrics();
+};
+
+window.toggleMasivoRowCheck = function(key, isChecked) {
+    if (masivoCartMap[key]) {
+        masivoCartMap[key].checked = isChecked;
+        if (!isChecked) {
+            masivoCartMap[key].qtySelected = 0;
+        } else if (masivoCartMap[key].qtySelected === 0) {
+            masivoCartMap[key].qtySelected = 1;
+        }
+        window.renderPedidoMasivoGrid();
+    }
+};
+
+window.toggleAllMasivoCheck = function(isChecked) {
+    Object.keys(masivoCartMap).forEach(k => {
+        masivoCartMap[k].checked = isChecked;
+        if (!isChecked) {
+            masivoCartMap[k].qtySelected = 0;
+        } else if (masivoCartMap[k].qtySelected === 0) {
+            masivoCartMap[k].qtySelected = 1;
+        }
+    });
+    window.renderPedidoMasivoGrid();
+};
+
+window.updateMasivoItemQty = function(key, delta) {
+    if (!masivoCartMap[key]) return;
+    const itemObj = masivoCartMap[key];
+    const maxStock = itemObj.item.stockGen;
+    const newQty = Math.max(0, Math.min(maxStock, itemObj.qtySelected + delta));
+    itemObj.qtySelected = newQty;
+    itemObj.checked = newQty > 0;
+    window.renderPedidoMasivoGrid();
+};
+
+window.setMasivoItemQtyDirect = function(key, valStr) {
+    if (!masivoCartMap[key]) return;
+    const itemObj = masivoCartMap[key];
+    const maxStock = itemObj.item.stockGen;
+    const num = Math.max(0, Math.min(maxStock, parseInt(valStr) || 0));
+    itemObj.qtySelected = num;
+    itemObj.checked = num > 0;
+    window.renderPedidoMasivoGrid();
+};
+
+window.setAllMasivoQty = function(mode) {
+    Object.keys(masivoCartMap).forEach(k => {
+        const itemObj = masivoCartMap[k];
+        if (mode === 'max') {
+            itemObj.qtySelected = itemObj.item.stockGen;
+            itemObj.checked = true;
+        } else if (typeof mode === 'number') {
+            itemObj.qtySelected = Math.min(itemObj.item.stockGen, mode);
+            itemObj.checked = mode > 0;
+        }
+    });
+    const checkAll = document.getElementById('masivo-check-all');
+    if (checkAll) checkAll.checked = mode !== 0;
+    window.renderPedidoMasivoGrid();
+};
+
+window.updateMasivoMetrics = function() {
+    const kpiModels = document.getElementById('masivo-kpi-modelos');
+    const kpiTallas = document.getElementById('masivo-kpi-tallas');
+    const kpiDisponibles = document.getElementById('masivo-kpi-disponibles');
+    const kpiSeleccionadas = document.getElementById('masivo-kpi-seleccionadas');
+    const badgeSelected = document.getElementById('masivo-selected-count-badge');
+    const footerPieces = document.getElementById('masivo-footer-total-pieces');
+
+    const uniqueModels = new Set(masivoFaltantesList.map(i => i.id)).size;
+    const totalTallas = masivoFaltantesList.length;
+    const totalBodega = masivoFaltantesList.reduce((acc, i) => acc + i.stockGen, 0);
+
+    let totalSeleccionadas = 0;
+    let totalItemsChecked = 0;
+    Object.values(masivoCartMap).forEach(entry => {
+        if (entry.checked && entry.qtySelected > 0) {
+            totalSeleccionadas += entry.qtySelected;
+            totalItemsChecked++;
+        }
+    });
+
+    if (kpiModels) kpiModels.textContent = uniqueModels;
+    if (kpiTallas) kpiTallas.textContent = totalTallas;
+    if (kpiDisponibles) kpiDisponibles.textContent = `${totalBodega} pzs`;
+    if (kpiSeleccionadas) kpiSeleccionadas.textContent = `${totalSeleccionadas} pzs`;
+    if (badgeSelected) badgeSelected.textContent = `${totalItemsChecked} prendas (${totalSeleccionadas} pzs)`;
+    if (footerPieces) footerPieces.textContent = `${totalSeleccionadas} PZS`;
+};
+
+window.submitPedidoMasivo419 = async function() {
+    const itemsToTransfer = Object.values(masivoCartMap).filter(entry => entry.checked && entry.qtySelected > 0);
+
+    if (itemsToTransfer.length === 0) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Sin prendas seleccionadas',
+            text: 'Por favor asigna al menos 1 pieza en las prendas que deseas surtir a Local 419.',
+            background: '#151515', color: '#fff'
+        });
+        return;
+    }
+
+    const totalPiezas = itemsToTransfer.reduce((acc, entry) => acc + entry.qtySelected, 0);
+    const uniqueModelsCount = new Set(itemsToTransfer.map(e => e.item.id)).size;
+
+    let itemsListHtml = '<div class="max-h-48 overflow-y-auto custom-scrollbar my-2 border border-white/10 rounded-xl bg-black/40 p-2 space-y-1.5">';
+    itemsToTransfer.forEach(entry => {
+        const item = entry.item;
+        const qty = entry.qtySelected;
+        const imgUrl = (item.foto || item.imagen) ? String(item.foto || item.imagen).split(',')[0].trim() : 'https://images.unsplash.com/photo-1577212017184-807dd6acefd6?auto=format&fit=crop&q=80&w=100';
+        itemsListHtml += `
+            <div class="flex items-center justify-between bg-dark-200/60 p-2 rounded-lg border border-white/5 text-xs text-left">
+                <div class="flex items-center gap-2 min-w-0 pr-2">
+                    <img src="${imgUrl}" class="w-8 h-8 object-cover rounded bg-dark flex-shrink-0 border border-white/10">
+                    <div class="min-w-0">
+                        <div class="font-bold text-white truncate leading-tight">${item.nombre}</div>
+                        <div class="text-[10px] text-gray-400">Talla: <span class="text-amber-300 font-bold font-mono">${item.talla}</span> | ${item.genero || '-'} - ${item.version || '-'}</div>
+                    </div>
+                </div>
+                <div class="text-right flex-shrink-0 font-mono font-black text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                    ${qty} pzs
+                </div>
+            </div>
+        `;
+    });
+    itemsListHtml += '</div>';
+
+    const confirmRes = await Swal.fire({
+        title: '⚡ ¿Confirmar Orden Masiva para Local 419?',
+        html: `
+            <div class="text-left space-y-2 text-xs text-gray-300 py-1">
+                <div class="flex justify-between items-center bg-dark-200/40 p-2 rounded-xl border border-white/5 text-[11px]">
+                    <span>Modelos: <strong class="text-white font-bold">${uniqueModelsCount}</strong></span>
+                    <span>Tallas/SKUs: <strong class="text-amber-400 font-bold">${itemsToTransfer.length}</strong></span>
+                    <span>Total: <strong class="text-emerald-400 font-mono font-black">${totalPiezas} PZS</strong></span>
+                </div>
+
+                <div class="font-bold text-gray-200 text-[11px] pt-1 uppercase tracking-wider flex items-center justify-between">
+                    <span>📋 Detalle del Pedido (${itemsToTransfer.length} artículos):</span>
+                </div>
+
+                ${itemsListHtml}
+
+                <div class="p-2.5 bg-black/40 border border-amber-500/30 rounded-xl mt-2 text-[11px] text-amber-300">
+                    📦 <strong>Orden Registrada (Pendiente):</strong> El stock de Local 419 NO se incrementará inmediatamente. Las existencias se incrementarán automáticamente cuando la orden cambie a estatus <b>Finalizada</b>.
+                </div>
+            </div>
+        `,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Sí, Generar Orden Masiva (Pendiente)',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#f59e0b',
+        cancelButtonColor: '#374151',
+        background: '#151515', color: '#fff',
+        customClass: { popup: 'border border-white/10 rounded-2xl max-w-lg shadow-2xl' }
+    });
+
+    if (!confirmRes.isConfirmed) return;
+
+    Swal.fire({
+        title: 'Procesando Orden Masiva...',
+        text: 'Generando registro de orden en estatus Pendiente',
+        allowOutsideClick: false,
+        background: '#151515', color: '#fff',
+        didOpen: () => Swal.showLoading()
+    });
+
+    // ⚡ 1. RESERVAR STOCK DE BODEGA GENERAL OPTIMISTAMENTE EN MEMORIA (0ms Latencia)
+    // El incremento de stock en Local 419 se realizará ÚNICAMENTE cuando la orden cambie a estatus "Finalizada".
+    itemsToTransfer.forEach(entry => {
+        const item = entry.item;
+        const qty = entry.qtySelected;
+
+        // Descontar stock en Bodega General
+        const prodGen = (allProducts || []).find(p => String(p.id || '').toUpperCase() === String(item.id || '').toUpperCase());
+        if (prodGen && Array.isArray(prodGen.tallas)) {
+            const tGen = prodGen.tallas.find(t => String(t.talla || '').trim().toUpperCase() === String(item.talla || '').trim().toUpperCase());
+            if (tGen) {
+                const currentSt = Number(tGen.stock !== undefined ? tGen.stock : (tGen.inventario || 0)) || 0;
+                tGen.stock = Math.max(0, currentSt - qty);
+                tGen.inventario = Math.max(0, currentSt - qty);
+            }
+        }
+    });
+
+    if (typeof renderProducts === 'function') renderProducts();
+
+    // ⚡ 2. ENVIAR A GOOGLE SHEETS API
+    try {
+        const payloadItems = itemsToTransfer.map(entry => ({
+            id_inventario: entry.item.id_inventario || `INV-${entry.item.id}-${entry.item.talla}`,
+            id_producto: entry.item.id,
+            id_playera: entry.item.id,
+            talla: entry.item.talla,
+            cantidad: entry.qtySelected,
+            precio_unitario_final: 0
+        }));
+
+        const loggedUserObj = localStorage.getItem('logged_user') ? JSON.parse(localStorage.getItem('logged_user')) : null;
+        const sessionUserName = loggedUserObj ? (loggedUserObj.nombre_completo || loggedUserObj.usuario || 'Usuario en Sesión') : 'Usuario en Sesión';
+        const sessionUserId = loggedUserObj ? (loggedUserObj.id_cliente || loggedUserObj.usuario || ('LOCAL-419-' + Date.now())) : ('LOCAL-419-' + Date.now());
+
+        let response = await fetch(API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({
+                action: 'create_order',
+                token: localStorage.getItem('session_token') || '',
+                usuario: sessionUserName,
+                id_cliente: sessionUserId,
+                nombre_cliente: sessionUserName,
+                tipo_precio_aplicado: 'Surtido 419',
+                tipo_entrega: 'Local 419',
+                envio: false,
+                costo_envio: 0,
+                articulos: payloadItems,
+                items: payloadItems
+            })
+        });
+
+        let resData = await response.json();
+
+        if (resData.status !== 'success') {
+            // Intentar con traspaso_masivo_419 como alternativa
+            response = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({
+                    action: 'traspaso_masivo_419',
+                    token: localStorage.getItem('session_token') || '',
+                    usuario: sessionUserName,
+                    nombre_cliente: sessionUserName,
+                    origen: 'general_a_419',
+                    items: payloadItems
+                })
+            });
+            resData = await response.json();
+        }
+
+        const folioCreado = resData.id_orden || resData.id_orden_temp || 'ORD-419';
+
+        Swal.fire({
+            icon: 'success',
+            title: '¡Orden Masiva Generada!',
+            html: `
+                <div class="text-left space-y-2 text-xs py-1 text-gray-300">
+                    <p>Folio de Orden: <strong class="text-amber-400 font-mono font-bold">${folioCreado}</strong></p>
+                    <p>Piezas Registradas: <strong class="text-emerald-400 font-bold">${totalPiezas} PZS</strong></p>
+                    <p>Estatus Inicial: <strong class="text-yellow-400 font-bold">Pendiente</strong></p>
+                    <div class="p-2.5 bg-black/40 border border-emerald-500/30 rounded-xl mt-2 text-[11px] text-emerald-300">
+                        ✓ La orden fue creada y las existencias fueron descontadas de Bodega General. El stock de Local 419 se sumará cuando la orden cambie a <b>Finalizada</b>.
+                    </div>
+                </div>
+            `,
+            background: '#151515', color: '#fff',
+            confirmButtonColor: '#10b981'
+        });
+
+        window.closePedidoMasivo419Modal();
+
+        if (typeof fetchInitialProducts === 'function') fetchInitialProducts(true);
+        if (typeof fetchProducts419 === 'function') fetchProducts419(true);
+        if (typeof fetchOrdenes === 'function') fetchOrdenes();
+
+    } catch (err) {
+        console.warn("Fallo al persistir surtido masivo en la nube:", err);
+        Swal.fire({
+            icon: 'warning',
+            title: 'Orden Masiva Registrada Localmente',
+            text: `La orden por ${totalPiezas} piezas en estatus Pendiente fue registrada en pantalla y descontada de Bodega General. Se sincronizará con Google Sheets al reconectar.`,
+            background: '#151515', color: '#fff',
+            confirmButtonColor: '#f59e0b'
+        });
+        window.closePedidoMasivo419Modal();
+    }
+};
+
+/* ==========================================================================
+   MÓDULO DE ESTADÍSTICA E INDICADORES KPI DE VENTAS
+   ========================================================================== */
+
+/**
+ * Obtiene el rango de fechas Lunes (00:00:00.000) a Domingo (23:59:59.999) para la semana actual o dada.
+ */
+function getWeekRange(d = new Date()) {
+    const date = new Date(d);
+    const day = date.getDay(); // 0 = Domingo, 1 = Lunes, ..., 6 = Sábado
+    const dayOfWeek = day === 0 ? 7 : day;
+    
+    const startOfWeek = new Date(date);
+    startOfWeek.setDate(date.getDate() - (dayOfWeek - 1));
+    startOfWeek.setHours(0, 0, 0, 0);
+
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 6);
+    endOfWeek.setHours(23, 59, 59, 999);
+
+    return { startOfWeek, endOfWeek, dayOfWeek };
+}
+
+/**
+ * Obtiene el rango del 1er día del mes (00:00:00) al último día del mes (23:59:59).
+ */
+function getMonthRange(d = new Date()) {
+    const startOfMonth = new Date(d.getFullYear(), d.getMonth(), 1, 0, 0, 0, 0);
+    const endOfMonth = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999);
+    const dayOfMonth = d.getDate();
+    const totalDaysInMonth = endOfMonth.getDate();
+
+    return { startOfMonth, endOfMonth, dayOfMonth, totalDaysInMonth };
+}
+
+/**
+ * Carga activamente las órdenes de la base de datos para garantizar que se disponga de la información más reciente.
+ */
+window.loadAllOrdersForStatistics = async function(force = false) {
+    if (!force && typeof allFetchedOrdenes !== 'undefined' && Array.isArray(allFetchedOrdenes) && allFetchedOrdenes.length > 0) {
+        return allFetchedOrdenes;
+    }
+
+    if (window.startTopLoadingBar) startTopLoadingBar();
+    try {
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({ action: "search_orders" })
+        });
+        if (!response.ok) throw new Error("Error HTTP " + response.status);
+        const result = await response.json();
+
+        if (result && result.status === 'success' && Array.isArray(result.data)) {
+            allFetchedOrdenes = result.data;
+        }
+    } catch (error) {
+        console.warn("Error al consultar órdenes para módulo de estadísticas:", error);
+    } finally {
+        if (window.finishTopLoadingBar) finishTopLoadingBar();
+    }
+    return (typeof allFetchedOrdenes !== 'undefined' && Array.isArray(allFetchedOrdenes)) ? allFetchedOrdenes : [];
+};
+
+/**
+ * Abre el modal de Estadística y desencadena la descarga/cálculo de indicadores.
+ */
+window.openEstadisticasModal = async function() {
+    const modal = document.getElementById('admin-estadisticas-modal');
+    if (!modal) return;
+
+    const savedMetaSemana = localStorage.getItem('stat_target_semana') || '100';
+    const savedMetaMes = localStorage.getItem('stat_target_mes') || '400';
+
+    const inputSemana = document.getElementById('stat-input-meta-semana');
+    const inputMes = document.getElementById('stat-input-meta-mes');
+
+    if (inputSemana) inputSemana.value = savedMetaSemana;
+    if (inputMes) inputMes.value = savedMetaMes;
+
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+
+    const tbody = document.getElementById('stat-table-weekly-breakdown');
+    if (tbody) {
+        tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-purple-400 font-semibold animate-pulse">⏳ Obteniendo información de órdenes y ventas en tiempo real...</td></tr>`;
+    }
+
+    // Cargar e inicializar gastos fijos del Local 419
+    initGastosInputs419();
+
+    await window.loadAllOrdersForStatistics();
+    window.computeAndRenderStatistics();
+};
+
+/**
+ * Obtiene los gastos fijos mensuales configurados para el Local 419 (con valores por defecto o desde localStorage).
+ */
+function getGastosFijos419() {
+    const renta = parseFloat(document.getElementById('stat-419-input-renta')?.value || localStorage.getItem('stat_419_renta') || 5000) || 0;
+    const luz = parseFloat(document.getElementById('stat-419-input-luz')?.value || localStorage.getItem('stat_419_luz') || 1500) || 0;
+    const ayudante = parseFloat(document.getElementById('stat-419-input-ayudante')?.value || localStorage.getItem('stat_419_ayudante') || 6000) || 0;
+    const agua = parseFloat(document.getElementById('stat-419-input-agua')?.value || localStorage.getItem('stat_419_agua') || 150) || 0;
+    const internet = parseFloat(document.getElementById('stat-419-input-internet')?.value || localStorage.getItem('stat_419_internet') || 700) || 0;
+    const otros = parseFloat(document.getElementById('stat-419-input-otros')?.value || localStorage.getItem('stat_419_otros') || 0) || 0;
+
+    const totalGastos = renta + luz + ayudante + agua + internet + otros;
+    return { renta, luz, ayudante, agua, internet, otros, totalGastos };
+}
+
+/**
+ * Carga o inicializa los valores de gastos fijos en los inputs del formulario 419.
+ */
+function initGastosInputs419() {
+    const savedRenta = localStorage.getItem('stat_419_renta') || '5000';
+    const savedLuz = localStorage.getItem('stat_419_luz') || '1500';
+    const savedAyudante = localStorage.getItem('stat_419_ayudante') || '6000';
+    const savedAgua = localStorage.getItem('stat_419_agua') || '150';
+    const savedInternet = localStorage.getItem('stat_419_internet') || '700';
+    const savedOtros = localStorage.getItem('stat_419_otros') || '0';
+
+    if (document.getElementById('stat-419-input-renta')) document.getElementById('stat-419-input-renta').value = savedRenta;
+    if (document.getElementById('stat-419-input-luz')) document.getElementById('stat-419-input-luz').value = savedLuz;
+    if (document.getElementById('stat-419-input-ayudante')) document.getElementById('stat-419-input-ayudante').value = savedAyudante;
+    if (document.getElementById('stat-419-input-agua')) document.getElementById('stat-419-input-agua').value = savedAgua;
+    if (document.getElementById('stat-419-input-internet')) document.getElementById('stat-419-input-internet').value = savedInternet;
+    if (document.getElementById('stat-419-input-otros')) document.getElementById('stat-419-input-otros').value = savedOtros;
+}
+
+/**
+ * Calcula y renderiza el módulo de Rentabilidad & Punto de Equilibrio del Local 419.
+ */
+function computeRentabilidad419() {
+    const { totalGastos } = getGastosFijos419();
+
+    if (document.getElementById('stat-419-val-gastos-total')) {
+        document.getElementById('stat-419-val-gastos-total').textContent = `$${totalGastos.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    }
+    if (document.getElementById('stat-419-val-meta-bar')) {
+        document.getElementById('stat-419-val-meta-bar').textContent = `$${totalGastos.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    }
+
+    const now = new Date();
+    const { startOfMonth, endOfMonth } = getMonthRange(now);
+
+    const productsMap = new Map();
+    if (typeof allProducts !== 'undefined' && Array.isArray(allProducts)) {
+        allProducts.forEach(p => {
+            if (!p) return;
+            const pId = String(p.id || p.id_playera || '').trim();
+            if (pId) productsMap.set(pId, p);
+            if (p.nombre) productsMap.set(normalizeText(p.nombre), p);
+        });
+    }
+
+    let rawOrdersList = [];
+    if (typeof allFetchedOrdenes !== 'undefined' && Array.isArray(allFetchedOrdenes)) {
+        rawOrdersList = rawOrdersList.concat(allFetchedOrdenes);
+    }
+    if (typeof window.ordenes419Data !== 'undefined' && Array.isArray(window.ordenes419Data)) {
+        rawOrdersList = rawOrdersList.concat(window.ordenes419Data);
+    }
+
+    const uniqueOrdersMap = new Map();
+    rawOrdersList.forEach(o => {
+        if (!o) return;
+        const idKey = o.id_orden || o.id || o.id_orden_419;
+        if (!idKey) return;
+        uniqueOrdersMap.set(String(idKey).trim(), o);
+    });
+
+    let pzsVendidas419 = 0;
+    let gananciaBruta419 = 0;
+    let ventaTotal419 = 0;
+
+    uniqueOrdersMap.forEach(o => {
+        if (typeof isOrdenCancelada === 'function' ? isOrdenCancelada(o.estatus || o.Estatus) : String(o.estatus || '').toLowerCase().includes('cancel')) {
+            return;
+        }
+
+        const origenStr = (o.origen || o.tipo_orden || o.origen_orden || '').toString().toLowerCase();
+        const idStr = String(o.id_orden || o.id || '').toUpperCase();
+        const is419 = origenStr.includes('419') || idStr.includes('419');
+        if (!is419) return;
+
+        const dateObj = typeof parseOrdenFecha === 'function' ? parseOrdenFecha(o.fecha || o.created_at || o.fecha_creacion || o.Fecha) : new Date(o.fecha || o.created_at);
+        if (!dateObj || isNaN(dateObj.getTime())) return;
+
+        if (dateObj < startOfMonth || dateObj > endOfMonth) return;
+
+        const items = o.articulos_carrito || o.detalle || o.items || o.Ordenes_Detalle;
+        if (Array.isArray(items) && items.length > 0) {
+            items.forEach(d => {
+                const estDet = d.EstatusOrdenDetalle !== undefined ? d.EstatusOrdenDetalle : d.estatus_detalle;
+                if (estDet === 0 || estDet === "0") return;
+
+                const cant = parseInt(d.cantidad || d.Cantidad || d.cant || 0, 10);
+                if (isNaN(cant) || cant <= 0) return;
+
+                pzsVendidas419 += cant;
+
+                let pId = '';
+                if (d.id_playera) {
+                    if (typeof d.id_playera === 'object') pId = String(d.id_playera.id || d.id_playera.nombre || '').trim();
+                    else pId = String(d.id_playera).trim();
+                }
+
+                const matchedProduct = productsMap.get(pId) || productsMap.get(normalizeText(d.nombre_playera || d.nombre || ''));
+
+                const precioMenudeo = matchedProduct ? (parseFloat(matchedProduct.precio_menudeo) || parseFloat(d.precio_unitario_final) || 550) : (parseFloat(d.precio_unitario_final) || 550);
+                const precioSuperMayoreo = matchedProduct ? (parseFloat(matchedProduct.precio_mayoreo_super) || 300) : 300;
+
+                const gananciaUnitario = Math.max(0, precioMenudeo - precioSuperMayoreo);
+                gananciaBruta419 += gananciaUnitario * cant;
+                ventaTotal419 += (parseFloat(d.subtotal_renglon) || (precioMenudeo * cant));
+            });
+        } else {
+            const cant = parseInt(o.total_piezas || o.piezas || o.Cantidad || 1, 10);
+            pzsVendidas419 += cant;
+            const montoOrd = parseFloat(o.gran_total || o.total_neto || o.total || o.monto || 0) || (550 * cant);
+            ventaTotal419 += montoOrd;
+            gananciaBruta419 += 250 * cant;
+        }
+    });
+
+    const margenPromedioReal = pzsVendidas419 > 0 ? (gananciaBruta419 / pzsVendidas419) : 250;
+
+    const pzsMesEquilibrio = totalGastos > 0 ? Math.ceil(totalGastos / margenPromedioReal) : 0;
+    const pzsSemanaEquilibrio = Math.ceil(pzsMesEquilibrio / 4.333);
+    const pzsDiaEquilibrio = (pzsMesEquilibrio / 30).toFixed(1);
+    const ventaMetaMes = pzsMesEquilibrio * (margenPromedioReal > 0 ? (margenPromedioReal + 300) : 550);
+
+    const utilidadNeta = gananciaBruta419 - totalGastos;
+
+    if (document.getElementById('stat-419-val-pzs-mes-target')) document.getElementById('stat-419-val-pzs-mes-target').textContent = `${pzsMesEquilibrio} pzs`;
+    if (document.getElementById('stat-419-val-monto-mes-target')) document.getElementById('stat-419-val-monto-mes-target').textContent = `Venta meta: $${ventaMetaMes.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/mes`;
+
+    if (document.getElementById('stat-419-val-pzs-semana-target')) document.getElementById('stat-419-val-pzs-semana-target').textContent = `${pzsSemanaEquilibrio} pzs`;
+    if (document.getElementById('stat-419-val-pzs-dia-target')) document.getElementById('stat-419-val-pzs-dia-target').textContent = `${pzsDiaEquilibrio} pzs`;
+
+    if (document.getElementById('stat-419-val-ganancia-bruta')) document.getElementById('stat-419-val-ganancia-bruta').textContent = `$${gananciaBruta419.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    if (document.getElementById('stat-419-val-pzs-vendidas')) document.getElementById('stat-419-val-pzs-vendidas').textContent = pzsVendidas419;
+    if (document.getElementById('stat-419-val-margen-prom')) document.getElementById('stat-419-val-margen-prom').textContent = `$${margenPromedioReal.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+    const utilCard = document.getElementById('stat-419-card-utilidad-neta');
+    const badgeRent = document.getElementById('stat-419-badge-rentabilidad');
+    const utilVal = document.getElementById('stat-419-val-utilidad-neta');
+    const utilStatus = document.getElementById('stat-419-val-utilidad-status');
+
+    if (utilVal) {
+        const sign = utilidadNeta >= 0 ? '+' : '';
+        utilVal.textContent = `${sign}$${utilidadNeta.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    }
+
+    if (utilCard) {
+        utilCard.classList.remove('border-emerald-500/40', 'bg-emerald-500/10', 'border-amber-500/40', 'bg-amber-500/10', 'border-red-500/40', 'bg-red-500/10');
+        if (utilidadNeta > 0) {
+            utilCard.classList.add('border-emerald-500/40', 'bg-emerald-500/10');
+            if (utilVal) utilVal.className = 'text-2xl font-black text-emerald-400';
+            if (utilStatus) {
+                utilStatus.className = 'mt-2 text-[10px] font-bold text-emerald-300 border-t border-white/5 pt-1.5';
+                utilStatus.textContent = `🚀 Local Rentable (+ $${utilidadNeta.toLocaleString('es-MX', { minimumFractionDigits: 2 })} de ganancia neta)`;
+            }
+            if (badgeRent) {
+                badgeRent.className = 'px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30';
+                badgeRent.textContent = '🟢 Local Rentable';
+            }
+        } else if (utilidadNeta === 0 && pzsVendidas419 > 0) {
+            utilCard.classList.add('border-amber-500/40', 'bg-amber-500/10');
+            if (utilVal) utilVal.className = 'text-2xl font-black text-amber-300';
+            if (utilStatus) {
+                utilStatus.className = 'mt-2 text-[10px] font-bold text-amber-300 border-t border-white/5 pt-1.5';
+                utilStatus.textContent = `🟡 Punto de Equilibrio Alcanzado (Gastos cubiertos)`;
+            }
+            if (badgeRent) {
+                badgeRent.className = 'px-3 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30';
+                badgeRent.textContent = '🟡 En Punto de Equilibrio';
+            }
+        } else {
+            utilCard.classList.add('border-red-500/40', 'bg-red-500/10');
+            if (utilVal) utilVal.className = 'text-2xl font-black text-red-400';
+            const pzsFaltantes = Math.max(0, pzsMesEquilibrio - pzsVendidas419);
+            if (utilStatus) {
+                utilStatus.className = 'mt-2 text-[10px] font-bold text-red-300 border-t border-white/5 pt-1.5';
+                utilStatus.textContent = `⚠️ Faltan ${pzsFaltantes} pzs para cubrir gastos fijos del mes`;
+            }
+            if (badgeRent) {
+                badgeRent.className = 'px-3 py-1 rounded-full text-xs font-bold bg-red-500/20 text-red-300 border border-red-500/30';
+                badgeRent.textContent = '🔴 En Pérdida (Atrasado)';
+            }
+        }
+    }
+
+    const pctCubierto = totalGastos > 0 ? Math.min(100, Math.round((gananciaBruta419 / totalGastos) * 100)) : 0;
+    if (document.getElementById('stat-419-val-pct-cobertura')) {
+        document.getElementById('stat-419-val-pct-cobertura').textContent = `${pctCubierto}% de gastos fijos cubiertos (${pzsVendidas419}/${pzsMesEquilibrio} pzs)`;
+    }
+    if (document.getElementById('stat-419-bar-rentabilidad')) {
+        document.getElementById('stat-419-bar-rentabilidad').style.width = `${pctCubierto}%`;
+        if (pctCubierto >= 100) {
+            document.getElementById('stat-419-bar-rentabilidad').className = 'h-full bg-emerald-500 transition-all duration-500';
+        } else if (pctCubierto >= 80) {
+            document.getElementById('stat-419-bar-rentabilidad').className = 'h-full bg-amber-500 transition-all duration-500';
+        } else {
+            document.getElementById('stat-419-bar-rentabilidad').className = 'h-full bg-red-500 transition-all duration-500';
+        }
+    }
+}
+
+/**
+ * Cierra el modal de Estadística.
+ */
+window.closeEstadisticasModal = function() {
+    const modal = document.getElementById('admin-estadisticas-modal');
+    if (!modal) return;
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+};
+
+/**
+ * Aplica estilos dinámicos (verde/amarillo/rojo) a las tarjetas y badges de ritmo según el porcentaje alcanzado.
+ */
+function applyPacingCardStyles(cardId, badgeId, rhythmPct) {
+    const card = document.getElementById(cardId);
+    const badge = document.getElementById(badgeId);
+    if (!card || !badge) return;
+
+    card.classList.remove(
+        'border-emerald-500/40', 'bg-emerald-500/10',
+        'border-amber-500/40', 'bg-amber-500/10',
+        'border-red-500/40', 'bg-red-500/10',
+        'border-white/10', 'bg-dark-200'
+    );
+    badge.classList.remove(
+        'bg-emerald-500/20', 'text-emerald-300', 'border-emerald-500/40',
+        'bg-amber-500/20', 'text-amber-300', 'border-amber-500/40',
+        'bg-red-500/20', 'text-red-300', 'border-red-500/40'
+    );
+
+    if (rhythmPct >= 100) {
+        card.classList.add('border-emerald-500/40', 'bg-emerald-500/10');
+        badge.classList.add('bg-emerald-500/20', 'text-emerald-300', 'border', 'border-emerald-500/40');
+        badge.textContent = '🟢 Excelente (En Ritmo)';
+    } else if (rhythmPct >= 80) {
+        card.classList.add('border-amber-500/40', 'bg-amber-500/10');
+        badge.classList.add('bg-amber-500/20', 'text-amber-300', 'border', 'border-amber-500/40');
+        badge.textContent = '🟡 Alerta (Bajo Ritmo)';
+    } else {
+        card.classList.add('border-red-500/40', 'bg-red-500/10');
+        badge.classList.add('bg-red-500/20', 'text-red-300', 'border', 'border-red-500/40');
+        badge.textContent = '🔴 Crítico (Atrasado)';
+    }
+}
+
+/**
+ * Re-calcula y renderiza todas las métricas de Estadística basándose en las órdenes actuales.
+ */
+window.computeAndRenderStatistics = function() {
+    const filterOrigen = document.getElementById('stat-origen-filter') ? document.getElementById('stat-origen-filter').value : 'all';
+    
+    const is419Only = filterOrigen === '419';
+    const gridGen = document.getElementById('stat-general-kpi-grid');
+    const metaInputs = document.getElementById('stat-meta-inputs-container');
+    const rent419 = document.getElementById('stat-419-rentabilidad-container');
+
+    if (is419Only) {
+        if (gridGen) gridGen.classList.add('hidden');
+        if (metaInputs) metaInputs.classList.add('hidden');
+        if (rent419) rent419.classList.remove('hidden');
+    } else {
+        if (gridGen) gridGen.classList.remove('hidden');
+        if (metaInputs) metaInputs.classList.remove('hidden');
+        if (rent419) rent419.classList.add('hidden');
+    }
+    
+    const metaSemana = parseFloat(document.getElementById('stat-input-meta-semana')?.value || 100) || 100;
+    const metaMes = parseFloat(document.getElementById('stat-input-meta-mes')?.value || 400) || 400;
+
+    const now = new Date();
+    const { startOfWeek, endOfWeek, dayOfWeek } = getWeekRange(now);
+    const { startOfMonth, endOfMonth, dayOfMonth, totalDaysInMonth } = getMonthRange(now);
+
+    const formatDayMonth = (d) => `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}`;
+    const semanaRangeStr = `${formatDayMonth(startOfWeek)} al ${formatDayMonth(endOfWeek)}`;
+    const mesRangeStr = `${now.toLocaleString('es-MX', { month: 'long' }).toUpperCase()} (1-${totalDaysInMonth})`;
+
+    if (document.getElementById('stat-badge-semana-range')) {
+        document.getElementById('stat-badge-semana-range').textContent = semanaRangeStr;
+    }
+    if (document.getElementById('stat-badge-mes-range')) {
+        document.getElementById('stat-badge-mes-range').textContent = mesRangeStr;
+    }
+
+    const expectedSemanaPzs = Math.round(metaSemana * (dayOfWeek / 7));
+    const expectedMesPzs = Math.round(metaMes * (dayOfMonth / totalDaysInMonth));
+
+    // Consolidar todas las fuentes posibles de órdenes en memoria
+    let rawOrdersList = [];
+    if (typeof allFetchedOrdenes !== 'undefined' && Array.isArray(allFetchedOrdenes)) {
+        rawOrdersList = rawOrdersList.concat(allFetchedOrdenes);
+    }
+    if (typeof window.ordenesData !== 'undefined' && Array.isArray(window.ordenesData)) {
+        rawOrdersList = rawOrdersList.concat(window.ordenesData);
+    }
+    if (typeof window.ordenes419Data !== 'undefined' && Array.isArray(window.ordenes419Data)) {
+        rawOrdersList = rawOrdersList.concat(window.ordenes419Data);
+    }
+
+    // Desduplicar órdenes por su ID
+    const uniqueOrdersMap = new Map();
+    rawOrdersList.forEach(o => {
+        if (!o) return;
+        const idKey = o.id_orden || o.id || o.id_orden_419;
+        if (!idKey) return;
+        uniqueOrdersMap.set(String(idKey).trim(), o);
+    });
+
+    let semanaPiezas = 0;
+    let semanaDinero = 0;
+    let mesPiezas = 0;
+    let mesDinero = 0;
+
+    const dailyBreakdown = [
+        { dayNum: 1, name: 'Lunes', pzs: 0, dinero: 0, dateObj: null },
+        { dayNum: 2, name: 'Martes', pzs: 0, dinero: 0, dateObj: null },
+        { dayNum: 3, name: 'Miércoles', pzs: 0, dinero: 0, dateObj: null },
+        { dayNum: 4, name: 'Jueves', pzs: 0, dinero: 0, dateObj: null },
+        { dayNum: 5, name: 'Viernes', pzs: 0, dinero: 0, dateObj: null },
+        { dayNum: 6, name: 'Sábado', pzs: 0, dinero: 0, dateObj: null },
+        { dayNum: 7, name: 'Domingo', pzs: 0, dinero: 0, dateObj: null },
+    ];
+
+    for (let i = 0; i < 7; i++) {
+        const dObj = new Date(startOfWeek);
+        dObj.setDate(startOfWeek.getDate() + i);
+        dailyBreakdown[i].dateObj = dObj;
+    }
+
+    uniqueOrdersMap.forEach(o => {
+        // Excluir órdenes canceladas
+        if (typeof isOrdenCancelada === 'function' ? isOrdenCancelada(o.estatus || o.Estatus) : String(o.estatus || '').toLowerCase().includes('cancel')) {
+            return;
+        }
+
+        // Filtrar por sucursal / origen
+        const origenStr = (o.origen || o.tipo_orden || o.origen_orden || '').toString().toLowerCase();
+        const idStr = String(o.id_orden || o.id || '').toUpperCase();
+        const is419 = origenStr.includes('419') || idStr.includes('419');
+
+        if (filterOrigen === '419' && !is419) return;
+        if (filterOrigen === 'general' && is419) return;
+
+        // Parsear fecha de la orden
+        const dateObj = typeof parseOrdenFecha === 'function' ? parseOrdenFecha(o.fecha || o.created_at || o.fecha_creacion || o.Fecha) : new Date(o.fecha || o.created_at);
+        if (!dateObj || isNaN(dateObj.getTime())) return;
+
+        // Conteo exacto de piezas desde el detalle de la orden
+        const items = o.articulos_carrito || o.detalle || o.items || o.Ordenes_Detalle;
+        let pzs = 0;
+        if (Array.isArray(items) && items.length > 0) {
+            items.forEach(d => {
+                const estDet = d.EstatusOrdenDetalle !== undefined ? d.EstatusOrdenDetalle : d.estatus_detalle;
+                if (estDet === 0 || estDet === "0") return;
+                const cant = parseInt(d.cantidad || d.Cantidad || d.cant || 0, 10);
+                if (!isNaN(cant) && cant > 0) pzs += cant;
+            });
+        } else if (o.total_piezas || o.piezas || o.Cantidad) {
+            pzs = parseInt(o.total_piezas || o.piezas || o.Cantidad || 0, 10);
+        } else if (o.gran_total || o.total || o.monto || o.total_neto) {
+            pzs = 1;
+        }
+
+        const monto = parseFloat(o.gran_total || o.total_neto || o.total || o.Gran_Total || o.Total || o.monto || 0) || 0;
+
+        // Evaluar si cae en la semana actual (Lunes a Domingo)
+        if (dateObj >= startOfWeek && dateObj <= endOfWeek) {
+            semanaPiezas += pzs;
+            semanaDinero += monto;
+
+            const d = dateObj.getDay();
+            const dIndex = (d === 0 ? 7 : d) - 1;
+            if (dailyBreakdown[dIndex]) {
+                dailyBreakdown[dIndex].pzs += pzs;
+                dailyBreakdown[dIndex].dinero += monto;
+            }
+        }
+
+        // Evaluar si cae en el mes actual (Día 1 al último)
+        if (dateObj >= startOfMonth && dateObj <= endOfMonth) {
+            mesPiezas += pzs;
+            mesDinero += monto;
+        }
+    });
+
+    const semanaRitmoPct = expectedSemanaPzs > 0 ? Math.round((semanaPiezas / expectedSemanaPzs) * 100) : 0;
+    const mesRitmoPct = expectedMesPzs > 0 ? Math.round((mesPiezas / expectedMesPzs) * 100) : 0;
+
+    // Renderizar KPI 1: Piezas Semana
+    if (document.getElementById('stat-val-semana-piezas')) document.getElementById('stat-val-semana-piezas').textContent = semanaPiezas;
+    if (document.getElementById('stat-val-semana-meta-target')) document.getElementById('stat-val-semana-meta-target').textContent = metaSemana;
+    if (document.getElementById('stat-val-semana-esperado')) document.getElementById('stat-val-semana-esperado').textContent = `Meta hoy: ${expectedSemanaPzs} pzs`;
+    
+    const dayNames = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+    if (document.getElementById('stat-val-semana-dia-nombre')) {
+        document.getElementById('stat-val-semana-dia-nombre').textContent = `${dayNames[dayOfWeek - 1]} (Día ${dayOfWeek} de 7)`;
+    }
+    const semanaProgressPct = Math.min(100, Math.round((semanaPiezas / metaSemana) * 100));
+    if (document.getElementById('stat-bar-semana-progress')) document.getElementById('stat-bar-semana-progress').style.width = `${semanaProgressPct}%`;
+
+    // Renderizar KPI 2: Dinero Semana
+    if (document.getElementById('stat-val-semana-dinero')) {
+        document.getElementById('stat-val-semana-dinero').textContent = `$${semanaDinero.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    }
+    const semanaDineroProm = dayOfWeek > 0 ? (semanaDinero / dayOfWeek) : 0;
+    if (document.getElementById('stat-val-semana-dinero-prom')) {
+        document.getElementById('stat-val-semana-dinero-prom').textContent = `$${semanaDineroProm.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    }
+
+    // Renderizar KPI 3: Ritmo Semanal (%)
+    if (document.getElementById('stat-val-semana-ritmo-pct')) document.getElementById('stat-val-semana-ritmo-pct').textContent = `${semanaRitmoPct}%`;
+    applyPacingCardStyles('stat-card-semana-ritmo', 'stat-badge-semana-ritmo', semanaRitmoPct);
+    
+    const diffSemanaPzs = semanaPiezas - expectedSemanaPzs;
+    if (document.getElementById('stat-desc-semana-ritmo')) {
+        if (diffSemanaPzs >= 0) {
+            document.getElementById('stat-desc-semana-ritmo').textContent = `⚡ Vas +${diffSemanaPzs} pzs arriba del ritmo estimado al día de hoy (${dayNames[dayOfWeek - 1]}).`;
+        } else {
+            document.getElementById('stat-desc-semana-ritmo').textContent = `⚠️ Faltan ${Math.abs(diffSemanaPzs)} pzs para alcanzar el 100% del ritmo esperado hoy (${dayNames[dayOfWeek - 1]}).`;
+        }
+    }
+
+    // Renderizar KPI 4: Piezas Mes
+    if (document.getElementById('stat-val-mes-piezas')) document.getElementById('stat-val-mes-piezas').textContent = mesPiezas;
+    if (document.getElementById('stat-val-mes-meta-target')) document.getElementById('stat-val-mes-meta-target').textContent = metaMes;
+    if (document.getElementById('stat-val-mes-esperado')) document.getElementById('stat-val-mes-esperado').textContent = `Meta hoy: ${expectedMesPzs} pzs`;
+    if (document.getElementById('stat-val-mes-dia-nombre')) {
+        document.getElementById('stat-val-mes-dia-nombre').textContent = `Día ${dayOfMonth} de ${totalDaysInMonth}`;
+    }
+    const mesProgressPct = Math.min(100, Math.round((mesPiezas / metaMes) * 100));
+    if (document.getElementById('stat-bar-mes-progress')) document.getElementById('stat-bar-mes-progress').style.width = `${mesProgressPct}%`;
+
+    // Renderizar KPI 5: Dinero Mes
+    if (document.getElementById('stat-val-mes-dinero')) {
+        document.getElementById('stat-val-mes-dinero').textContent = `$${mesDinero.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    }
+    const mesDineroProm = dayOfMonth > 0 ? (mesDinero / dayOfMonth) : 0;
+    if (document.getElementById('stat-val-mes-dinero-prom')) {
+        document.getElementById('stat-val-mes-dinero-prom').textContent = `$${mesDineroProm.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    }
+
+    // Renderizar KPI 6: Ritmo Mensual (%)
+    if (document.getElementById('stat-val-mes-ritmo-pct')) document.getElementById('stat-val-mes-ritmo-pct').textContent = `${mesRitmoPct}%`;
+    applyPacingCardStyles('stat-card-mes-ritmo', 'stat-badge-mes-ritmo', mesRitmoPct);
+    
+    const diffMesPzs = mesPiezas - expectedMesPzs;
+    if (document.getElementById('stat-desc-mes-ritmo')) {
+        if (diffMesPzs >= 0) {
+            document.getElementById('stat-desc-mes-ritmo').textContent = `⚡ Vas +${diffMesPzs} pzs arriba del ritmo estimado al día ${dayOfMonth} del mes.`;
+        } else {
+            document.getElementById('stat-desc-mes-ritmo').textContent = `⚠️ Faltan ${Math.abs(diffMesPzs)} pzs para alcanzar el 100% del ritmo esperado hoy (Día ${dayOfMonth}).`;
+        }
+    }
+
+    const dailyTargetAvg = (metaSemana / 7).toFixed(1);
+    if (document.getElementById('stat-val-promedio-diario-target')) {
+        document.getElementById('stat-val-promedio-diario-target').textContent = `${dailyTargetAvg} pzs/día`;
+    }
+
+    // Renderizar Tabla Desglose Diario
+    const tbody = document.getElementById('stat-table-weekly-breakdown');
+    if (tbody) {
+        tbody.innerHTML = '';
+        const targetPerDay = metaSemana / 7;
+
+        dailyBreakdown.forEach((item) => {
+            const isToday = item.dayNum === dayOfWeek;
+            const isPast = item.dayNum < dayOfWeek;
+            const formattedDate = item.dateObj ? `${item.dateObj.getDate().toString().padStart(2, '0')}/${(item.dateObj.getMonth() + 1).toString().padStart(2, '0')}` : '';
+
+            let badgeHtml = '';
+            if (isToday) {
+                if (item.pzs >= Math.round(targetPerDay)) {
+                    badgeHtml = `<span class="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-bold border border-emerald-500/30">🟢 Hoy (Cumplido)</span>`;
+                } else {
+                    badgeHtml = `<span class="px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 text-[10px] font-bold border border-purple-500/30">⚡ Hoy En Proceso</span>`;
+                }
+            } else if (isPast) {
+                if (item.pzs >= Math.round(targetPerDay)) {
+                    badgeHtml = `<span class="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 text-[10px] font-semibold">Meta Alcanzada</span>`;
+                } else if (item.pzs > 0) {
+                    badgeHtml = `<span class="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 text-[10px]">Ventas Parciales</span>`;
+                } else {
+                    badgeHtml = `<span class="px-2 py-0.5 rounded-full bg-red-500/10 text-red-400 text-[10px]">Sin Ventas</span>`;
+                }
+            } else {
+                badgeHtml = `<span class="px-2 py-0.5 rounded-full bg-white/5 text-gray-500 text-[10px]">Pendiente</span>`;
+            }
+
+            const tr = document.createElement('tr');
+            tr.className = isToday ? 'bg-purple-500/10 font-medium' : 'hover:bg-white/5';
+            tr.innerHTML = `
+                <td class="py-2.5 px-3 font-semibold text-gray-200">
+                    ${item.name} ${isToday ? '<span class="text-purple-400 font-bold ml-1">(Hoy)</span>' : ''}
+                </td>
+                <td class="py-2.5 px-3 text-gray-400 font-mono text-[11px]">${formattedDate}</td>
+                <td class="py-2.5 px-3 text-center font-bold ${item.pzs > 0 ? 'text-white' : 'text-gray-500'}">
+                    ${item.pzs} pzs
+                </td>
+                <td class="py-2.5 px-3 text-right font-bold ${item.dinero > 0 ? 'text-emerald-400' : 'text-gray-500'}">
+                    $${item.dinero.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </td>
+                <td class="py-2.5 px-3 text-center">
+                    ${badgeHtml}
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    // Calcular y actualizar rentabilidad & punto de equilibrio del Local 419
+    computeRentabilidad419();
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+    const btnSave = document.getElementById('btn-save-stat-targets');
+    if (btnSave) {
+        btnSave.addEventListener('click', () => {
+            const metaSemana = document.getElementById('stat-input-meta-semana')?.value || '100';
+            const metaMes = document.getElementById('stat-input-meta-mes')?.value || '400';
+
+            localStorage.setItem('stat_target_semana', metaSemana);
+            localStorage.setItem('stat_target_mes', metaMes);
+
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Metas Actualizadas',
+                    text: `Nuevas metas: Semanal = ${metaSemana} pzs | Mensual = ${metaMes} pzs`,
+                    timer: 1800,
+                    showConfirmButton: false,
+                    background: '#151515',
+                    color: '#fff'
+                });
+            }
+
+            window.computeAndRenderStatistics();
+        });
+    }
+
+    const selectOrigen = document.getElementById('stat-origen-filter');
+    if (selectOrigen) {
+        selectOrigen.addEventListener('change', () => {
+            window.computeAndRenderStatistics();
+        });
+    }
+
+    // Listeners reactivos para gastos fijos de Local 419
+    ['stat-419-input-renta', 'stat-419-input-luz', 'stat-419-input-ayudante', 'stat-419-input-agua', 'stat-419-input-internet', 'stat-419-input-otros'].forEach(id => {
+        const input = document.getElementById(id);
+        if (input) {
+            input.addEventListener('input', () => {
+                computeRentabilidad419();
+            });
+        }
+    });
+
+    const btnSave419 = document.getElementById('btn-save-gastos-419');
+    if (btnSave419) {
+        btnSave419.addEventListener('click', () => {
+            localStorage.setItem('stat_419_renta', document.getElementById('stat-419-input-renta')?.value || '5000');
+            localStorage.setItem('stat_419_luz', document.getElementById('stat-419-input-luz')?.value || '1500');
+            localStorage.setItem('stat_419_ayudante', document.getElementById('stat-419-input-ayudante')?.value || '6000');
+            localStorage.setItem('stat_419_agua', document.getElementById('stat-419-input-agua')?.value || '150');
+            localStorage.setItem('stat_419_internet', document.getElementById('stat-419-input-internet')?.value || '700');
+            localStorage.setItem('stat_419_otros', document.getElementById('stat-419-input-otros')?.value || '0');
+
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Gastos Fijos Guardados',
+                    text: 'Se han guardado los gastos del Local 419 en el sistema.',
+                    timer: 1800,
+                    showConfirmButton: false,
+                    background: '#151515', color: '#fff'
+                });
+            }
+            computeRentabilidad419();
+        });
+    }
+});
+
 
 
 

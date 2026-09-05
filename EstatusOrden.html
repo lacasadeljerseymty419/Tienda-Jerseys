@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Estatus y Rastreo de Tu Pedido</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        dark: {
+                            DEFAULT: '#090d16',
+                            100: '#111827',
+                            200: '#1f2937',
+                            300: '#374151',
+                        },
+                        navy: {
+                            400: '#60a5fa',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        body { background-color: #090d16; color: #f3f4f6; font-family: system-ui, -apple-system, sans-serif; }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between selection:bg-navy-500 selection:text-white pb-10">
+    <!-- YouTube Style Top Blue Loading Bar -->
+    <div id="yt-top-loading-bar" class="fixed top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-blue-600 via-blue-500 to-sky-400 shadow-[0_0_12px_rgba(59,130,246,0.9)] z-[99999] pointer-events-none transition-all duration-300 opacity-0 w-0"></div>
+
+    <!-- Header / Navbar -->
+    <header class="bg-dark-100/90 backdrop-blur-md border-b border-white/10 sticky top-0 z-50">
+        <div class="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
+            <a href="clientes.html" class="flex items-center gap-2 group">
+                <span class="bg-gradient-to-r from-blue-500 to-amber-500 p-2 rounded-xl text-white font-black text-sm shadow-md group-hover:scale-105 transition-transform">📦</span>
+                <div class="leading-tight">
+                    <span class="font-extrabold text-white text-base tracking-wider block">RASTREO DE PEDIDO</span>
+                    <span class="text-[10px] text-amber-400 font-semibold uppercase tracking-widest block font-mono">Estado en Tiempo Real</span>
+                </div>
+            </a>
+            <a href="clientes.html" class="text-xs text-gray-400 hover:text-white transition-colors flex items-center gap-1 bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-lg border border-white/10">
+                <span>🛒 Ir a la Tienda</span>
+            </a>
+        </div>
+    </header>
+
+    <!-- Contenido Principal -->
+    <main class="max-w-3xl mx-auto px-4 py-6 flex-grow w-full space-y-6">
+
+        <!-- Buscador Rápido de Orden si no viene por URL -->
+        <div id="search-box-container" class="bg-dark-100 border border-white/10 rounded-2xl p-4 sm:p-6 shadow-xl text-center hidden">
+            <h2 class="text-lg font-bold text-white mb-1">🔍 Consulta tu Pedido</h2>
+            <p class="text-xs text-gray-400 mb-4">Ingresa tu número de orden (Ej. ORD-1788219550328) para ver el estatus en tiempo real.</p>
+            <form id="form-search-order" class="flex gap-2 max-w-md mx-auto">
+                <input type="text" id="input-order-id" placeholder="Ej. ORD-1788219550328" required class="flex-grow bg-dark-200 border border-white/10 rounded-xl px-4 py-2 text-sm text-white font-mono placeholder-gray-500 focus:outline-none focus:border-navy-400">
+                <button type="submit" class="bg-navy-600 hover:bg-navy-500 text-white px-5 py-2 rounded-xl text-sm font-bold transition-all shadow">
+                    Buscar
+                </button>
+            </form>
+        </div>
+
+        <!-- Skeleton Loader / Carga -->
+        <div id="loading-container" class="bg-dark-100 border border-white/10 rounded-2xl p-8 text-center space-y-4">
+            <div class="inline-block animate-spin text-navy-400 text-4xl mb-2">⚡</div>
+            <h3 class="text-base font-bold text-white">Buscando información de tu pedido...</h3>
+            <p class="text-xs text-gray-400">Consultando directamente la información de tu pedido.</p>
+        </div>
+
+        <!-- Contenedor de Error si la Orden No Existe -->
+        <div id="error-container" class="bg-dark-100 border border-red-500/30 rounded-2xl p-8 text-center space-y-4 hidden">
+            <div class="text-4xl text-red-400">⚠️</div>
+            <h3 class="text-lg font-bold text-white">No encontramos la orden solicitada</h3>
+            <p id="error-message-text" class="text-xs text-gray-400 max-w-md mx-auto">Verifica que el número de orden sea correcto o contacta a soporte.</p>
+            <div class="pt-2 flex flex-wrap justify-center gap-3">
+                <button onclick="showSearchBox()" class="px-4 py-2 rounded-xl bg-dark-200 hover:bg-dark-300 text-white font-semibold text-xs border border-white/10">
+                    🔍 Intentar con otro número
+                </button>
+                <a href="https://wa.me/5218132698182" target="_blank" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1">
+                    💬 Contactar Soporte
+                </a>
+            </div>
+        </div>
+
+        <!-- Contenedor Principal del Pedido Encontrado -->
+        <div id="order-details-container" class="space-y-6 hidden">
+
+            <!-- Banner Superior con ID y Copiar -->
+            <div class="bg-dark-100 border border-white/10 rounded-2xl p-4 sm:p-6 shadow-xl relative overflow-hidden">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Número de Pedido</span>
+                            <span id="badge-delivery-type" class="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-amber-500/20 text-amber-300 border border-amber-500/30">---</span>
+                        </div>
+                        <h1 id="order-id-title" class="text-xl sm:text-2xl font-black text-white font-mono mt-1 tracking-tight">ORD-XXXXXXXXXXXXX</h1>
+                        <p id="order-date-str" class="text-xs text-gray-400 mt-0.5">📅 Fecha: ---</p>
+                    </div>
+                    
+                    <div class="flex items-center gap-2 shrink-0">
+                        <button onclick="copyOrderId()" class="px-3 py-1.5 rounded-xl bg-dark-200 hover:bg-white/10 text-gray-300 hover:text-white border border-white/10 font-mono text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer">
+                            <span>📋 Copiar ID</span>
+                        </button>
+                        <button onclick="refreshOrderDetails()" class="p-2 rounded-xl bg-navy-600/20 hover:bg-navy-600 text-navy-300 hover:text-white border border-navy-500/30 text-xs transition-all cursor-pointer" title="Actualizar Estatus">
+                            <span>🔄</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Barra / Stepper de Estatus -->
+                <div class="mt-6 pt-6 border-t border-white/5">
+                    <div class="text-xs font-bold text-gray-300 mb-4 uppercase tracking-wider flex items-center justify-between">
+                        <span>Línea de Tiempo del Pedido</span>
+                        <span id="current-status-badge" class="px-2.5 py-0.5 rounded-lg text-xs font-extrabold bg-blue-500/20 text-blue-300 border border-blue-500/30">Pendiente</span>
+                    </div>
+
+                    <!-- Si la orden está cancelada -->
+                    <div id="cancel-banner" class="hidden p-4 rounded-xl bg-red-500/15 border border-red-500/30 text-center text-red-400 text-sm font-bold">
+                        🚫 ESTA ORDEN HA SIDO CANCELADA
+                    </div>
+
+                    <!-- Stepper Visual -->
+                    <div id="stepper-bar" class="grid grid-cols-4 gap-2 relative">
+                        <!-- Step 1: Recibido -->
+                        <div id="step-1" class="flex flex-col items-center text-center space-y-1.5 opacity-40">
+                            <div class="w-9 h-9 rounded-full bg-dark-200 border-2 border-gray-600 flex items-center justify-center text-sm font-bold text-gray-400 step-icon transition-all">
+                                📝
+                            </div>
+                            <span class="text-[10px] sm:text-xs font-bold text-gray-300 leading-tight">1. Recibido</span>
+                        </div>
+
+                        <!-- Step 2: En Preparación -->
+                        <div id="step-2" class="flex flex-col items-center text-center space-y-1.5 opacity-40">
+                            <div class="w-9 h-9 rounded-full bg-dark-200 border-2 border-gray-600 flex items-center justify-center text-sm font-bold text-gray-400 step-icon transition-all">
+                                ⚙️
+                            </div>
+                            <span class="text-[10px] sm:text-xs font-bold text-gray-300 leading-tight">2. En Proceso</span>
+                        </div>
+
+                        <!-- Step 3: Listo / En Ruta -->
+                        <div id="step-3" class="flex flex-col items-center text-center space-y-1.5 opacity-40">
+                            <div class="w-9 h-9 rounded-full bg-dark-200 border-2 border-gray-600 flex items-center justify-center text-sm font-bold text-gray-400 step-icon transition-all">
+                                🚚
+                            </div>
+                            <span id="step-3-label" class="text-[10px] sm:text-xs font-bold text-gray-300 leading-tight">3. Listo / Enviado</span>
+                        </div>
+
+                        <!-- Step 4: Entregado -->
+                        <div id="step-4" class="flex flex-col items-center text-center space-y-1.5 opacity-40">
+                            <div class="w-9 h-9 rounded-full bg-dark-200 border-2 border-gray-600 flex items-center justify-center text-sm font-bold text-gray-400 step-icon transition-all">
+                                ✅
+                            </div>
+                            <span class="text-[10px] sm:text-xs font-bold text-gray-300 leading-tight">4. Completado</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Información de Envío / Guía / Recojo -->
+            <div id="info-delivery-card" class="bg-dark-100 border border-white/10 rounded-2xl p-4 sm:p-6 shadow-xl space-y-3">
+                <h3 class="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-2">
+                    <span>📦 Información de Entrega y Cliente</span>
+                </h3>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    <div class="bg-dark-200/50 p-3 rounded-xl border border-white/5">
+                        <span class="text-gray-400 block text-[10px] uppercase tracking-wider font-semibold">Cliente</span>
+                        <span id="client-name-val" class="text-white font-bold text-sm block mt-0.5">---</span>
+                    </div>
+                    <div class="bg-dark-200/50 p-3 rounded-xl border border-white/5">
+                        <span class="text-gray-400 block text-[10px] uppercase tracking-wider font-semibold">Modalidad</span>
+                        <span id="delivery-method-val" class="text-amber-300 font-bold text-xs block mt-0.5">---</span>
+                    </div>
+                </div>
+
+                <!-- Sección de Número de Guía de Paquetería -->
+                <div id="tracking-guide-container" class="hidden bg-emerald-500/10 border border-emerald-500/30 p-3.5 rounded-xl text-xs space-y-1">
+                    <div class="flex items-center justify-between">
+                        <span class="text-emerald-400 font-bold uppercase tracking-wider text-[10px]">📦 Número de Guía / Rastreo Paquetería</span>
+                        <span class="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-mono">Enviado</span>
+                    </div>
+                    <div class="flex items-center justify-between pt-1">
+                        <span id="tracking-guide-num" class="font-mono text-sm font-black text-white tracking-widest">---</span>
+                        <button onclick="copyTrackingGuide()" class="text-[11px] bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-2.5 py-1 rounded-lg transition-all">
+                            📋 Copiar Guía
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Aviso de Recojo o Envío -->
+                <div id="delivery-notice-container" class="p-3.5 rounded-xl bg-dark-200/50 border border-white/5 text-xs text-gray-300 leading-relaxed">
+                    <!-- Inyectado dinámicamente -->
+                </div>
+            </div>
+
+            <!-- Desglose de Artículos -->
+            <div class="bg-dark-100 border border-white/10 rounded-2xl p-4 sm:p-6 shadow-xl space-y-4">
+                <h3 class="text-xs font-bold text-gray-300 uppercase tracking-wider flex items-center justify-between">
+                    <span>🛒 Artículos en la Orden</span>
+                    <span id="items-count-badge" class="text-[10px] bg-white/5 px-2 py-0.5 rounded text-gray-400 font-mono">0 pzs</span>
+                </h3>
+
+                <div id="items-list-container" class="space-y-3">
+                    <!-- Artículos inyectados aquí -->
+                </div>
+
+                <!-- Resumen Financiero -->
+                <div class="border-t border-white/10 pt-4 space-y-2 text-xs">
+                    <div class="flex justify-between text-gray-400">
+                        <span>Subtotal Prendas:</span>
+                        <span id="summary-subtotal" class="font-mono text-gray-200 font-semibold">$0.00</span>
+                    </div>
+                    <div id="summary-envio-row" class="flex justify-between text-gray-400 hidden">
+                        <span>Costo de Envío:</span>
+                        <span id="summary-envio-val" class="font-mono text-gray-200 font-semibold">$0.00</span>
+                    </div>
+                    <div class="flex justify-between text-base font-extrabold text-white border-t border-white/10 pt-2.5">
+                        <span>Total Neto a Pagar:</span>
+                        <span id="summary-total-neto" class="font-mono text-emerald-400 text-lg">$0.00</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Botones de Acción Fijos -->
+            <div class="flex flex-col sm:flex-row gap-3 pt-2">
+                <button onclick="contactWhatsAppSupport()" class="w-full sm:flex-1 py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg transition-all cursor-pointer">
+                    <span>📱 Contactar a Soporte por WhatsApp</span>
+                </button>
+                <a href="clientes.html" class="w-full sm:w-auto py-3 px-5 rounded-xl bg-dark-200 hover:bg-dark-300 text-gray-300 hover:text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 border border-white/10 transition-all text-center">
+                    <span>🛒 Ir a la Tienda</span>
+                </a>
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="text-center text-xs text-gray-500 py-4 border-t border-white/5">
+        <p>© 2026 Consulta y Rastreo de Pedidos</p>
+    </footer>
+
+    <!-- Configuración Global API -->
+    <script src="./js/config.js?v=10.6.0"></script>
+    <script>
+        let currentLoadedOrder = null;
+        let ytProgressInterval = null;
+
+        function startTopLoadingBar() {
+            const bar = document.getElementById('yt-top-loading-bar');
+            if (!bar) return;
+            if (ytProgressInterval) clearInterval(ytProgressInterval);
+
+            bar.style.transition = 'width 200ms cubic-bezier(0.4, 0, 0.2, 1), opacity 200ms ease';
+            bar.style.opacity = '1';
+            bar.style.width = '20%';
+
+            let currentProgress = 20;
+            ytProgressInterval = setInterval(() => {
+                if (currentProgress < 75) {
+                    currentProgress += Math.random() * 8 + 4;
+                    bar.style.width = `${Math.min(currentProgress, 75)}%`;
+                } else if (currentProgress < 92) {
+                    currentProgress += Math.random() * 2 + 0.5;
+                    bar.style.width = `${Math.min(currentProgress, 92)}%`;
+                }
+            }, 200);
+        }
+
+        function finishTopLoadingBar() {
+            const bar = document.getElementById('yt-top-loading-bar');
+            if (!bar) return;
+
+            if (ytProgressInterval) {
+                clearInterval(ytProgressInterval);
+                ytProgressInterval = null;
+            }
+
+            bar.style.transition = 'width 180ms cubic-bezier(0, 0, 0.2, 1), opacity 250ms ease-out 180ms';
+            bar.style.width = '100%';
+
+            setTimeout(() => {
+                bar.style.opacity = '0';
+                setTimeout(() => {
+                    bar.style.transition = 'none';
+                    bar.style.width = '0%';
+                }, 300);
+            }, 200);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const orderId = urlParams.get('id_orden') || urlParams.get('id') || urlParams.get('order_id');
+
+            if (orderId && orderId.trim()) {
+                fetchOrderDetails(orderId.trim());
+            } else {
+                showSearchBox();
+            }
+
+            document.getElementById('form-search-order').addEventListener('submit', (e) => {
+                e.preventDefault();
+                const val = document.getElementById('input-order-id').value.trim();
+                if (val) {
+                    window.history.pushState({}, '', `?id_orden=${encodeURIComponent(val)}`);
+                    fetchOrderDetails(val);
+                }
+            });
+        });
+
+        function showSearchBox() {
+            document.getElementById('loading-container').classList.add('hidden');
+            document.getElementById('error-container').classList.add('hidden');
+            document.getElementById('order-details-container').classList.add('hidden');
+            document.getElementById('search-box-container').classList.remove('hidden');
+        }
+
+        async function fetchOrderDetails(orderId) {
+            document.getElementById('search-box-container').classList.add('hidden');
+            document.getElementById('error-container').classList.add('hidden');
+            document.getElementById('order-details-container').classList.add('hidden');
+            document.getElementById('loading-container').classList.remove('hidden');
+
+            startTopLoadingBar();
+            const targetIdClean = String(orderId).trim().toUpperCase();
+
+            try {
+                const apiEndpoint = window.API_URL || "https://script.google.com/macros/s/AKfycbwQaUeO9EnLQCZe5B6juTmRYoGKm443dGYPbpHcbeFpKbvXNYm0akhYoSLc1AM_mVNZ-g/exec";
+                const response = await fetch(apiEndpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify({ action: "track_order", id_orden: targetIdClean })
+                });
+
+                if (!response.ok) throw new Error("Error de conexión HTTP " + response.status);
+                const data = await response.json();
+
+                document.getElementById('loading-container').classList.add('hidden');
+
+                if (data && data.status === 'success' && Array.isArray(data.data)) {
+                    const match = data.data.find(o => String(o.id_orden).trim().toUpperCase() === targetIdClean) || data.data[0];
+                    if (match) {
+                        currentLoadedOrder = match;
+                        renderOrderDetails(match);
+                    } else {
+                        showErrorState(`No se encontró ningún pedido con el número "${targetIdClean}".`);
+                    }
+                } else {
+                    showErrorState(data.message || 'No fue posible obtener la información del servidor.');
+                }
+            } catch (err) {
+                console.error("Error al consultar orden:", err);
+                document.getElementById('loading-container').classList.add('hidden');
+                showErrorState("Ocurrió un error al comunicarse con el servidor. Inténtalo de nuevo.");
+            } finally {
+                finishTopLoadingBar();
+            }
+        }
+
+        function showErrorState(msg) {
+            document.getElementById('error-message-text').textContent = msg;
+            document.getElementById('error-container').classList.remove('hidden');
+        }
+
+        function refreshOrderDetails() {
+            if (currentLoadedOrder && currentLoadedOrder.id_orden) {
+                fetchOrderDetails(currentLoadedOrder.id_orden);
+            }
+        }
+
+        function renderOrderDetails(orden) {
+            const container = document.getElementById('order-details-container');
+            container.classList.remove('hidden');
+
+            // ID y Fecha
+            document.getElementById('order-id-title').textContent = orden.id_orden || 'ORD-000';
+            const dateObj = new Date(orden.fecha);
+            const dateStr = !isNaN(dateObj.getTime()) 
+                ? (dateObj.toLocaleDateString('es-MX', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) + ' ' + dateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}))
+                : (orden.fecha || 'Sin fecha');
+            document.getElementById('order-date-str').textContent = `📅 Fecha: ${dateStr}`;
+
+            // Cliente
+            document.getElementById('client-name-val').textContent = orden.nombre_cliente || orden.id_cliente || 'Cliente';
+
+            // Tipo de entrega badge
+            const isPos419 = String(orden.id_orden).toUpperCase().startsWith('POS419-') || orden.origen === '419';
+            const envioSolicitado = String(orden.envio_solicitado || '').trim().toLowerCase();
+            const tieneEnvio = envioSolicitado.startsWith('s') || Number(orden.envio_costo) > 0 || Number(orden.costo_envio) > 0;
+
+            let deliveryLabel = '🏪 Recolección en Tienda';
+            let deliveryClass = 'bg-amber-500/20 text-amber-300 border-amber-500/30';
+
+            if (isPos419) {
+                deliveryLabel = '💻 Compra en Tienda Física';
+                deliveryClass = 'bg-amber-500/20 text-amber-300 border-amber-500/30';
+            } else if (tieneEnvio) {
+                deliveryLabel = '🚚 Envío a Domicilio';
+                deliveryClass = 'bg-blue-500/20 text-blue-300 border-blue-500/30';
+            } else if (orden.tipo_entrega_label) {
+                deliveryLabel = orden.tipo_entrega_label;
+            }
+
+            const badgeDel = document.getElementById('badge-delivery-type');
+            badgeDel.textContent = deliveryLabel;
+            badgeDel.className = `px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase border ${deliveryClass}`;
+
+            document.getElementById('delivery-method-val').textContent = deliveryLabel;
+
+            // Guía de Paquetería
+            const trackingContainer = document.getElementById('tracking-guide-container');
+            const trackingNumEl = document.getElementById('tracking-guide-num');
+            if (orden.guia && String(orden.guia).trim()) {
+                trackingContainer.classList.remove('hidden');
+                trackingNumEl.textContent = String(orden.guia).trim();
+            } else {
+                trackingContainer.classList.add('hidden');
+            }
+
+            // Aviso de Entrega / Recojo
+            const noticeEl = document.getElementById('delivery-notice-container');
+            if (tieneEnvio) {
+                noticeEl.innerHTML = `<span class="font-bold text-blue-400">🏠 Envío por Paquetería:</span> Tu pedido será preparado y despachado. Recibirás tu número de guía de rastreo una vez recolectado por la paquetería.`;
+            } else {
+                noticeEl.innerHTML = `<span class="font-bold text-amber-400">📍 Recolección en Tienda:</span> Al realizar tu pedido después de las 10:30 AM, estará listo para entregar al día siguiente hábil en horario comercial.`;
+            }
+
+            // Stepper de Estatus
+            renderStatusStepper(orden.estatus);
+
+            // Artículos
+            renderItemsList(orden.articulos_carrito || []);
+
+            // Resumen Financiero
+            const isSurtido419Order = String(orden.id_orden).toUpperCase().includes('419') || orden.origen === '419' || orden.tipo_precio_aplicado === 'Surtido 419';
+            const subtotalNum = isSurtido419Order ? 0 : Number(orden.gran_total || 0);
+            const envioNum = isSurtido419Order ? 0 : Number(orden.envio_costo !== undefined ? orden.envio_costo : (orden.costo_envio || 0));
+            const totalNetoNum = isSurtido419Order ? 0 : Number(orden.total_neto !== undefined ? orden.total_neto : (subtotalNum + envioNum));
+
+            document.getElementById('summary-subtotal').textContent = `$${subtotalNum.toFixed(2)}`;
+
+            const envioRow = document.getElementById('summary-envio-row');
+            if (tieneEnvio || envioNum > 0) {
+                envioRow.classList.remove('hidden');
+                document.getElementById('summary-envio-val').textContent = envioNum === 0 ? 'Gratis' : `$${envioNum.toFixed(2)}`;
+            } else {
+                envioRow.classList.add('hidden');
+            }
+
+            document.getElementById('summary-total-neto').textContent = `$${totalNetoNum.toFixed(2)}`;
+        }
+
+        function renderStatusStepper(estatusStr) {
+            const rawEst = String(estatusStr || 'Pendiente').trim();
+            const est = rawEst.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+            const currentBadge = document.getElementById('current-status-badge');
+            currentBadge.textContent = rawEst;
+
+            const cancelBanner = document.getElementById('cancel-banner');
+            const stepperBar = document.getElementById('stepper-bar');
+
+            if (est.includes('cancel')) {
+                cancelBanner.classList.remove('hidden');
+                stepperBar.classList.add('hidden');
+                currentBadge.className = "px-2.5 py-0.5 rounded-lg text-xs font-extrabold bg-red-500/20 text-red-400 border border-red-500/30";
+                return;
+            }
+
+            cancelBanner.classList.add('hidden');
+            stepperBar.classList.remove('hidden');
+
+            let activeStep = 1;
+            if (est.includes('revisando') || est.includes('proceso') || est.includes('preparacion')) {
+                activeStep = 2;
+            } else if (est.includes('disponible') || est.includes('recoger') || est.includes('enviar') || est.includes('ruta')) {
+                activeStep = 3;
+            } else if (est.includes('entregada') || est.includes('finalizada') || est.includes('completad')) {
+                activeStep = 4;
+            }
+
+            for (let i = 1; i <= 4; i++) {
+                const stepEl = document.getElementById(`step-${i}`);
+                const iconEl = stepEl.querySelector('.step-icon');
+
+                if (i <= activeStep) {
+                    stepEl.classList.remove('opacity-40');
+                    stepEl.classList.add('opacity-100');
+                    iconEl.className = "w-9 h-9 rounded-full bg-navy-600 border-2 border-navy-400 flex items-center justify-center text-sm font-bold text-white step-icon shadow-lg shadow-navy-500/30 scale-105";
+                } else {
+                    stepEl.classList.remove('opacity-100');
+                    stepEl.classList.add('opacity-40');
+                    iconEl.className = "w-9 h-9 rounded-full bg-dark-200 border-2 border-gray-600 flex items-center justify-center text-sm font-bold text-gray-400 step-icon";
+                }
+            }
+
+            if (activeStep === 4) {
+                currentBadge.className = "px-2.5 py-0.5 rounded-lg text-xs font-extrabold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30";
+            } else {
+                currentBadge.className = "px-2.5 py-0.5 rounded-lg text-xs font-extrabold bg-blue-500/20 text-blue-300 border border-blue-500/30";
+            }
+        }
+
+        function renderItemsList(articulos) {
+            const container = document.getElementById('items-list-container');
+            container.innerHTML = '';
+
+            let totalPzs = 0;
+
+            if (!articulos || articulos.length === 0) {
+                container.innerHTML = '<div class="text-xs text-gray-500 italic text-center py-3">Sin detalle de artículos</div>';
+                document.getElementById('items-count-badge').textContent = '0 pzs';
+                return;
+            }
+
+            articulos.forEach(art => {
+                const cant = Number(art.cantidad || 1);
+                totalPzs += cant;
+
+                let prod = {};
+                if (art.id_playera && typeof art.id_playera === 'object') {
+                    prod = art.id_playera;
+                } else if (art.producto && typeof art.producto === 'object') {
+                    prod = art.producto;
+                }
+
+                const imgUrl = (prod.foto || prod.imagen || art.foto) 
+                    ? String(prod.foto || prod.imagen || art.foto).split(',')[0].trim() 
+                    : 'https://images.unsplash.com/photo-1577212017184-807dd6acefd6?auto=format&fit=crop&q=80&w=100';
+
+                const nombre = prod.nombre || art.nombre_playera || `Artículo ${art.id_producto || art.id_playera || ''}`;
+                const genero = prod.genero || art.genero || '-';
+                const tipo = prod.tipo || art.tipo || '-';
+                const version = prod.version || art.version || '-';
+
+                const itemTotal = Number(art.subtotal_renglon || (Number(art.precio_unitario_final || 0) * cant));
+                const unitPrice = cant > 0 ? (itemTotal / cant) : itemTotal;
+
+                let persHtml = '';
+                if (art.id_personalizacion && typeof art.id_personalizacion === 'object') {
+                    if (art.id_personalizacion.concepto && art.id_personalizacion.id_personalizacion !== 'PERS-NONE') {
+                        persHtml = `<span class="text-navy-400 font-semibold">${art.id_personalizacion.concepto}</span>`;
+                    }
+                } else if (art.id_personalizacion && art.id_personalizacion !== 'PERS-NONE') {
+                    persHtml = `<span class="text-navy-400 font-semibold">Personalizada</span>`;
+                }
+
+                if (art.texto_personalizado) {
+                    persHtml += ` <span class="text-emerald-400 font-mono font-bold">("${art.texto_personalizado}")</span>`;
+                }
+
+                const itemCard = `
+                    <div class="flex items-center gap-3 bg-dark-200/40 p-3 rounded-xl border border-white/5">
+                        <img src="${imgUrl}" alt="Foto" class="w-14 h-14 rounded-lg object-cover bg-dark flex-shrink-0 border border-white/10">
+                        <div class="flex-grow min-w-0">
+                            <h4 class="font-bold text-white text-xs sm:text-sm truncate leading-tight">${nombre}</h4>
+                            <div class="text-[10px] text-gray-400 mt-0.5 uppercase tracking-wider font-medium">
+                                ${genero} | ${tipo} | ${version}
+                            </div>
+                            <div class="text-[11px] text-gray-300 mt-1">
+                                Talla: <span class="text-amber-400 font-bold">${art.talla || 'Única'}</span> | 
+                                Cant: <span class="text-white font-semibold">${cant}</span>
+                            </div>
+                            ${persHtml ? `<div class="text-[10px] text-gray-400 mt-0.5">Pers: ${persHtml}</div>` : ''}
+                        </div>
+                        <div class="text-right flex-shrink-0 min-w-[75px]">
+                            <div class="font-mono font-black text-white text-xs sm:text-sm">$${itemTotal.toFixed(2)}</div>
+                            <div class="text-[9px] text-gray-500 font-mono mt-0.5">$${unitPrice.toFixed(2)} c/u</div>
+                        </div>
+                    </div>
+                `;
+                container.insertAdjacentHTML('beforeend', itemCard);
+            });
+
+            document.getElementById('items-count-badge').textContent = `${totalPzs} pzs`;
+        }
+
+        function copyOrderId() {
+            if (!currentLoadedOrder || !currentLoadedOrder.id_orden) return;
+            navigator.clipboard.writeText(currentLoadedOrder.id_orden);
+            Swal.fire({
+                toast: true,
+                position: 'bottom-end',
+                icon: 'success',
+                title: `📋 ID Copiado: ${currentLoadedOrder.id_orden}`,
+                showConfirmButton: false,
+                timer: 1800,
+                background: '#151515', color: '#fff'
+            });
+        }
+
+        function copyTrackingGuide() {
+            if (!currentLoadedOrder || !currentLoadedOrder.guia) return;
+            navigator.clipboard.writeText(currentLoadedOrder.guia);
+            Swal.fire({
+                toast: true,
+                position: 'bottom-end',
+                icon: 'success',
+                title: `📋 Guía Copiada: ${currentLoadedOrder.guia}`,
+                showConfirmButton: false,
+                timer: 1800,
+                background: '#151515', color: '#fff'
+            });
+        }
+
+        function contactWhatsAppSupport() {
+            if (!currentLoadedOrder) {
+                window.open('https://wa.me/5218132698182', '_blank');
+                return;
+            }
+            const orderId = currentLoadedOrder.id_orden;
+            const waText = encodeURIComponent(`Hola! Tengo una consulta sobre el estatus de mi orden *${orderId}*. ¿Me podrían apoyar?`);
+            window.open(`https://wa.me/5218132698182?text=${waText}`, '_blank');
+        }
+    </script>
+</body>
+</html>

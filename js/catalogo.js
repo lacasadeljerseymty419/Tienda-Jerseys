@@ -1,4 +1,4 @@
-const API_URL = window.API_URL || "https://script.google.com/macros/s/AKfycbw97tnD6AOYXNkttgCnQRtg2WpikVw_cXdIYnKdc3lFIdeQ8PrbL1RRGdqMM7KD82ucQg/exec";
+const API_URL = window.API_URL || "https://script.google.com/macros/s/AKfycbwQaUeO9EnLQCZe5B6juTmRYoGKm443dGYPbpHcbeFpKbvXNYm0akhYoSLc1AM_mVNZ-g/exec";
 
 // Elementos DOM
 const DOM = {
@@ -372,8 +372,20 @@ function renderLocalProducts(products) {
                 if (stockVal > 0) {
                     stockTotal += stockVal;
                     const displayTalla = String(t.talla || '');
-                    const shortLabel = displayTalla.includes('(') ? (displayTalla.split('(')[0].trim() || displayTalla) : displayTalla;
-                    tallasHtml += `<span class="px-1.5 py-0.5 border border-gray-200 rounded text-[9px] sm:text-[10px] font-bold text-gray-600 bg-gray-50 whitespace-nowrap" title="${displayTalla}">${shortLabel}</span>`;
+                    let shortLabel = displayTalla;
+                    if (displayTalla.includes('(')) {
+                        const parts = displayTalla.split('(');
+                        const numPart = parts[0].trim();
+                        const detailPart = parts[1].replace(')', '').trim();
+                        const ageMatch = detailPart.match(/(\d+)\s*(?:a|-)\s*(\d+)/i);
+                        if (ageMatch && numPart) {
+                            shortLabel = `${numPart} (${ageMatch[1]}-${ageMatch[2]}A)`;
+                        } else {
+                            const cleanDetail = detailPart.replace(/años|año|anios|anio/gi, 'A').trim();
+                            shortLabel = `${numPart} (${cleanDetail})`;
+                        }
+                    }
+                    tallasHtml += `<span class="px-2 py-0.5 border border-emerald-200 bg-emerald-50 text-emerald-700 rounded text-[9px] sm:text-[10px] font-bold whitespace-nowrap" title="${displayTalla}">${shortLabel}</span>`;
                 }
             });
         }

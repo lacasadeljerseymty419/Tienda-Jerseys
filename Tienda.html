@@ -87,77 +87,62 @@
                         <label class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Buscar Producto</label>
                         <input type="text" id="filter-nombre" placeholder="Nombre, equipo, marca..." class="w-full bg-[#18181b] border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-blue-500 text-white placeholder-gray-500 transition-colors">
                     </div>
-                    <div class="space-y-1.5">
-                        <label class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Tipo</label>
-                        <select id="filter-tipo" class="w-full bg-[#18181b] border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-blue-500 text-gray-200 appearance-none cursor-pointer">
-                            <option value="">Todos los tipos</option>
-                        </select>
-                    </div>
-                    <div class="space-y-1.5">
-                        <label class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Versión / Categoría</label>
-                        <select id="filter-version" class="w-full bg-[#18181b] border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-blue-500 text-gray-200 appearance-none cursor-pointer">
-                            <option value="">Todas las versiones</option>
-                        </select>
-                    </div>
-                    <div class="space-y-1.5">
-                        <label class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Género</label>
-                        <select id="filter-genero" class="w-full bg-[#18181b] border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-blue-500 text-gray-200 appearance-none cursor-pointer">
-                            <option value="">Todos los géneros</option>
-                        </select>
-                    </div>
-                </div>
 
-                <div class="mt-6 pt-6 border-t border-white/10">
-                    <button id="btn-aplicar" class="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold rounded-xl transition-all shadow-lg shadow-blue-500/20 text-sm flex justify-center items-center gap-2">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                        Filtrar Inventario
-                    </button>
+                    <div class="space-y-2 pt-2 border-t border-white/5">
+                        <label class="text-[10px] font-bold text-blue-400 uppercase tracking-wider block">Presupuesto Rápido</label>
+                        <div class="grid grid-cols-2 gap-1.5" id="price-chips-container">
+                            <button type="button" onclick="window.setPriceChip(0, 0)" class="price-chip-btn px-2 py-1.5 rounded-lg text-[10px] font-bold border transition-all bg-blue-600 text-white border-blue-500 shadow-sm" data-min="0" data-max="0">
+                                🔘 Todos
+                            </button>
+                            <button type="button" onclick="window.setPriceChip(0, 500)" class="price-chip-btn px-2 py-1.5 rounded-lg text-[10px] font-bold border transition-all bg-[#18181b] text-gray-300 border-white/10 hover:border-emerald-500/40 hover:text-white" data-min="0" data-max="500">
+                                🟢 Hasta $500
+                            </button>
+                            <button type="button" onclick="window.setPriceChip(500, 750)" class="price-chip-btn px-2 py-1.5 rounded-lg text-[10px] font-bold border transition-all bg-[#18181b] text-gray-300 border-white/10 hover:border-blue-500/40 hover:text-white" data-min="500" data-max="750">
+                                🔵 $500 - $750
+                            </button>
+                            <button type="button" onclick="window.setPriceChip(750, 0)" class="price-chip-btn px-2 py-1.5 rounded-lg text-[10px] font-bold border transition-all bg-[#18181b] text-gray-300 border-white/10 hover:border-purple-500/40 hover:text-white" data-min="750" data-max="0">
+                                🟣 Más de $750
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="space-y-1.5 pt-1">
+                        <label class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Rango Personalizado ($)</label>
+                        <div class="flex items-center gap-2">
+                            <input type="number" id="filter-precio-min" placeholder="Min $" min="0" class="w-full bg-[#18181b] border border-white/10 rounded-xl px-2.5 py-2 text-xs focus:outline-none focus:border-blue-500 text-white placeholder-gray-500">
+                            <span class="text-gray-500 text-xs">-</span>
+                            <input type="number" id="filter-precio-max" placeholder="Max $" min="0" class="w-full bg-[#18181b] border border-white/10 rounded-xl px-2.5 py-2 text-xs focus:outline-none focus:border-blue-500 text-white placeholder-gray-500">
+                        </div>
+                    </div>
                 </div>
             </div>
         </aside>
 
-        <!-- Barra de Búsqueda Móvil y Toggle Filtros (Mismo Estilo del Sistema) -->
+        <!-- Barra de Búsqueda Móvil (Mismo Estilo del Sistema) -->
         <div class="sm:hidden p-4 bg-[#141416] border-b border-white/10 sticky top-20 z-30 shadow-md">
             <div class="flex gap-2">
                 <input type="text" id="mobile-search-input" placeholder="Buscar jersey o artículo..." class="flex-grow bg-[#18181b] border border-white/10 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 text-white placeholder-gray-500 transition-colors">
-                <button id="btn-toggle-filters" class="px-4 py-2.5 bg-[#18181b] border border-white/10 rounded-xl text-gray-300 hover:text-blue-400 hover:bg-white/5 transition-colors flex items-center justify-center">
-                    <svg id="icon-toggle-filters" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path></svg>
-                </button>
-            </div>
-            
-            <!-- Panel colapsable de filtros móviles -->
-            <div id="mobile-filters-panel" class="hidden mt-3 space-y-3 pt-3 border-t border-white/10">
-                <select id="mobile-filter-tipo" class="w-full bg-[#18181b] border border-white/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-500 text-white appearance-none cursor-pointer">
-                    <option value="">Todos los tipos</option>
-                </select>
-                <select id="mobile-filter-version" class="w-full bg-[#18181b] border border-white/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-500 text-white appearance-none cursor-pointer">
-                    <option value="">Todas las versiones</option>
-                </select>
-                <select id="mobile-filter-genero" class="w-full bg-[#18181b] border border-white/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-500 text-white appearance-none cursor-pointer">
-                    <option value="">Todos los géneros</option>
-                </select>
-                <button id="btn-aplicar-mobile" class="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold rounded-xl transition-all shadow-md text-sm">
-                    Aplicar Filtros
-                </button>
             </div>
         </div>
 
         <!-- Contenido Principal (Grid de Productos) -->
         <section class="flex-grow p-4 sm:p-6 lg:p-8 w-full min-w-0">
-            <div class="mb-6 flex flex-wrap justify-between items-end gap-3">
+            <div class="mb-6 flex flex-wrap justify-between items-center gap-3">
                 <div>
                     <h2 class="text-xl sm:text-2xl font-black text-white tracking-tight flex items-center gap-2 uppercase">
                         Tienda
                     </h2>
                     <p class="text-sm text-gray-400 mt-1">Inventario disponible en tienda con existencias y precios al momento.</p>
                 </div>
-                <div class="text-xs sm:text-sm text-gray-400 font-medium bg-[#141416] px-3 py-1.5 rounded-xl border border-white/10">
-                    <span id="results-count" class="text-blue-400 font-extrabold font-mono">0</span> productos encontrados
+                <div class="flex items-center gap-2">
+                    <div class="text-xs sm:text-sm text-gray-400 font-medium bg-[#141416] px-3 py-1.5 rounded-xl border border-white/10">
+                        <span id="results-count" class="text-blue-400 font-extrabold font-mono">0</span> productos encontrados
+                    </div>
                 </div>
             </div>
 
             <!-- Grid de Productos -->
-            <div id="products-grid" class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
+            <div id="products-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-5 lg:gap-6">
                 <!-- Se inyectan productos con JS -->
             </div>
 
@@ -208,7 +193,7 @@
     </template>
 
             <!-- Grid de Productos -->
-            <div id="products-grid" class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
+            <div id="products-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-5 lg:gap-6">
                 <!-- Se inyectan productos con JS -->
             </div>
 
@@ -262,8 +247,8 @@
         </div>
     </template>
 
-    <!-- Configuración Global API y Módulo Tienda -->
-    <script src="./js/config.js?v=9.3.0"></script>
-    <script src="./js/tienda.js?v=2.2.0"></script>
+    <!-- Configuración Global API -->
+    <script src="./js/config.js?v=10.6.0"></script>
+    <script src="./js/tienda.js?v=2.6.0"></script>
 </body>
 </html>
