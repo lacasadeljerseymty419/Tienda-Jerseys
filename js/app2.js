@@ -4043,13 +4043,13 @@ function createProductCard(producto, cardIndex = 0) {
     let carouselControlsHtml = '';
     if (images.length > 1) {
         carouselControlsHtml = `
-            <button type="button" class="carousel-prev-btn absolute left-1.5 sm:left-2 top-1/2 -translate-y-1/2 w-6 h-6 sm:w-8 sm:h-8 bg-black/70 hover:bg-black/90 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-all text-white z-30 opacity-100 md:opacity-0 md:group-hover:opacity-100">
+            <button type="button" class="carousel-prev-btn absolute left-1.5 sm:left-2 top-1/2 -translate-y-1/2 w-6 h-6 sm:w-8 sm:h-8 bg-black/70 hover:bg-black/90 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-all text-white z-10 opacity-100 md:opacity-0 md:group-hover:opacity-100">
                 <svg class="w-3 h-3 sm:w-4.5 sm:h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"></path></svg>
             </button>
-            <button type="button" class="carousel-next-btn absolute right-1.5 sm:right-2 top-1/2 -translate-y-1/2 w-6 h-6 sm:w-8 sm:h-8 bg-black/70 hover:bg-black/90 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-all text-white z-30 opacity-100 md:opacity-0 md:group-hover:opacity-100">
+            <button type="button" class="carousel-next-btn absolute right-1.5 sm:right-2 top-1/2 -translate-y-1/2 w-6 h-6 sm:w-8 sm:h-8 bg-black/70 hover:bg-black/90 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-all text-white z-10 opacity-100 md:opacity-0 md:group-hover:opacity-100">
                 <svg class="w-3 h-3 sm:w-4.5 sm:h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"></path></svg>
             </button>
-            <div class="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1 z-30 bg-black/60 px-2 py-1 rounded-full opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+            <div class="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1 z-10 bg-black/60 px-2 py-1 rounded-full opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                 ${images.map((_, i) => `<span class="carousel-dot w-1.5 h-1.5 rounded-full ${i === 0 ? 'bg-white' : 'bg-white/40'} transition-all duration-300" data-idx="${i}"></span>`).join('')}
             </div>
         `;
@@ -10037,29 +10037,32 @@ function renderInventario419Grid(products) {
         let totalStock419 = 0;
 
         if (tallasArray.length > 0) {
-            sizeBoxesHtml = tallasArray.map(tObj => {
-                const sz = String(tObj.talla || '').toUpperCase();
-                const shortSz = formatShortTallaLabel(sz);
-                const cant = Number(tObj.stock || 0);
-                totalStock419 += cant;
-                const hasStock = cant > 0;
-                
-                const boxStyle = hasStock
-                    ? 'bg-[#222226] text-white border-white/10 hover:border-amber-400'
-                    : 'bg-white/5 text-gray-500 border-white/5 opacity-60';
+            tallasArray.forEach(tObj => {
+                totalStock419 += Number(tObj.stock || 0);
+            });
 
-                const badgeBg = hasStock ? 'bg-amber-500 text-black font-extrabold' : 'bg-gray-700 text-gray-300';
+            const tallasConStock = tallasArray.filter(tObj => Number(tObj.stock || 0) > 0);
 
-                return `
-                <div class="relative group/size cursor-pointer" onclick="openLocal419InventoryModal('${prod.id}')" title="Gestionar existencias 419 (Talla ${sz})">
-                    <div class="min-w-[2.5rem] px-1.5 h-10 sm:min-w-[2.75rem] sm:h-11 rounded-xl border flex items-center justify-center font-bold text-xs ${boxStyle} transition-all shadow-sm whitespace-nowrap">
-                        ${shortSz}
-                    </div>
-                    <span class="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1 rounded-full ${badgeBg} text-[10px] flex items-center justify-center shadow-md border border-dark-100">
-                        ${cant}
-                    </span>
-                </div>`;
-            }).join('');
+            if (tallasConStock.length > 0) {
+                sizeBoxesHtml = tallasConStock.map(tObj => {
+                    const sz = String(tObj.talla || '').toUpperCase();
+                    const shortSz = formatShortTallaLabel(sz);
+                    const cant = Number(tObj.stock || 0);
+                    
+                    const boxStyle = 'bg-[#222226] text-white border-white/10 hover:border-amber-400';
+                    const badgeBg = 'bg-amber-500 text-black font-extrabold';
+
+                    return `
+                    <div class="relative group/size cursor-pointer" onclick="openLocal419InventoryModal('${prod.id}')" title="Gestionar existencias 419 (Talla ${sz})">
+                        <div class="min-w-[2.2rem] px-1.5 h-9 sm:min-w-[2.75rem] sm:h-11 rounded-xl border flex items-center justify-center font-bold text-[11px] sm:text-xs ${boxStyle} transition-all shadow-sm whitespace-nowrap">
+                            ${shortSz}
+                        </div>
+                        <span class="absolute -top-1.5 -right-1.5 min-w-[18px] h-4.5 sm:min-w-[20px] sm:h-5 px-1 rounded-full ${badgeBg} text-[9px] sm:text-[10px] flex items-center justify-center shadow-md border border-dark-100">
+                            ${cant}
+                        </span>
+                    </div>`;
+                }).join('');
+            }
         }
 
         const stockBadgeColor = totalStock419 > 0 ? 'bg-amber-500/20 text-amber-400 border-amber-500/30' : 'bg-red-500/10 text-red-400 border-red-500/20';
@@ -10072,13 +10075,13 @@ function renderInventario419Grid(products) {
         </div>`;
 
         return `
-        <div class="bg-[#141416] border border-white/10 rounded-2xl p-3 sm:p-4 flex flex-col justify-between hover:border-amber-500/40 transition-all duration-300 shadow-xl shadow-black/40 group relative">
+        <div class="bg-[#141416] border border-white/10 rounded-2xl p-3 sm:p-4 flex flex-col justify-between hover:border-amber-500/40 transition-colors duration-200 shadow-lg group relative">
             <div>
                 <!-- Imagen con relación de aspecto estilo catálogo -->
                 <div class="relative w-full aspect-[4/5] rounded-xl overflow-hidden mb-3 bg-dark-300 border border-white/5">
-                    <img src="${imgUrl}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" alt="${equipoNombre}">
+                    <img src="${imgUrl}" loading="lazy" decoding="async" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" alt="${equipoNombre}">
                     <div class="absolute inset-0 bg-gradient-to-t from-dark/60 via-transparent to-transparent opacity-60"></div>
-                    <span class="absolute top-2 right-2 px-2.5 py-1 rounded-lg ${stockBadgeColor} font-bold text-[10px] uppercase border shadow-md backdrop-blur-xs">
+                    <span class="absolute top-2 right-2 px-2.5 py-1 rounded-lg ${stockBadgeColor} font-bold text-[10px] uppercase border shadow-md bg-dark-200/90">
                         ${totalStock419} pcs
                     </span>
                 </div>

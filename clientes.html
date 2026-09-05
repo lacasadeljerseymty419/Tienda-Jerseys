@@ -95,7 +95,7 @@
         html {
             width: 100%;
             max-width: 100vw;
-            overflow-x: hidden !important;
+            overflow-x: clip !important;
             overscroll-behavior-x: none !important;
             touch-action: manipulation;
             -webkit-text-size-adjust: 100%;
@@ -103,7 +103,7 @@
         body {
             width: 100%;
             max-width: 100vw;
-            overflow-x: hidden !important;
+            overflow-x: clip !important;
             position: relative;
             overscroll-behavior-x: none !important;
             touch-action: manipulation;
@@ -277,7 +277,7 @@
         }
     </style>
 </head>
-<body class="font-sans antialiased min-h-screen flex flex-col selection:bg-navy-400/30 selection:text-navy-400 overflow-x-hidden">
+<body class="font-sans antialiased min-h-screen flex flex-col selection:bg-navy-400/30 selection:text-navy-400 overflow-x-clip">
     <!-- YouTube Style Top Blue Loading Bar -->
     <div id="yt-top-loading-bar" class="fixed top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-blue-600 via-blue-500 to-sky-400 shadow-[0_0_12px_rgba(59,130,246,0.9)] z-[99999] pointer-events-none transition-all duration-300 opacity-0 w-0"></div>
     
@@ -651,9 +651,9 @@
 
     <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-6 md:pb-10 w-full flex flex-col lg:flex-row gap-6 md:gap-10">
         
-        <!-- Sidebar de Filtros -->
-        <aside class="sidebar-tablet w-full lg:w-72 flex-shrink-0">
-            <div class="bg-dark-100 p-3 sm:p-4 lg:p-6 rounded-2xl border border-white/5 lg:sticky top-24 shadow-xl transition-all duration-300">
+        <!-- Sidebar de Filtros (Fijo/Sticky en Móvil y Escritorio) -->
+        <aside class="sidebar-tablet w-full lg:w-72 flex-shrink-0 sticky top-[84px] sm:top-[88px] z-40 lg:top-24 transition-all duration-300">
+            <div class="bg-dark-100/95 backdrop-blur-xl p-3 sm:p-4 lg:p-6 rounded-2xl border border-white/10 shadow-2xl transition-all duration-300">
                 <!-- Barra Superior Compacta (Búsqueda + Botón Filtros en Celulares y Tablets) -->
                 <div class="flex flex-col gap-2.5">
                     <!-- Búsqueda Principal Instantánea -->
@@ -678,7 +678,7 @@
                 </div>
                 
                 <!-- Panel Desplegable de Filtros Específicos (Horizontal Compacto en Móvil) -->
-                <div id="container-filtros" class="hidden mt-3 lg:mt-6 pt-3 lg:pt-0 border-t border-white/5 lg:border-none">
+                <div id="container-filtros" class="hidden mt-3 lg:mt-6 pt-3 lg:pt-0 border-t border-white/5 lg:border-none max-h-[65vh] overflow-y-auto custom-scrollbar">
                     <div class="grid grid-cols-2 lg:grid-cols-1 gap-2 sm:gap-3 lg:gap-4">
                         <div>
                             <label for="filter-orden" class="block text-[9px] sm:text-xs font-bold text-gray-400 mb-1 uppercase tracking-wider truncate">Ordenar por</label>
@@ -748,8 +748,8 @@
 
         <!-- Contenedor Principal (Grid) -->
         <div class="flex-grow">
-            <!-- Grid de Productos -->
-            <div id="products-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-5 lg:gap-6">
+            <!-- Grid de Productos (2 por fila en Móvil) -->
+            <div id="products-grid" class="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-2.5 sm:gap-5 lg:gap-6">
                 <!-- Skeletons se inyectan dinámicamente -->
             </div>
             
@@ -2639,7 +2639,7 @@
     </div>
 
     <!-- Vista Pantalla Completa: Inventario Local 419 -->
-    <div id="local419-inventario-modal" class="fixed inset-0 z-[200] flex flex-col hidden bg-[#0c0c0e] text-white w-screen h-screen overflow-hidden transition-all duration-300 opacity-0">
+    <div id="local419-inventario-modal" class="fixed inset-0 z-[200] flex flex-col hidden bg-[#0c0c0e] text-white h-[100dvh] overflow-hidden transition-opacity duration-300 opacity-0">
         <!-- Header de Pantalla Completa con Menú Integrado para Local 419 -->
         <header class="bg-[#141417] border-b border-amber-500/20 px-4 sm:px-8 py-3 flex flex-wrap items-center justify-between gap-4 flex-shrink-0 shadow-lg z-20">
             <div class="flex items-center gap-4 flex-wrap">
@@ -2696,8 +2696,8 @@
 
         <!-- Contenido Principal Pantalla Completa -->
         <main class="flex-grow max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 flex flex-col overflow-hidden">
-            <!-- Grid de tarjetas de productos Local 419 (Estilo Catálogo) -->
-            <div id="local419-inventario-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6 overflow-y-auto p-1 custom-scrollbar flex-grow pb-16">
+            <!-- Grid de tarjetas de productos Local 419 (2 por fila en Móvil) -->
+            <div id="local419-inventario-grid" class="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-6 overflow-y-auto p-1 custom-scrollbar flex-grow pb-16 [webkit-overflow-scrolling:touch] contain-content">
                 <!-- Inyectado vía JS con diseño de tarjetas exacto al catálogo -->
             </div>
         </main>
@@ -3022,8 +3022,8 @@
                         </button>
                     </div>
 
-                    <!-- Grid de Selección Rápida por Talla -->
-                    <div id="pos419-catalog-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 overflow-y-auto custom-scrollbar p-1 flex-grow">
+                    <!-- Grid de Selección Rápida por Talla (2 por fila en Móvil) -->
+                    <div id="pos419-catalog-grid" class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 overflow-y-auto custom-scrollbar p-1 flex-grow">
                         <!-- Se inyecta dinámicamente -->
                     </div>
                 </div>
@@ -3995,7 +3995,7 @@
     <!-- Configuración Global API -->
     <script src="./js/config.js?v=10.6.0"></script>
     <!-- Módulo Principal JS -->
-    <script src="./js/app2.js?v=26.18.0"></script>
+    <script src="./js/app2.js?v=26.21.0"></script>
 </body>
 </html>
 

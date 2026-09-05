@@ -88,7 +88,7 @@
         </aside>
 
         <!-- Barra de Búsqueda Móvil y Toggle Filtros -->
-        <div class="sm:hidden p-4 bg-white border-b border-gray-200 sticky top-16 z-30 shadow-sm">
+        <div class="sm:hidden p-4 bg-white border-b border-gray-200 sticky top-16 z-40 shadow-sm">
             <div class="flex gap-2">
                 <input type="text" id="mobile-search-input" placeholder="Buscar jersey..." class="flex-grow bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-navy-500 text-gray-800 placeholder-gray-400 transition-colors">
                 <button id="btn-toggle-filters" class="px-4 py-2.5 bg-gray-100 border border-gray-200 rounded-lg text-gray-600 hover:text-navy-600 hover:bg-gray-200 transition-colors flex items-center justify-center">
@@ -125,8 +125,8 @@
                 </div>
             </div>
 
-            <!-- Grid de Productos -->
-            <div id="products-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-5 lg:gap-6">
+            <!-- Grid de Productos (2 por fila en Móvil) -->
+            <div id="products-grid" class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-2.5 sm:gap-5 lg:gap-6">
                 <!-- Se inyectan productos con JS -->
             </div>
 
